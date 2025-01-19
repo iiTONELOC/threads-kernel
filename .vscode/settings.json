@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "schedulerconstants.h": "c",
+        "processes.h": "c",
+        "processlist.h": "c"
+    }
+}

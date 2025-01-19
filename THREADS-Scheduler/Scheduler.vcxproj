@@ -38,8 +38,12 @@
     <ClInclude Include="Include\Scheduler.h" />
     <ClInclude Include="Include\THREADSLib.h" />
     <ClInclude Include="Processes.h" />
+    <ClInclude Include="ProcessList.h" />
+    <ClInclude Include="SchedulerConstants.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Processes.c" />
+    <ClCompile Include="ProcessList.c" />
     <ClCompile Include="Scheduler.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
