@@ -1,4 +1,7 @@
 #pragma once
+#ifndef SCHEDULER_CONSTANTS_H
+#define SCHEDULER_CONSTANTS_H
+
 #define LOWEST_PRIORITY 0  // Lowest priority level - where watchdog runs
 #define HIGHEST_PRIORITY 5 // Highest priority level - where the scheduler runs
 
@@ -22,7 +25,15 @@
 #define READY 0
 #define RUNNING 1
 #define BLOCKED 2
+#define QUIT 3
 
 #ifndef NULL
 #define NULL ((void *)0)
+#endif
+
+/* Time Slice */
+#define MIN_TIME_SLICE_MS 20
+#define MAX_TIME_SLICE_MS 50
+#define DEFAULT_TIME_SLICE_MS 20
+
 #endif

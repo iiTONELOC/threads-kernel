@@ -2,6 +2,7 @@
     "files.associations": {
         "schedulerconstants.h": "c",
         "processes.h": "c",
-        "processlist.h": "c"
+        "processlist.h": "c",
+        "threadslib.h": "c"
     }
 }
