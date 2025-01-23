@@ -197,6 +197,10 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     insertIntoProcessTable(pNewProc, &processTable, &runningProcess, proc_slot);
     insertIntoProcessList(pNewProc, &processStatusList, READY, priority);
 
+    console_output(debugFlag, "Process %s has been added to the ready list\n", processTable[proc_slot].name);
+    // show ready list
+    console_output(debugFlag, "Ready List - First Ready Process: %s\n", processStatusList[READY].name);
+
     return pNewProc->pid;
 
 } /* spawn */
@@ -544,7 +548,7 @@ void dispatcher()
 
     // remove the process that is at the head of the ready list, with the highest priority
     // The lists are ordered by priority, and are sorted on insertion
-    nextProcess = &processStatusList[READY];
+    nextProcess = &processStatusList;
     runningProcess = nextProcess;
 
     // if there is no process to run, then some error has occurred
@@ -556,7 +560,7 @@ void dispatcher()
     else
     {
         // This process needs to be removed from the ready list and added to the running list[sets its status to running]
-        removeFromProcessList(nextProcess, &processStatusList[READY]);
+        removeFromProcessList(nextProcess, &processStatusList);
         insertIntoProcessList(nextProcess, &processStatusList, RUNNING, nextProcess->priority);
 
         // check if the process has a start time, if not set it

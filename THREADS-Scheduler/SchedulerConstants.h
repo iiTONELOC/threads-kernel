@@ -22,10 +22,16 @@
 #define SIG_TERM 15
 
 /* Process status */
+#define NUM_PROCESS_STATES 4
 #define READY 0
 #define RUNNING 1
 #define BLOCKED 2
 #define QUIT 3
+
+/* Max Processes*/
+#ifndef MAX_PROCESSES
+#define MAX_PROCESSES 50
+#endif
 
 #ifndef NULL
 #define NULL ((void *)0)

@@ -2,6 +2,11 @@
 #include "Processes.h"
 #endif
 
+/*_______________________Global Variables_______________________*/
+
+static Process processTable[MAX_PROCESSES];           // storage table for all processes
+static Process processStatusList[NUM_PROCESS_STATES]; // process state list for ready, running, blocked, quit
+
 /*_______________________Function  Definitions_______________________*/
 
 /**
@@ -309,29 +314,38 @@ void insertIntoProcessList(Process *newProcessNodePtr,
                            int withPriority)
 {
     Process *previousProcessPtr = NULL;
-    Process *usingProcessListHeadPtr = &usingStatusListPtr[withStatus];
+    Process *currentProcessPtr = &usingStatusListPtr[withStatus];
 
-    // loop over the list to find the correct position to insert the new process
-    // based on the priority (larger priorities at the beginning)
-    while (usingProcessListHeadPtr != NULL && usingProcessListHeadPtr->priority > withPriority)
+    // debug this process
+    console_output(1, "Inserting Process %s into the %s list\n",
+                   newProcessNodePtr->name, usingStatusListPtr[withStatus].name);
+
+    // TODO: FIX THIS BROKEN AZZ CHIT - IF an entry is in the list its overwriting it
+    //  rather than adding it to the end
+
+    //  loop over the list to find the correct position to insert the new process
+    //  based on the priority (larger priorities at the beginning)
+    while (currentProcessPtr != NULL && currentProcessPtr->priority > withPriority)
     {
-        previousProcessPtr = usingProcessListHeadPtr;
-        usingProcessListHeadPtr = usingProcessListHeadPtr->nextProcessPtr[withStatus];
+        previousProcessPtr = currentProcessPtr;
+        currentProcessPtr = currentProcessPtr->nextProcessPtr[withStatus];
     }
 
     // if the previous process is NULL then the new process is the head
     if (previousProcessPtr == NULL)
     {
-        *usingProcessListHeadPtr = *newProcessNodePtr;
+        usingStatusListPtr[withStatus] = *newProcessNodePtr;
     }
     else
     {
         // insert the new process between the previous and current process
         previousProcessPtr->nextProcessPtr[withStatus] = newProcessNodePtr;
+        // update the next pointer of the new process to the current process
+        newProcessNodePtr->nextProcessPtr[withStatus] = currentProcessPtr;
     }
 
     // set the next pointer of the new node to the current node
-    newProcessNodePtr->nextProcessPtr[withStatus] = usingProcessListHeadPtr;
+    newProcessNodePtr->nextProcessPtr[withStatus] = currentProcessPtr;
 
     // set the status of the new process if it is different from the current status
     if (newProcessNodePtr->status != withStatus)
@@ -343,13 +357,6 @@ void insertIntoProcessList(Process *newProcessNodePtr,
     if (newProcessNodePtr->priority != withPriority)
     {
         newProcessNodePtr->priority = withPriority;
-    }
-
-    // attach the processList information to the new process
-    // Maybe this isn't necessary? but ensures a single source of truth
-    for (int i = 0; i < 4; i++)
-    {
-        newProcessNodePtr->nextProcessPtr[i] = &usingStatusListPtr[i];
     }
 }
 

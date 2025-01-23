@@ -37,6 +37,11 @@ typedef struct _process
 	unsigned short demotionCount;	 /* Number of times the process has been punished */
 } Process;
 
+/*_______________________Global Variables_______________________*/
+
+static Process processTable[MAX_PROCESSES];			  // storage table for all processes
+static Process processStatusList[NUM_PROCESS_STATES]; // process state list for ready, running, blocked, quit
+
 /*_______________________Function Prototypes_______________________*/
 // PROCESS TABLE FUNCTIONS - Storage for all processes Array of Processes
 void initializeProcessTable(Process *usingTablePtr);
@@ -61,10 +66,10 @@ void configureProcessForTable(Process *newProcessPtr, int pid, int tblIndex,
 void initializeProcessList(Process **usingProcessListPtr);
 
 void insertIntoProcessList(Process *newProcessNodePtr,
-						   Process *usingStatusListPtr,
+						   Process **usingStatusListPtr,
 						   int withStatus,
 						   int withPriority);
 
-void removeFromProcessList(Process *processNodePtr, Process **usingProcessListHeadPtr);
+void removeFromProcessList(Process *processNodePtr, Process *usingProcessListHeadPtr);
 
 #endif
