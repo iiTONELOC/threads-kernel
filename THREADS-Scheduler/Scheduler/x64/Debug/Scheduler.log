@@ -1,0 +1,25 @@
+﻿  Processes.c
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(19,26): warning C4047: '=': 'short' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(21,29): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(22,29): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(23,30): warning C4047: '=': 'unsigned long' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(24,30): warning C4047: '=': 'char' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(27,31): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(28,31): warning C4047: '=': 'unsigned __int64' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(29,31): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(30,32): warning C4047: '=': 'unsigned __int64' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(31,32): warning C4047: '=': 'unsigned long' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(32,32): warning C4047: '=': 'unsigned int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(33,32): warning C4047: '=': 'unsigned int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(36,33): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(37,34): warning C4047: '=': 'unsigned __int64' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(38,35): warning C4047: '=': 'char' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(39,35): warning C4047: '=': 'unsigned __int64' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(40,36): warning C4047: '=': 'unsigned short' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(79,40): warning C4047: '==': 'int' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(195,9): warning C4013: 'console_output' undefined; assuming extern returning int
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(251,31): warning C4047: '=': 'char' differs in levels of indirection from 'void *'
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(252,5): warning C4013: 'strcpy' undefined; assuming extern returning int
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(312,37): warning C4028: formal parameter 2 different from declaration
+C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\Processes.c(408,29): warning C4047: '=': 'int' differs in levels of indirection from 'void *'
+  Scheduler.vcxproj -> C:\Users\Atrop\Desktop\threads-kernel\THREADS-Scheduler\InternalLib\Scheduler.lib
