@@ -1,6 +1,7 @@
 # Prerequisites
 *.d
-
+.vs
+.vscode
 # Object files
 *.o
 *.ko
