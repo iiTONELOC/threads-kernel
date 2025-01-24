@@ -42,7 +42,7 @@ typedef struct _linkedListNode
 
 typedef struct _linkedList
 {
-    int count;
+    size_t count;
     // int offset;
     void *pHead;
     void *pTail;
@@ -64,6 +64,13 @@ typedef struct _linkedList
  *        first node. This is similar to the strcmp function for strings.
  */
 void InitializeList(LinkedList *pList, /*int offset,*/ int (*OrderFunction)(void *pNode1, void *pNode2));
+
+/**
+ * @brief Initializes a node to NULL values.
+ *
+ * @param pNode Pointer to the LinkedListNode structure to be initialized.
+ */
+void InitializeNode(LinkedListNode *pNode);
 
 /**
  * @brief Inserts a node into a linked list.

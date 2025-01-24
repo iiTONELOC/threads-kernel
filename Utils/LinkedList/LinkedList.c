@@ -30,6 +30,18 @@ void InitializeList(LinkedList *pList, /*int offset,*/ int (*OrderFunction)(void
     pList->OrderFunction = OrderFunction;
 }
 
+void InitializeNode(LinkedListNode *pNode)
+{
+    if (pNode == NULL)
+    {
+        return;
+    }
+
+    pNode->pNext = NULL;
+    pNode->pPrev = NULL;
+    pNode->pData = NULL;
+}
+
 void InsertNode(LinkedList *pList, void *pNode)
 {
 

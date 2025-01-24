@@ -12,4 +12,3 @@ gcc -Wall -c .\LinkedListsTest.c -o .\out\LinkedListsTest.o
 
 # Link the object files to create the final executable
 gcc .\out\LinkedList.o .\out\LinkedListsTest.o -o .\out\LinkedListsTest.exe
-

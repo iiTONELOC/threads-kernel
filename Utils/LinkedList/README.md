@@ -12,9 +12,9 @@
     +-----------------------------------+
     |            LinkedList             |
     +-----------------------------------+
-    | count         |        int        |
+    | count         |       size_t      |
     | pHead         |     (Pointer)     |
-    | pTail         |    (Pointer)      |
+    | pTail         |     (Pointer)     |
     | OrderFunction |   Function Ptr    |
     +-----------------------------------+
 
@@ -34,23 +34,47 @@ The code is adapted from Professor Duren's skeleton and Anthony Tropeano's doubl
 - [LinkedList.c](#linkedlistc)
   - [Overview](#overview)
   - [Table of Contents](#table-of-contents)
+  - [Structures](#structures)
   - [Function Definitions](#function-definitions)
     - [1. `InitializeList`](#1-initializelist)
       - [Description:](#description)
       - [Parameters:](#parameters)
-    - [2. `InsertNode`](#2-insertnode)
+    - [2. `InitializeNode`](#2-initializenode)
       - [Description:](#description-1)
       - [Parameters:](#parameters-1)
       - [Behavior:](#behavior)
-    - [3. `RemoveNode`](#3-removenode)
+    - [2. `InsertNode`](#2-insertnode)
       - [Description:](#description-2)
       - [Parameters:](#parameters-2)
       - [Behavior:](#behavior-1)
-    - [4. `PrintList`](#4-printlist)
+    - [3. `RemoveNode`](#3-removenode)
       - [Description:](#description-3)
       - [Parameters:](#parameters-3)
       - [Behavior:](#behavior-2)
+    - [4. `PrintList`](#4-printlist)
+      - [Description:](#description-4)
+      - [Parameters:](#parameters-4)
+      - [Behavior:](#behavior-3)
   - [Building the Tests](#building-the-tests)
+
+## Structures
+
+```c
+typedef struct _linkedListNode
+{
+    void *pNext;
+    void *pPrev;
+    void *pData;
+} LinkedListNode;
+
+typedef struct _linkedList
+{
+    size_t count;
+    void *pHead;
+    void *pTail;
+    int (*OrderFunction)(void *pNode1, void *pNode2);
+} LinkedList;
+```
 
 ## Function Definitions
 
@@ -68,6 +92,25 @@ This function initializes a doubly linked list by setting its count to 0, and bo
 
 - `pList` _(LinkedList *)_: Pointer to the linked list to be initialized.
 - `OrderFunction` _(int (*)(void *, void *))_: A function pointer that defines the ordering of nodes in the list. If `NULL`, nodes will be inserted at the end of the list.
+
+### 2. `InitializeNode`
+
+```c
+void InitializeNode(LinkedListNode *pNode)
+```
+
+#### Description:
+
+This function initializes a single node to all NULL values
+
+#### Parameters:
+
+- `pList` _(LinkedListNode *)_: Pointer to the linked list node to initialize.
+
+#### Behavior:
+
+- Returns NULL if given a NULL pointer
+
 
 ### 2. `InsertNode`
 
