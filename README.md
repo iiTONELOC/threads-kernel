@@ -27,3 +27,4 @@ Our task was to implement a kernel using the C programming language from the gro
 | Name | College | Program | Contact |
 | --- | --- | --- | --- |
 | Anthony Tropeano | [**College of Applied Science and Technology**](https://azcast.arizona.edu/) | [*Cyber Operations/Cyber Engineering*](https://azcast.arizona.edu/academics/cyber-operations/cyber-engineering) | [**GitHub**](https://github.com/iiTONELOC) <br> [**Email**](mailto:atropeano@arizona.edu) |
+| Connor Stackhouse | [**College of Applied Science and Technology**](https://azcast.arizona.edu/) | [*Cyber Operations/Cyber Engineering*](https://azcast.arizona.edu/academics/cyber-operations/cyber-engineering) | [**GitHub**](https://github.com/con-stackhouse) <br> [**Email**](mailto:cstackhouse@arizona.edu) |

@@ -35,11 +35,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Utils\LinkedListArray\LinkedListArray.h" />
+    <ClInclude Include="..\Utils\LinkedList\LinkedList.h" />
+    <ClInclude Include="Include\Constants.h" />
     <ClInclude Include="Include\Scheduler.h" />
     <ClInclude Include="Include\THREADSLib.h" />
     <ClInclude Include="Processes.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Utils\LinkedListArray\LinkedListArray.c" />
+    <ClCompile Include="..\Utils\LinkedListArray\LinkedListArrayTests.c" />
+    <ClCompile Include="..\Utils\LinkedList\LinkedList.c" />
+    <ClCompile Include="..\Utils\LinkedList\LinkedListsTest.c" />
+    <ClCompile Include="Process.c" />
     <ClCompile Include="Scheduler.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

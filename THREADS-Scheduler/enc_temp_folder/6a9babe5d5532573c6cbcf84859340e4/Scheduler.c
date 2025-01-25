@@ -147,8 +147,6 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
      * the initial value of the process's program counter (PC)
      */
     pNewProc->context = context_initialize(launch, stacksize, arg);
-    
-    // call dispatcher
 
     return pNewProc->pid;
 

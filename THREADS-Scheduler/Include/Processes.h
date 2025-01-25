@@ -1,5 +1,16 @@
 #pragma once
+#ifndef PROCESSES_H
+#define PROCESSES_H
 
+#ifndef IMPORT_STDLIB
+#define IMPORT_STDLIB
+#include <stdlib.h>
+#endif
+
+#ifndef SCHEDULER_CONSTANTS_H
+#include "Constants.h"
+#endif
+/*_______________________Structures _______________________*/
 typedef struct _process
 {
 	struct _process *nextReadyProcess;
@@ -18,4 +29,17 @@ typedef struct _process
 	unsigned int stacksize;
 	int status; /* READY, QUIT, BLOCKED, etc. */
 
+	unsigned int quantum;
+	unsigned int startTime;
+	unsigned int elapsedTime;
+	unsigned long long cpuTime;
+
 } Process;
+
+/*_______________________Function Prototypes_______________________*/
+
+void InitializeProcessToNull(Process *usingProcessPtr);
+int GetEmptyControlBlockIndex(Process *fromProcessTablePtr);
+void InitializeProcessTable(Process *usingTablePtr, size_t size);
+
+#endif

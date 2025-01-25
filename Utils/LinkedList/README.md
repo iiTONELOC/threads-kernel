@@ -92,6 +92,8 @@ This function initializes a doubly linked list by setting its count to 0, and bo
 
 - `pList` _(LinkedList *)_: Pointer to the linked list to be initialized.
 - `OrderFunction` _(int (*)(void *, void *))_: A function pointer that defines the ordering of nodes in the list. If `NULL`, nodes will be inserted at the end of the list.
+  
+---
 
 ### 2. `InitializeNode`
 
@@ -111,6 +113,7 @@ This function initializes a single node to all NULL values
 
 - Returns NULL if given a NULL pointer
 
+---
 
 ### 2. `InsertNode`
 
@@ -132,6 +135,8 @@ This function inserts a node into the linked list. It places the new node in its
 - If the list is empty, the node becomes both the head and the tail.
 - If the `OrderFunction` is provided, the function will compare the node with the existing nodes to insert it in the correct position.
 - If no order function is provided, the node will be added to the end of the list.
+
+--- 
 
 ### 3. `RemoveNode`
 
@@ -155,6 +160,8 @@ This function removes a node from the linked list. It correctly updates the list
 - If the node is somewhere in between, the previous and next pointers of the neighboring nodes are updated to remove the node.
 - If the list becomes empty after the removal, both the head and tail pointers are set to `NULL`.
 
+---
+
 ### 4. `PrintList`
 
 ```c
@@ -173,6 +180,8 @@ This function prints the contents of the linked list to the standard output. For
 
 - It starts at the head of the list and traverses through each node, printing the information for each one.
 - The loop continues until it reaches the end of the list (when the current node is `NULL`).
+
+---
 
 ## Building the Tests
 
