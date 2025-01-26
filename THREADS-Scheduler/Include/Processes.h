@@ -10,14 +10,18 @@
 #ifndef SCHEDULER_CONSTANTS_H
 #include "Constants.h"
 #endif
+
+#ifndef LINKEDLIST_H
+#include "LinkedList.h"
+#endif
+
 /*_______________________Structures _______________________*/
 typedef struct _process
 {
-	struct _process *nextReadyProcess;
-	struct _process *nextSiblingProcess;
 
-	struct _process *pParent;
-	struct _process *pChildren;
+	struct LinkedList *pChildren;
+	struct LinkedListNode *pParent;
+	struct LinkedListNode *nextReadyProcess;
 
 	char name[MAXNAME];		/* Process name */
 	char startArgs[MAXARG]; /* Process arguments */
@@ -28,8 +32,8 @@ typedef struct _process
 	char *stack;
 	unsigned int stacksize;
 	int status; /* READY, QUIT, BLOCKED, etc. */
-
 	unsigned int quantum;
+	int processTableIndex;
 	unsigned int startTime;
 	unsigned int elapsedTime;
 	unsigned long long cpuTime;

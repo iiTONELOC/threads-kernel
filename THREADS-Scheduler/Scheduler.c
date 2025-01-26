@@ -8,21 +8,24 @@
 #include "LinkedList.h"
 #include "LinkedListArray.h"
 
-int nextPid = 1;
+int nextPid = 0;
 int debugFlag = 1;
 int inBootStrap = 0;
-Process *runningProcess = NULL;                    // tracks current running process
-Process processTable[MAX_PROCESSES];               // master table of processes
-interrupt_handler_t *interruptHandlers = NULL;     // interrupt handlers from THREADS API
-LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
-LinkedList processTableStateList = {0, NULL, NULL, NULL};
-LinkedListArray processTableStateListArray = {NULL, &processTableStateList, &procTableListBucket[0]}; // Process state linked list
+Process *runningProcess = NULL;                          // tracks current running process
+Process processTable[MAX_PROCESSES];                     // master table of processes
+interrupt_handler_t *interruptHandlers = NULL;           // interrupt handlers from THREADS API
+LinkedListNode procTableListBucket[MAX_PROCESSES];       // Storage for process state linked list
+LinkedList priorityListQueue[NUM_PROCESS_STATES];        // Priority list queue for process states
+LinkedList processTableNodeList = {0, NULL, NULL, NULL}; // Process linked list nodes linked list
+LinkedListArray processTableNodeListArray = {NULL, &processTableNodeList,
+                                             &procTableListBucket[0]}; // Process linked list nodes linked list
 
 void time_slice();
 void dispatcher();
 static int launch(void *);
 static int watchdog(char *);
 static void check_deadlock();
+static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
 int OrderFunction(void *pNode1, void *pNode2);
@@ -77,20 +80,19 @@ int bootstrap(void *pArgs)
                    "init(): Process table initialized with %d entries\n", MAX_PROCESSES);
 
     /* Initialize the Ready list, etc. */
-    InitializeLinkedListArray(&processTableStateListArray,
-                              &processTableStateList,
+    InitializeLinkedListArray(&processTableNodeListArray,
+                              &processTableNodeList,
                               &procTableListBucket[0],
                               MAX_PROCESSES,
                               OrderFunction);
     console_output(debugFlag,
-                   "init(): Process table initialized with %p entries\n", processTableStateListArray);
+                   "init(): Process table initialized with %p entries\n", processTableNodeListArray);
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
     interruptHandlers[THREADS_TIMER_INTERRUPT] = &clockInterruptHandler;
 
     /* startup a watchdog process */
-
     result = k_spawn("watchdog", watchdog, NULL, THREADS_MIN_STACK_SIZE, LOWEST_PRIORITY);
     if (result < 0)
     {
@@ -108,10 +110,10 @@ int bootstrap(void *pArgs)
         stop(1);
     }
 
-    /* Initialized and ready to go!! */
+    ///* Initialized and ready to go!! */
     inBootStrap = 0;
     /* This should never return since we are not a real process. */
-
+    dispatcher();
     stop(-3);
     return 0;
 }
@@ -135,13 +137,14 @@ int bootstrap(void *pArgs)
 int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
 {
     int proc_slot;
+    struct _linkedListNode *pLLNode;
     struct _process *pNewProc;
 
     DebugConsole("spawn(): creating process %s\n", name);
 
     disableInterrupts();
 
-    /* Validate all of the parameters, starting with the name. */
+    /*Validate all of the parameters, starting with the name. */
     if (name == NULL)
     {
         console_output(debugFlag, "spawn(): Name value is NULL.\n");
@@ -153,27 +156,78 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         stop(1);
     }
 
+    if (!arg == NULL && strlen(arg) >= (MAXARG - 1))
+    {
+        console_output(debugFlag, "spawn(): Process arg is too long.  Halting...\n");
+        stop(1);
+    }
+
+    if (entryPoint == NULL)
+    {
+        console_output(debugFlag, "spawn(): entryPoint is NULL.\n");
+        return -1;
+    }
+
+    if (stacksize < THREADS_MIN_STACK_SIZE)
+    {
+        console_output(debugFlag, "spawn(): Stack size is too small.\n");
+        return -2;
+    }
+
+    if (priority < LOWEST_PRIORITY || priority > HIGHEST_PRIORITY)
+    {
+        console_output(debugFlag, "spawn(): Priority is out of range.\n");
+        return -3;
+    }
+
     /* Find an empty slot in the process table */
 
-    proc_slot = 1; // just use 1 for now!
+    proc_slot = GetEmptyControlBlockIndex(&processTable[0]);
+
     pNewProc = &processTable[proc_slot];
 
     /* Setup the entry in the process table. */
-    strcpy(pNewProc->name, name);
+    pNewProc->pid = nextPid;                   // set process id
+    pNewProc->startTime = 0;                   // set the start time to an initial value
+    pNewProc->cpuTime = 0;                     // set the cpu time to an initial value
+    pNewProc->status = READY;                  // set the status to ready
+    pNewProc->elapsedTime = 0;                 // set the elapsed time to an initial value
+    *pNewProc->startArgs = arg;                // set process arguments
+    strcpy(pNewProc->name, name);              // set process name
+    pNewProc->priority = priority;             // set process priority
+    pNewProc->stacksize = stacksize;           // set process stack size
+    pNewProc->entryPoint = entryPoint;         // set process entry point
+    pNewProc->processTableIndex = proc_slot;   // set the table index
+    pNewProc->quantum = DEFAULT_TIME_SLICE_MS; // set the time slice
+
+    // add the process to the process table state linked list
+    InsertDataIntoLinkedListArray(&processTableNodeListArray, pNewProc);
 
     /* If there is a parent process,add this to the list of children. */
     if (runningProcess != NULL)
     {
+        // Linked List Node to the Current Running Process from
+        // node storage - AKA THE PARENT
+        pLLNode = &procTableListBucket[runningProcess->processTableIndex];
+        // Add the child to the parent's linked list of children
+        InsertNode(((LinkedListNode *)pLLNode)->pData, &procTableListBucket[proc_slot]);
+        // add the parent link list node to the child process' pParent
+        pNewProc->pParent = pLLNode;
     }
 
     /* Add the process to the ready list. */
+    InsertNode(&priorityListQueue[READY], &procTableListBucket[proc_slot]);
 
     /* Initialize context for this process, but use launch function pointer for
      * the initial value of the process's program counter (PC)
      */
     pNewProc->context = context_initialize(launch, stacksize, arg);
 
-    // call dispatcher
+    if (!inBootStrap)
+    {
+        // call dispatcher
+        dispatcher();
+    }
 
     return pNewProc->pid;
 
@@ -195,6 +249,7 @@ static int launch(void *args)
     DebugConsole("launch(): started: %s\n", runningProcess->name);
 
     /* Enable interrupts */
+    enableInterrupts();
 
     /* Call the function passed to spawn and capture its return value */
     DebugConsole("Process %d returned to launch\n", runningProcess->pid);
@@ -324,11 +379,56 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-    Process *nextProcess = NULL;
+    disableInterrupts();
+    LinkedListNode *pNextLNode = NULL;
+    Process *pCurrentProc = NULL;
 
-    /* IMPORTANT: context switch enables interrupts. */
-    context_switch(nextProcess->context);
+    // if  there is a running process we need to check to see if it has
+    // exceeded its quantum
+
+    if (runningProcess != NULL && runningProcess->quantum < MIN_TIME_SLICE_MS)
+    {
+
+        enableInterrupts();
+        return;
+    }
+
+    if (runningProcess != NULL)
+    {
+        // change the running process to READY
+        runningProcess->status = READY;
+        // access the linked list node for the current process
+        pNextLNode = priorityListQueue[RUNNING].pHead;
+
+        // removes the currently running process and adds it to the end of the READY list
+        // in a sorted manner
+        RemoveNode(&priorityListQueue[RUNNING], pNextLNode);
+        InsertNode(&priorityListQueue[READY], pNextLNode);
+    }
+
+    // go to the READY list, and grab the head, which is the next process to run
+    pNextLNode = priorityListQueue[READY].pHead;
+
+    if (pNextLNode == NULL)
+    {
+        watchdog(NULL);
+    }
+
+    // set the next process to run to RUNNING
+    pCurrentProc = ((Process *)pNextLNode->pData);
+    pCurrentProc->status = RUNNING;
+
+    // remove the pCurrentProc from the READY list
+    RemoveNode(&priorityListQueue[READY], pNextLNode);
+    InsertNode(&priorityListQueue[RUNNING], pNextLNode);
+
+    // set the running process to the current process
+    runningProcess = pCurrentProc;
+
+    context_switch(pCurrentProc->context);
 }
+
+// /* IMPORTANT: context switch enables interrupts. */
 
 /**************************************************************************
    Name - watchdog
@@ -371,6 +471,21 @@ static inline void disableInterrupts()
     set_psr(psr);
 
 } /* disableInterrupts */
+
+/*
+ * Enables the interrupts.
+ */
+static inline void enableInterrupts()
+{
+
+    int psr = get_psr();
+
+    psr = psr | PSR_INTERRUPTS;
+
+    set_psr(psr);
+
+} /*
+
 
 /**************************************************************************
    Name - DebugConsole

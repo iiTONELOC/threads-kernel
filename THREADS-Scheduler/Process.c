@@ -27,7 +27,7 @@ void InitializeProcessToNull(Process *usingProcessPtr)
     usingProcessPtr->elapsedTime = NULL;
     usingProcessPtr->startArgs[0] = NULL;
     usingProcessPtr->nextReadyProcess = NULL;
-    usingProcessPtr->nextSiblingProcess = NULL;
+    usingProcessPtr->processTableIndex = NULL;
 }
 
 /**
