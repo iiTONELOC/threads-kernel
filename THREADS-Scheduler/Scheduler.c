@@ -5,14 +5,18 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
+#include "LinkedList.h"
+#include "LinkedListArray.h"
 
 int nextPid = 1;
 int debugFlag = 1;
 int inBootStrap = 0;
-
-Process *runningProcess = NULL;
-Process processTable[MAX_PROCESSES];
-interrupt_handler_t *interruptHandlers = NULL;
+Process *runningProcess = NULL;                    // tracks current running process
+Process processTable[MAX_PROCESSES];               // master table of processes
+interrupt_handler_t *interruptHandlers = NULL;     // interrupt handlers from THREADS API
+LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
+LinkedList processTableStateList = {0, NULL, NULL, NULL};
+LinkedListArray processTableStateListArray = {NULL, &processTableStateList, &procTableListBucket[0]}; // Process state linked list
 
 void time_slice();
 void dispatcher();
@@ -21,6 +25,7 @@ static int watchdog(char *);
 static void check_deadlock();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
+int OrderFunction(void *pNode1, void *pNode2);
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
 
 /* DO NOT REMOVE */
@@ -52,26 +57,45 @@ extern int SchedulerEntryPoint(void *pArgs);
  *************************************************************************/
 int bootstrap(void *pArgs)
 {
+
     int result; /* value returned by call to spawn() */
+
+    /*
+        set the inBootStrap flag to true - this will ensure the dispatcher does
+        not run until the system is ready to go. This is important since
+        k_spawn() will call the dispatcher after the context for the process is
+        initialized.
+    */
+    inBootStrap = 1;
 
     /* set this to the scheduler version of this function.*/
     check_io = check_io_scheduler;
 
     /* Initialize the process table. */
     InitializeProcessTable(processTable, MAX_PROCESSES);
-    console_output(debugFlag, "init(): Process table initialized with %d entries\n", MAX_PROCESSES);
+    console_output(debugFlag,
+                   "init(): Process table initialized with %d entries\n", MAX_PROCESSES);
 
     /* Initialize the Ready list, etc. */
+    InitializeLinkedListArray(&processTableStateListArray,
+                              &processTableStateList,
+                              &procTableListBucket[0],
+                              MAX_PROCESSES,
+                              OrderFunction);
+    console_output(debugFlag,
+                   "init(): Process table initialized with %p entries\n", processTableStateListArray);
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
     interruptHandlers[THREADS_TIMER_INTERRUPT] = &clockInterruptHandler;
 
     /* startup a watchdog process */
+
     result = k_spawn("watchdog", watchdog, NULL, THREADS_MIN_STACK_SIZE, LOWEST_PRIORITY);
     if (result < 0)
     {
-        console_output(debugFlag, "Scheduler(): spawn for watchdog returned an error (%d), stopping...\n", result);
+        console_output(debugFlag,
+                       "Scheduler(): spawn for watchdog returned an error (%d), stopping...\n", result);
         stop(1);
     }
 
@@ -79,12 +103,13 @@ int bootstrap(void *pArgs)
     result = k_spawn("Scheduler", SchedulerEntryPoint, NULL, 2 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
     if (result < 0)
     {
-        console_output(debugFlag, "Scheduler(): spawn for SchedulerEntryPoint returned an error (%d), stopping...\n", result);
+        console_output(debugFlag,
+                       "Scheduler(): spawn for SchedulerEntryPoint returned an error (%d), stopping...\n", result);
         stop(1);
     }
 
     /* Initialized and ready to go!! */
-
+    inBootStrap = 0;
     /* This should never return since we are not a real process. */
 
     stop(-3);
@@ -147,7 +172,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
      * the initial value of the process's program counter (PC)
      */
     pNewProc->context = context_initialize(launch, stacksize, arg);
-    
+
     // call dispatcher
 
     return pNewProc->pid;
@@ -436,4 +461,23 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
+}
+
+/**
+ * @brief Order function for the test data.
+ *
+ * @param pNode1 The first process to compare.
+ * @param pNode2 The second process to compare.
+ *
+ * @return The difference between the two priorites.
+ */
+int OrderFunction(void *pNode1, void *pNode2)
+{
+    Process *process1 = (Process *)((LinkedListNode *)pNode1)->pData;
+    Process *process2 = (Process *)((LinkedListNode *)pNode2)->pData;
+
+    // descending order, the linked list test runs ascending order
+    // so here we cover both bases as this function is passed to the
+    // linked list's initialization function
+    return process2->priority - process1->priority;
 }
