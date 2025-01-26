@@ -8,17 +8,23 @@
 #include "LinkedList.h"
 #include "LinkedListArray.h"
 
-int nextPid = 0;
-int debugFlag = 1;
-int inBootStrap = 0;
-Process *runningProcess = NULL;                          // tracks current running process
-Process processTable[MAX_PROCESSES];                     // master table of processes
-interrupt_handler_t *interruptHandlers = NULL;           // interrupt handlers from THREADS API
-LinkedListNode procTableListBucket[MAX_PROCESSES];       // Storage for process state linked list
-LinkedList priorityListQueue[NUM_PROCESS_STATES];        // Priority list queue for process states
-LinkedList processTableNodeList = {0, NULL, NULL, NULL}; // Process linked list nodes linked list
-LinkedListArray processTableNodeListArray = {NULL, &processTableNodeList,
-                                             &procTableListBucket[0]}; // Process linked list nodes linked list
+int nextPid = 0;                               // next process id
+int debugFlag = 1;                             // debug flag
+int inBootStrap = 0;                           // flag to indicate if the system is in bootstrap
+Process *runningProcess = NULL;                // tra cks current running process
+Process processTable[MAX_PROCESSES];           // process table
+interrupt_handler_t *interruptHandlers = NULL; // interrupt handlers from THREADS API
+
+LinkedList priorityListQueue[NUM_PROCESS_STATES];  // Priority list queue for process states
+LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
+LinkedListArray processStateArray = {NULL,         // Process state linked list array
+                                     &priorityListQueue,
+                                     &procTableListBucket};
+
+// LinkedList processTableNodeList = {0, NULL, NULL, NULL}; // Process linked list nodes linked list
+// LinkedListArray processTable_NodeListArray = {NULL,
+//                                              &processTableNodeList,
+//                                              &procTableListBucket[0]}; // Process linked list nodes linked list
 
 void time_slice();
 void dispatcher();
@@ -75,18 +81,16 @@ int bootstrap(void *pArgs)
     check_io = check_io_scheduler;
 
     /* Initialize the process table. */
-    InitializeProcessTable(processTable, MAX_PROCESSES);
+    InitializeProcessTable(&processTable, MAX_PROCESSES);
     console_output(debugFlag,
                    "init(): Process table initialized with %d entries\n", MAX_PROCESSES);
 
     /* Initialize the Ready list, etc. */
-    InitializeLinkedListArray(&processTableNodeListArray,
-                              &processTableNodeList,
-                              &procTableListBucket[0],
+    InitializeLinkedListArray(&processStateArray,
+                              &priorityListQueue,
+                              &procTableListBucket,
                               MAX_PROCESSES,
                               OrderFunction);
-    console_output(debugFlag,
-                   "init(): Process table initialized with %p entries\n", processTableNodeListArray);
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
@@ -136,13 +140,14 @@ int bootstrap(void *pArgs)
 ************************************************************************ */
 int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
 {
-    int proc_slot;
-    struct _linkedListNode *pLLNode;
-    struct _process *pNewProc;
-
-    DebugConsole("spawn(): creating process %s\n", name);
 
     disableInterrupts();
+    int result = 0;
+    int proc_slot;
+    struct _process *pNewProc;
+    struct _linkedListNode *pLLNode;
+
+    DebugConsole("spawn(): creating process %s\n", name);
 
     /*Validate all of the parameters, starting with the name. */
     if (name == NULL)
@@ -181,15 +186,20 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     }
 
     /* Find an empty slot in the process table */
+    proc_slot = GetEmptyControlBlockIndex(processTable);
 
-    proc_slot = GetEmptyControlBlockIndex(&processTable[0]);
+    if (proc_slot < 0)
+    {
+        console_output(debugFlag, "spawn(): No empty slots in the process table.\n");
+        return -4;
+    }
 
     pNewProc = &processTable[proc_slot];
 
     /* Setup the entry in the process table. */
     pNewProc->pid = nextPid;                   // set process id
-    pNewProc->startTime = 0;                   // set the start time to an initial value
     pNewProc->cpuTime = 0;                     // set the cpu time to an initial value
+    pNewProc->startTime = 0;                   // set the start time to an initial value
     pNewProc->status = READY;                  // set the status to ready
     pNewProc->elapsedTime = 0;                 // set the elapsed time to an initial value
     *pNewProc->startArgs = arg;                // set process arguments
@@ -200,8 +210,14 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     pNewProc->processTableIndex = proc_slot;   // set the table index
     pNewProc->quantum = DEFAULT_TIME_SLICE_MS; // set the time slice
 
-    // add the process to the process table state linked list
-    InsertDataIntoLinkedListArray(&processTableNodeListArray, pNewProc);
+    // add the process to node storage
+    result = InsertDataIntoLinkedListArray(&processStateArray, pNewProc);
+
+    if (result != proc_slot)
+    {
+        console_output(debugFlag, "spawn(): Error: Process Table and linked list node storage is out-of-sync.\n");
+        return -5;
+    }
 
     /* If there is a parent process,add this to the list of children. */
     if (runningProcess != NULL)
@@ -215,19 +231,18 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         pNewProc->pParent = pLLNode;
     }
 
-    /* Add the process to the ready list. */
-    InsertNode(&priorityListQueue[READY], &procTableListBucket[proc_slot]);
-
     /* Initialize context for this process, but use launch function pointer for
      * the initial value of the process's program counter (PC)
      */
     pNewProc->context = context_initialize(launch, stacksize, arg);
 
-    if (!inBootStrap)
-    {
-        // call dispatcher
-        dispatcher();
-    }
+    /* Add the process to the ready list. */
+    /* InsertNode(&priorityListQueue[READY], &procTableListBucket[proc_slot]);*/
+
+    /* Increment the process id for the next process */
+    nextPid++;
+
+    dispatcher();
 
     return pNewProc->pid;
 
@@ -245,13 +260,14 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 *************************************************************************/
 static int launch(void *args)
 {
-
+    int result = 0;
     DebugConsole("launch(): started: %s\n", runningProcess->name);
 
     /* Enable interrupts */
     enableInterrupts();
 
     /* Call the function passed to spawn and capture its return value */
+    result = runningProcess->entryPoint(args);
     DebugConsole("Process %d returned to launch\n", runningProcess->pid);
 
     /* Stop the process gracefully */
@@ -379,9 +395,17 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-    disableInterrupts();
+
     LinkedListNode *pNextLNode = NULL;
     Process *pCurrentProc = NULL;
+
+    // if we are in bootstrap, we need to return
+    if (inBootStrap)
+    {
+        return;
+    }
+
+    disableInterrupts();
 
     // if  there is a running process we need to check to see if it has
     // exceeded its quantum
@@ -428,8 +452,6 @@ void dispatcher()
     context_switch(pCurrentProc->context);
 }
 
-// /* IMPORTANT: context switch enables interrupts. */
-
 /**************************************************************************
    Name - watchdog
 
@@ -444,6 +466,20 @@ void dispatcher()
 static int watchdog(char *dummy)
 {
     DebugConsole("watchdog(): called\n");
+    Process *pNextReadyProc = (Process *)((LinkedListNode *)priorityListQueue[READY].pHead)->pData;
+    if (inBootStrap)
+    {
+        // We are still booting up, so we need to wait for the system to be ready
+        return 0;
+    }
+
+    // if there are no processes and we are not in bootstrap, stop the system
+    if (pNextReadyProc == NULL)
+    {
+        stop(0);
+    }
+
+    // TODO: Implement the watchdog function
     while (1)
     {
         check_deadlock();
@@ -522,10 +558,6 @@ int check_io_scheduler()
  */
 void time_slice()
 {
-    if (inBootStrap)
-    {
-        return;
-    }
 
     static int elapsed = 0;                          // time elapsed since last context switch
     static int lastTime = 0;                         // last time the clock interrupt was called
@@ -558,6 +590,7 @@ void time_slice()
     // check if the elapsed time is greater than the minimum quantum
     if (elapsed >= minQuantumUs)
     {
+        console_output(1, "SWITCHING CONTEXT QUANTUM EXPIRED");
         elapsed = 0;
         dispatcher();
     }

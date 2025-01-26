@@ -43,7 +43,6 @@ typedef struct _linkedListNode
 typedef struct _linkedList
 {
     size_t count;
-    // int offset;
     void *pHead;
     void *pTail;
     int (*OrderFunction)(void *pNode1, void *pNode2);
@@ -63,7 +62,7 @@ typedef struct _linkedList
  *        comes before the second, zero if they are equal, and a positive value if the
  *        first node. This is similar to the strcmp function for strings.
  */
-void InitializeList(LinkedList *pList, /*int offset,*/ int (*OrderFunction)(void *pNode1, void *pNode2));
+void InitializeList(LinkedList *pList, int (*OrderFunction)(void *pNode1, void *pNode2));
 
 /**
  * @brief Initializes a node to NULL values.

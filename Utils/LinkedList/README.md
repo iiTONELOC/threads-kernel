@@ -4,17 +4,17 @@
      +-------------------------+
      |      LinkedListNode     |
      +-------------------------+
-     | pPrev   |   (Pointer)   |
-     | pData   |   (Pointer)   |
-     | pNext   |   (Pointer)   |
+     | pPrev   |   (Void *)    |
+     | pData   |   (Void *)    |
+     | pNext   |   (Void *)    |
      +-------------------------+
      
     +-----------------------------------+
     |            LinkedList             |
     +-----------------------------------+
-    | count         |       size_t      |
-    | pHead         |     (Pointer)     |
-    | pTail         |     (Pointer)     |
+    | count         |      size_t       |
+    | pHead         |     (Void *)      |
+    | pTail         |     (Void *)      |
     | OrderFunction |   Function Ptr    |
     +-----------------------------------+
 
