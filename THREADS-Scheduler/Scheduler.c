@@ -1,12 +1,16 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+// various headers may already import stdio.h, so set the IMPORT_STDIO flag
+#ifndef IMPORT_STDIO
+#define IMPORT_STDIO
 #include <stdio.h>
+#endif
 #include "THREADSLib.h"
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
-#include "LinkedList.h"
-#include "LinkedListArray.h"
+#include "StringUtils.h"
+#include "LinkedListArray.h" // imports LinkedList.h as well
 
 int nextPid = 1;                                   // next process id
 int debugFlag = 1;                                 // debug flag
@@ -25,11 +29,9 @@ void dispatcher();
 static int launch(void *);
 static int watchdog(char *);
 static void check_deadlock();
-void TrimRight(char *string);
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
-void CopyString(char *source, char *destination, size_t size);
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
 
 /* DO NOT REMOVE */
@@ -779,55 +781,4 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
-}
-
-//  TODO: Move to a utility file
-
-/**
- * @brief Trims the right side of a string
- *
- * @param string The string to trim
- */
-void TrimRight(char *string)
-{
-    int i = 0;
-    // while we haven't reached the end of the string
-    while (string[i] != '\0')
-    {
-        // keep going
-        i++;
-    }
-    // end of the string was found
-    i--;
-    // loop backwards until we find a character that is not a space, tab, newline, or carriage return
-    while (string[i] == ' ' || string[i] == '\t' || string[i] == '\n' || string[i] == '\r')
-    {
-        // null terminate the string
-        string[i] = '\0';
-        // move to the next character
-        i--;
-    }
-}
-
-/**
- * @brief Copy a string from source to destination
- *
- * @param source The source string
- * @param destination The destination string
- * @param size The size of the destination string
- */
-void CopyString(char *source, char *destination, size_t size)
-{
-    // size_t is an unsigned long long integer
-    unsigned long long i = 0ULL;
-    // while we haven't reached the end of the string
-    while (source[i] != '\0')
-    {
-        // copy the character
-        destination[i] = source[i];
-        // move to the next character
-        i++;
-    }
-    // null terminate the string
-    destination[i] = '\0';
 }

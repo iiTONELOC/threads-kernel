@@ -15,7 +15,7 @@
  */
 
 #ifndef LINKEDLIST_H
-#include "../LinkedList/LinkedList.h"
+#include "LinkedList.h"
 #endif
 
 #ifndef LINKEDLISTARRAY_H
