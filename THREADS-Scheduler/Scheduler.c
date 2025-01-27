@@ -8,32 +8,28 @@
 #include "LinkedList.h"
 #include "LinkedListArray.h"
 
-int nextPid = 1;                               // next process id
-int debugFlag = 1;                             // debug flag
-int inBootStrap = 0;                           // flag to indicate if the system is in bootstrap
-Process *runningProcess = NULL;                // tra cks current running process
-Process processTable[MAX_PROCESSES];           // process table
-interrupt_handler_t *interruptHandlers = NULL; // interrupt handlers from THREADS API
-
+int nextPid = 1;                                   // next process id
+int debugFlag = 1;                                 // debug flag
+int inBootStrap = 0;                               // flag to indicate if the system is in bootstrap
+Process *runningProcess = NULL;                    // tra cks current running process
+Process processTable[MAX_PROCESSES];               // process table
+interrupt_handler_t *interruptHandlers = NULL;     // interrupt handlers from THREADS API
 LinkedList priorityListQueue[NUM_PROCESS_STATES];  // Priority list queue for process states
 LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
 LinkedListArray processStateArray = {NULL,         // Process state linked list array
                                      &priorityListQueue,
                                      &procTableListBucket};
 
-// LinkedList processTableNodeList = {0, NULL, NULL, NULL}; // Process linked list nodes linked list
-// LinkedListArray processTable_NodeListArray = {NULL,
-//                                              &processTableNodeList,
-//                                              &procTableListBucket[0]}; // Process linked list nodes linked list
-
 void time_slice();
 void dispatcher();
 static int launch(void *);
 static int watchdog(char *);
 static void check_deadlock();
+void TrimRight(char *string);
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
+void CopyString(char *source, char *destination, size_t size);
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
 
 /* DO NOT REMOVE */
@@ -192,8 +188,6 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         return -4;
     }
 
-    // console_output(FALSE, "DEBUG: name = [%s]\n", name ? name : "NULL");
-    // console_output(FALSE, "DEBUG: arg = [%s]\n", arg ? (char *)arg : "NULL");
     // Get the process structure from the process table
     pNewProc = &processTable[proc_slot];
 
@@ -209,24 +203,16 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     pNewProc->entryPoint = entryPoint;         // set process entry point
     pNewProc->processTableIndex = proc_slot;   // set the table index
     pNewProc->quantum = DEFAULT_TIME_SLICE_MS; // set the time slice
-
-    // Copy process name
-    strncpy(pNewProc->name, name, MAXNAME - 1);
-    pNewProc->name[MAXNAME - 1] = '\0'; // Null-terminate
-
-    // Copy process arguments
+    CopyString(name, pNewProc->name, MAXNAME); // Copy process name - shouldn't be NULL
+    // Copy process arguments - might be NULL
     if (arg != NULL)
     {
-        strncpy(pNewProc->startArgs, (char *)(void *)arg, MAXARG - 1);
-        pNewProc->startArgs[MAXARG - 1] = '\0'; // Null-terminate
+        CopyString(arg, pNewProc->startArgs, MAXARG);
     }
     else
     {
         pNewProc->startArgs[0] = '\0'; // Empty string if no arguments
     }
-
-    // console_output(FALSE, "DEBUG: name-set = [%s]\n", pNewProc->name);
-    // console_output(FALSE, "DEBUG: arg-set = [%s]\n", pNewProc->startArgs);
 
     // add the process to node storage and the ready list
     result = InsertDataIntoLinkedListArray(&processStateArray, pNewProc);
@@ -254,7 +240,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     /* Initialize context for this process, but use launch function pointer for
      * the initial value of the process's program counter (PC)
      */
-    pNewProc->context = context_initialize(launch, stacksize, arg);
+    pNewProc->context = context_initialize(launch, stacksize, &arg);
 
     /* Increment the process id for the next process */
     nextPid++;
@@ -278,13 +264,11 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 static int launch(void *args)
 {
     int result = 0;
-    // DebugConsole("launch(): started: %s\n", runningProcess->name);
-
     /* Enable interrupts */
     enableInterrupts();
 
     /* Call the function passed to spawn and capture its return value */
-    result = runningProcess->entryPoint(args);
+    result = runningProcess->entryPoint(runningProcess->startArgs);
 
     /* Stop the process gracefully */
     k_exit(result);
@@ -795,4 +779,55 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
+}
+
+//  TODO: Move to a utility file
+
+/**
+ * @brief Trims the right side of a string
+ *
+ * @param string The string to trim
+ */
+void TrimRight(char *string)
+{
+    int i = 0;
+    // while we haven't reached the end of the string
+    while (string[i] != '\0')
+    {
+        // keep going
+        i++;
+    }
+    // end of the string was found
+    i--;
+    // loop backwards until we find a character that is not a space, tab, newline, or carriage return
+    while (string[i] == ' ' || string[i] == '\t' || string[i] == '\n' || string[i] == '\r')
+    {
+        // null terminate the string
+        string[i] = '\0';
+        // move to the next character
+        i--;
+    }
+}
+
+/**
+ * @brief Copy a string from source to destination
+ *
+ * @param source The source string
+ * @param destination The destination string
+ * @param size The size of the destination string
+ */
+void CopyString(char *source, char *destination, size_t size)
+{
+    // size_t is an unsigned long long integer
+    unsigned long long i = 0ULL;
+    // while we haven't reached the end of the string
+    while (source[i] != '\0')
+    {
+        // copy the character
+        destination[i] = source[i];
+        // move to the next character
+        i++;
+    }
+    // null terminate the string
+    destination[i] = '\0';
 }
