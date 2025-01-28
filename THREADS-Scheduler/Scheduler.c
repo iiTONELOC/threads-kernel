@@ -561,40 +561,39 @@ void dispatcher()
         return;
     }
 
-    disableInterrupts();
-
-    // if  there is a running process we need to check to see if it has
-    // exceeded its quantum
-    if (runningProcess != NULL && runningProcess->quantum < MIN_TIME_SLICE_MS)
+    // check to see if the current process has exceeded its quantum
+    if (runningProcess != NULL && runningProcess->elapsedTime < MIN_TIME_SLICE_MS)
     {
         return;
     }
 
-    if (runningProcess != NULL)
-    {
+    disableInterrupts();
 
-        // access the linked list node for the current process
-        pNextLNode = priorityListQueue[RUNNING].pHead;
-
-        changeProcessStatus(pNextLNode, READY);
-    }
-
-    // go to the READY list, and grab the head, which is the next process to run
+    // get the next ready process
     pNextLNode = priorityListQueue[READY].pHead;
 
-    if (pNextLNode == NULL)
+    // if there are no ready processes, call the watchdog
+    if (pNextLNode == NULL || pNextLNode->pData == NULL)
     {
-        console_output(debugFlag, "dispatcher(): No next process in ready list\n");
         watchdog(NULL);
     }
 
-    // set the next process to run to RUNNING
-    pCurrentProc = ((Process *)pNextLNode->pData);
+    // change the status of the running process to ready
+    if (runningProcess != NULL)
+    {
+        pNextLNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
+        changeProcessStatus(pNextLNode, READY);
+    }
+
+    // get the next process to run
+    pNextLNode = priorityListQueue[READY].pHead;
+
+    // set its status to running
     changeProcessStatus(pNextLNode, RUNNING);
     // set the running process to the current process
-    runningProcess = pCurrentProc;
+    runningProcess = ((Process *)pNextLNode->pData);
 
-    context_switch(pCurrentProc->context);
+    context_switch(((Process *)pNextLNode->pData)->context);
 }
 
 /**************************************************************************
@@ -619,7 +618,7 @@ static int watchdog(void *dummy)
         return 0;
     }
 
-    if (pNode == NULL)
+    if (pNode == NULL || pNode->pData == NULL)
     {
         stop(0);
     }
@@ -797,6 +796,11 @@ void changeProcessStatus(LinkedListNode *pListNode, int status)
 {
     // if the pListNode is null return
     if (pListNode == NULL)
+    {
+        return;
+    }
+
+    if (pListNode->pData == NULL)
     {
         return;
     }

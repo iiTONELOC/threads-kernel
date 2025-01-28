@@ -16,6 +16,11 @@ int OrderFunction(void *pNode1, void *pNode2)
     Process *process1 = (Process *)((LinkedListNode *)pNode1)->pData;
     Process *process2 = (Process *)((LinkedListNode *)pNode2)->pData;
 
+    if (process1 == NULL || process2 == NULL)
+    {
+        return 0;
+    }
+
     // descending order, the linked list test runs ascending order
     // so here we cover both bases as this function is passed to the
     // linked list's initialization function
