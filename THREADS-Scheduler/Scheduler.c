@@ -20,14 +20,14 @@ Process processTable[MAX_PROCESSES];               // process table
 interrupt_handler_t *interruptHandlers = NULL;     // interrupt handlers from THREADS API
 LinkedList priorityListQueue[NUM_PROCESS_STATES];  // Priority list queue for process states
 LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
-LinkedListArray processStateArray = {NULL,         // Process state linked list array
-                                     &priorityListQueue,
-                                     &procTableListBucket};
+LinkedListArray processStateArray = {0ULL,         // Process state linked list array
+                                     &priorityListQueue[0],
+                                     &procTableListBucket[0]};
 
 void time_slice();
 void dispatcher();
 static int launch(void *);
-static int watchdog(char *);
+static int watchdog(void *);
 static void check_deadlock();
 static inline void enableInterrupts();
 static inline void disableInterrupts();
@@ -79,18 +79,18 @@ int bootstrap(void *pArgs)
     check_io = check_io_scheduler;
 
     /* Initialize the process table. */
-    InitializeProcessTable(&processTable, MAX_PROCESSES);
+    InitializeProcessTable(processTable, MAX_PROCESSES);
 
     /* Initialize the Ready list, etc. */
     InitializeLinkedListArray(&processStateArray,
-                              &priorityListQueue,
-                              &procTableListBucket,
+                              &priorityListQueue[0],
+                              &procTableListBucket[0],
                               MAX_PROCESSES,
                               OrderFunction);
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
-    interruptHandlers[THREADS_TIMER_INTERRUPT] = &clockInterruptHandler;
+    interruptHandlers[THREADS_TIMER_INTERRUPT] = (interrupt_handler_t)&clockInterruptHandler;
 
     /* startup a watchdog process */
     result = k_spawn("watchdog", watchdog, NULL, THREADS_MIN_STACK_SIZE, LOWEST_PRIORITY);
@@ -158,7 +158,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         stop(1);
     }
 
-    if (!arg == NULL && strlen(arg) >= (MAXARG - 1))
+    if (arg != NULL && strlen((char *)arg) >= (MAXARG - 1))
     {
         console_output(debugFlag, "spawn(): Process arg is too long.  Halting...\n");
         stop(1);
@@ -377,7 +377,7 @@ int k_wait(int *code)
     // remove the child from the parent's children list
     RemoveNode(&runningProcess->pChildren, pTempNode);
     // reinitialize the process structure
-    InitializeProcessToNull(pChild);
+    InitializeProcessToDefault(pChild);
     // reinitialize the linked list node by setting all values to NULL
     InitializeNode(pTempNode);
 
@@ -608,7 +608,7 @@ void dispatcher()
 
    Returns - nothing
    *************************************************************************/
-static int watchdog(char *dummy)
+static int watchdog(void *dummy)
 {
     Process *pNextReadyProc = NULL;
     LinkedListNode *pNode = priorityListQueue[READY].pHead;

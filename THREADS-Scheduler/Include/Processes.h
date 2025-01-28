@@ -48,7 +48,7 @@ typedef struct _process
 /*_______________________Function Prototypes_______________________*/
 
 int OrderFunction(void *pNode1, void *pNode2);
-void InitializeProcessToNull(Process *usingProcessPtr);
+void InitializeProcessToDefault(Process *usingProcessPtr);
 int GetEmptyControlBlockIndex(Process *fromProcessTablePtr);
 void InitializeProcessTable(Process *usingTablePtr, size_t size);
 LinkedListNode *FindProcessNodeByPid(int pid, LinkedListNode *pNodeBucket);

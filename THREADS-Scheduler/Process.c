@@ -23,28 +23,31 @@ int OrderFunction(void *pNode1, void *pNode2)
 }
 
 /**
- * @brief Initializes a process to NULL
+ * @brief Initializes a process to Default values
  *
  * @param usingProcessPtr The node to initialize
+ *
+ * @note  Pointers are set to NULL, unsigned integers are set to 0, and signed
+ *        integers are set to -1. The LinkedLists are initialized. *
  */
-void InitializeProcessToNull(Process *usingProcessPtr)
+void InitializeProcessToDefault(Process *usingProcessPtr)
 {
-    usingProcessPtr->pid = NULL;
+    usingProcessPtr->pid = -1;
+    usingProcessPtr->status = -1;
+    usingProcessPtr->signal = -1;
+    usingProcessPtr->quantum = 0; // not currently used by timeslice
+    usingProcessPtr->cpuTime = 0;
     usingProcessPtr->stack = NULL;
-    usingProcessPtr->status = NULL;
-    usingProcessPtr->signal = NULL;
-    usingProcessPtr->quantum = NULL; // not currently used by timeslice
+    usingProcessPtr->exitCode = -1;
+    usingProcessPtr->priority = -1;
+    usingProcessPtr->startTime = -1;
+    usingProcessPtr->stacksize = -1;
     usingProcessPtr->context = NULL;
-    usingProcessPtr->cpuTime = NULL;
     usingProcessPtr->pParent = NULL;
-    usingProcessPtr->exitCode = NULL;
-    usingProcessPtr->priority = NULL;
-    usingProcessPtr->startTime = NULL;
-    usingProcessPtr->stacksize = NULL;
+    usingProcessPtr->elapsedTime = -1;
     usingProcessPtr->entryPoint = NULL;
-    usingProcessPtr->elapsedTime = NULL;
+    usingProcessPtr->processTableIndex = -1;
     usingProcessPtr->nextReadyProcess = NULL;
-    usingProcessPtr->processTableIndex = NULL;
     InitializeList(&usingProcessPtr->pDeadChildren, NULL);
     InitializeList(&usingProcessPtr->pJoiningProcesses, NULL);
     InitializeList(&usingProcessPtr->pChildren, OrderFunction);
@@ -65,7 +68,7 @@ void InitializeProcessTable(Process *usingTablePtr, size_t size)
     // NULL values
     for (i = 0; i < size; i++)
     {
-        InitializeProcessToNull(&usingTablePtr[i]);
+        InitializeProcessToDefault(&usingTablePtr[i]);
     }
 }
 
@@ -81,8 +84,10 @@ int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
     int i;
 
     for (i = 0; i < MAXPROC; i++)
-    {
-        if (fromProcessTablePtr[i].pid == NULL && fromProcessTablePtr[i].context == NULL)
+    { // if a pid hasn't been assigned and the context is NULL
+        // we have a slot we can use - regardless of whatever else is in the slot
+        if (fromProcessTablePtr[i].pid == -1 &&
+            fromProcessTablePtr[i].context == NULL)
             return i;
     }
 
@@ -96,40 +101,37 @@ int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
  * @param pNodeBucket The linked list node bucket to search
  *
  * @return The linked list node or NULL if not found
- * @note A pointer to the Process is contained within the pData member of the linked list node
- * A Linked List Node rather than a Process is returned so that the priority list queue can be
- * updated accordingly, and this relies on a linked list node rather than the bare process.
+ * @note
+ *  - A pointer to the Process is contained within the pData member of the linked list node.
+ *
+ *  - A Linked List Node rather than a Process is returned so that the priority list queue can be
+ *   updated accordingly
+ *
+ *    - This relies on a linked list node rather than the bare process.
  */
 LinkedListNode *FindProcessNodeByPid(int pid, LinkedListNode *pNodeBucket)
 {
     int i = 0;
-    Process *currentProcess = NULL;
-    LinkedListNode *currentNode = NULL;
 
     // loop over the array of nodes and look for a process with the
     // corresponding pid
     for (i = 0; i < MAXPROC; i++)
     {
-        currentNode = &pNodeBucket[i];
-        // check to see if pData is null
 
-        if (currentNode == NULL)
+        // If we have NULL data just skip to the next node
+        if (&pNodeBucket[i] == NULL || ((LinkedListNode *)&pNodeBucket[i])->pData == NULL)
         {
             continue;
         }
 
-        currentProcess = (Process *)currentNode->pData;
-
-        if (currentProcess == NULL)
+        // Non-NULL data, check the pid
+        if (((Process *)((LinkedListNode *)&pNodeBucket[i])->pData)->pid == pid)
         {
-            continue;
-        }
-
-        if (currentProcess->pid == pid)
-        {
-            return currentNode;
+            // match found
+            return &pNodeBucket[i];
         }
     }
 
+    // no match found
     return NULL;
 }

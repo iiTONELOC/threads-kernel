@@ -16,7 +16,7 @@
 
 // __________________________ Function Definitions __________________________
 
-void InitializeList(LinkedList *pList, /*int offset,*/ int (*OrderFunction)(void *pNode1, void *pNode2))
+void InitializeList(LinkedList *pList, int (*OrderFunction)(void *pNode1, void *pNode2))
 {
     if (pList == NULL)
     {
@@ -24,7 +24,6 @@ void InitializeList(LinkedList *pList, /*int offset,*/ int (*OrderFunction)(void
     }
 
     pList->count = 0;
-    // pList->offset = offset;
     pList->pHead = NULL;
     pList->pTail = NULL;
     pList->OrderFunction = OrderFunction;
@@ -44,7 +43,6 @@ void InitializeNode(LinkedListNode *pNode)
 
 void InsertNode(LinkedList *pList, void *pNode)
 {
-
     // If the list is empty, set the head and tail to the new node
     if (pList->count == 0)
     {
@@ -54,8 +52,8 @@ void InsertNode(LinkedList *pList, void *pNode)
     // Otherwise, insert the node in a sorted order
     else
     {
-        // Find the correct position to insert the new node
-        // it is possible that the order function is null
+        /*Find the correct position to insert the new node it is possible that
+        the order function is null*/
 
         // if the order function is null, insert at the end of the list
         if (pList->OrderFunction == NULL)
@@ -64,8 +62,8 @@ void InsertNode(LinkedList *pList, void *pNode)
             ((LinkedListNode *)pNode)->pPrev = pList->pTail;
 
             // Set the next pointer of the current tail to the new node
-            // ((LinkedListNode *)pList->pTail)->pNext = pNode;
-            // check if the tail is null before tring to access the next pointer, if the tail is null, the list is empty
+            //   check if the tail is null before tring to access the next
+            //   pointer,if the tail is null, the list is empty
             if (pList->pTail != NULL)
             {
                 ((LinkedListNode *)pList->pTail)->pNext = pNode;
@@ -86,8 +84,9 @@ void InsertNode(LinkedList *pList, void *pNode)
             ((LinkedListNode *)pNode)->pNext = pList->pHead;
 
             // Set the previous pointer of the current head to the new node
-            // ((LinkedListNode *)pList->pHead)->pPrev = pNode;
-            // check if the head is null before tring to access the previous pointer, if the head is null, the list is empty
+
+            // check if the head is null before tring to access the previous pointer,
+            //   if the head is null, the list is empty
             if (pList->pHead != NULL)
             {
                 ((LinkedListNode *)pList->pHead)->pPrev = pNode;
@@ -105,9 +104,8 @@ void InsertNode(LinkedList *pList, void *pNode)
         else if (pList->OrderFunction(pNode, pList->pTail) > 0)
         {
             ((LinkedListNode *)pNode)->pPrev = pList->pTail;
-
-            // ((LinkedListNode *)pList->pTail)->pNext = pNode;
-            // check if the tail is null before tring to access the next pointer, if the tail is null, the list is empty
+            // check if the tail is null before tring to access the next pointer,
+            //   if the tail is null, the list is empty
             if (pList->pTail != NULL)
             {
                 ((LinkedListNode *)pList->pTail)->pNext = pNode;
@@ -131,8 +129,9 @@ void InsertNode(LinkedList *pList, void *pNode)
                     ((LinkedListNode *)pNode)->pNext = current;
                     ((LinkedListNode *)pNode)->pPrev = current->pPrev;
                     current->pPrev = pNode;
-                    // ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = pNode;
-                    // check if the previous pointer is null before tring to access the next pointer, if the previous pointer is null, the list is empty
+                    // check if the previous pointer is null before tring to
+                    //   access the next pointer, if the previous pointer is
+                    //   null, the list is empty
                     if (((LinkedListNode *)pNode)->pPrev != NULL)
                     {
                         ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = pNode;
@@ -185,14 +184,36 @@ void RemoveNode(LinkedList *pList, void *pNode)
             ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = NULL;
         }
     }
-    // Otherwise, remove the node from the list
+    // Otherwise, remove the node from between two other nodes and update their pointers
+    // to point to each other, thereby removing the node from the list
     else
     {
         // Set the next pointer of the previous node to the next node
-        ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = ((LinkedListNode *)pNode)->pNext;
+        //  check if the previous pointer is null before tring to access the next
+        //  pointer, if the previous pointer is null, the list is empty
+        if (((LinkedListNode *)pNode)->pPrev != NULL)
+        {
+
+            ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = ((LinkedListNode *)pNode)->pNext;
+        }
+        else
+        {
+            pList->pHead = ((LinkedListNode *)pNode)->pNext;
+            pList->pTail = ((LinkedListNode *)pNode)->pNext;
+        }
 
         // Set the previous pointer of the next node to the previous node
-        ((LinkedListNode *)(((LinkedListNode *)pNode)->pNext))->pPrev = ((LinkedListNode *)pNode)->pPrev;
+        //  check if the next pointer is null before tring to access the previous
+        //  pointer, if the next pointer is null, the list is empty
+        if (((LinkedListNode *)pNode)->pNext != NULL)
+        {
+            ((LinkedListNode *)(((LinkedListNode *)pNode)->pNext))->pPrev = ((LinkedListNode *)pNode)->pPrev;
+        }
+        else
+        {
+            pList->pHead = ((LinkedListNode *)pNode)->pPrev;
+            pList->pTail = ((LinkedListNode *)pNode)->pPrev;
+        }
     }
 
     pList->count--;
@@ -210,7 +231,8 @@ void PrintList(LinkedList *pList)
 
     while (current != NULL)
     {
-        printf("Node: %p\n  Next: %p\n  Prev: %p\n  Data: %p\n", current, current->pNext, current->pPrev, current->pData);
+        printf("Node: %p\n  Next: %p\n  Prev: %p\n  Data: %p\n",
+               current, current->pNext, current->pPrev, current->pData);
         current = current->pNext;
     }
 
