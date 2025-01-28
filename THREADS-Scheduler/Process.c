@@ -45,6 +45,8 @@ void InitializeProcessToNull(Process *usingProcessPtr)
     usingProcessPtr->elapsedTime = NULL;
     usingProcessPtr->nextReadyProcess = NULL;
     usingProcessPtr->processTableIndex = NULL;
+    InitializeList(&usingProcessPtr->pDeadChildren, NULL);
+    InitializeList(&usingProcessPtr->pJoiningProcesses, NULL);
     InitializeList(&usingProcessPtr->pChildren, OrderFunction);
 }
 

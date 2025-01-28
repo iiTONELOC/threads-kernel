@@ -64,7 +64,17 @@ void InsertNode(LinkedList *pList, void *pNode)
             ((LinkedListNode *)pNode)->pPrev = pList->pTail;
 
             // Set the next pointer of the current tail to the new node
-            ((LinkedListNode *)pList->pTail)->pNext = pNode;
+            // ((LinkedListNode *)pList->pTail)->pNext = pNode;
+            // check if the tail is null before tring to access the next pointer, if the tail is null, the list is empty
+            if (pList->pTail != NULL)
+            {
+                ((LinkedListNode *)pList->pTail)->pNext = pNode;
+            }
+            else
+            {
+                pList->pHead = pNode;
+                pList->pTail = pNode;
+            }
 
             // Set the tail of the list to the new node
             pList->pTail = pNode;
@@ -76,7 +86,17 @@ void InsertNode(LinkedList *pList, void *pNode)
             ((LinkedListNode *)pNode)->pNext = pList->pHead;
 
             // Set the previous pointer of the current head to the new node
-            ((LinkedListNode *)pList->pHead)->pPrev = pNode;
+            // ((LinkedListNode *)pList->pHead)->pPrev = pNode;
+            // check if the head is null before tring to access the previous pointer, if the head is null, the list is empty
+            if (pList->pHead != NULL)
+            {
+                ((LinkedListNode *)pList->pHead)->pPrev = pNode;
+            }
+            else
+            {
+                pList->pHead = pNode;
+                pList->pTail = pNode;
+            }
 
             // Set the head of the list to the new node
             pList->pHead = pNode;
@@ -85,7 +105,19 @@ void InsertNode(LinkedList *pList, void *pNode)
         else if (pList->OrderFunction(pNode, pList->pTail) > 0)
         {
             ((LinkedListNode *)pNode)->pPrev = pList->pTail;
-            ((LinkedListNode *)pList->pTail)->pNext = pNode;
+
+            // ((LinkedListNode *)pList->pTail)->pNext = pNode;
+            // check if the tail is null before tring to access the next pointer, if the tail is null, the list is empty
+            if (pList->pTail != NULL)
+            {
+                ((LinkedListNode *)pList->pTail)->pNext = pNode;
+            }
+            else
+            {
+                pList->pHead = pNode;
+                pList->pTail = pNode;
+            }
+
             pList->pTail = pNode;
         }
         // Otherwise, find the correct position to insert the new node
@@ -99,7 +131,17 @@ void InsertNode(LinkedList *pList, void *pNode)
                     ((LinkedListNode *)pNode)->pNext = current;
                     ((LinkedListNode *)pNode)->pPrev = current->pPrev;
                     current->pPrev = pNode;
-                    ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = pNode;
+                    // ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = pNode;
+                    // check if the previous pointer is null before tring to access the next pointer, if the previous pointer is null, the list is empty
+                    if (((LinkedListNode *)pNode)->pPrev != NULL)
+                    {
+                        ((LinkedListNode *)(((LinkedListNode *)pNode)->pPrev))->pNext = pNode;
+                    }
+                    else
+                    {
+                        pList->pHead = pNode;
+                        pList->pTail = pNode;
+                    }
                     break; // exit the while loop condition met
                 }
 

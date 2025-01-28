@@ -20,6 +20,9 @@ typedef struct _process
 {
 
 	LinkedList pChildren;
+	LinkedList pDeadChildren;
+	LinkedList pJoiningProcesses;
+
 	LinkedListNode *pParent;
 	LinkedListNode *nextReadyProcess;
 

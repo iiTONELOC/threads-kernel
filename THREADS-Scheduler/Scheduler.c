@@ -32,6 +32,7 @@ static void check_deadlock();
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
+void changeProcessStatus(LinkedListNode *pListNode, int newStatus);
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
 
 /* DO NOT REMOVE */
@@ -313,26 +314,32 @@ int k_wait(int *code)
         return -5;
     }
 
-    // if this far a parent process exists, and we need to set the parent to block.
-    runningProcess->status = BLOCKED;
-
-    // Get the linked list node for the running process
-    pTempNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
-
-    // This should not happen, but if it does, return an error
-    if (pTempNode == NULL)
+    // Check to see if there is a dead child
+    if (runningProcess->pDeadChildren.count > 0)
     {
-        console_output(debugFlag, "k_wait(): Error: Corresponding Linked List Node for Process was not found!");
-        return -1;
+        // FIFO - removes the first child from the list
+        RemoveNode(&runningProcess->pDeadChildren, runningProcess->pDeadChildren.pHead);
     }
+    else
+    {
+        // Get the linked list node for the running process
+        pTempNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
 
-    // remove the process from the ready list and place it in the blocked list
-    RemoveNode(&priorityListQueue[RUNNING], pTempNode);
-    InsertNode(&priorityListQueue[BLOCKED], pTempNode);
-    // set the running process to NULL so the dispatcher can find the next process to run
-    runningProcess = NULL;
-    // call the dispatcher to update the running process to blocked
-    dispatcher();
+        // This should not happen, but if it does, return an error
+        if (pTempNode == NULL)
+        {
+            console_output(debugFlag, "k_wait(): Error: Corresponding Linked List Node for Process was not found!");
+            return -1;
+        }
+
+        // remove the process from the ready list and place it in the blocked list
+        changeProcessStatus(pTempNode, BLOCKED);
+
+        // set the running process to NULL so the dispatcher can find the next process to run
+        runningProcess = NULL;
+        // call the dispatcher to update the running process to blocked
+        dispatcher();
+    }
 
     // AFTER BLOCK - Parent needs to clean up for children
     // look in the Quit list for a child of this
@@ -408,32 +415,33 @@ void k_exit(int code)
         code = runningProcess->signal;
     }
 
-    // set the status to QUIT
-    runningProcess->status = QUIT;
     // set the exit code
     runningProcess->exitCode = code;
     // Grab the linked list node for the process
     pListNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
-    // remove the process from the running list
-    RemoveNode(&priorityListQueue[RUNNING], pListNode);
 
-    // add it to the quit list
-    InsertNode(&priorityListQueue[QUIT], pListNode);
+    // set the status to QUIT
+    changeProcessStatus(pListNode, QUIT);
 
     // UNBLOCK PARENT IF PARENT EXISTS
     if (runningProcess->pParent != NULL)
     {
-        // UNBLOCK PARENT
-        // set the parent to ready
-        ((Process *)((LinkedListNode *)runningProcess->pParent)->pData)->status = READY;
-
-        // move the parent from blocked to ready
-        RemoveNode(&priorityListQueue[BLOCKED], runningProcess->pParent);
-        InsertNode(&priorityListQueue[READY], runningProcess->pParent);
+        // check if the parent is blocked before changing the status
+        // if the parent is still running, we have a child process
+        // with a higher priority than the parent process
+        if (((Process *)runningProcess->pParent->pData)->status == BLOCKED)
+        {
+            changeProcessStatus(runningProcess->pParent, READY);
+        }
+        else
+        {
+            // place into parent's dead children list
+            // but do not change the status
+            InsertNode(&((Process *)runningProcess->pParent->pData)->pDeadChildren, pListNode);
+        }
     }
     // set the current running process to NULL
     runningProcess = NULL;
-
     // call the dispatcher
     dispatcher();
 }
@@ -484,11 +492,12 @@ int unblock(int pid)
         return -1;
     }
 
-    // explicitly set the status to READY
-    ((Process *)pListNode->pData)->status = READY;
-    // remove the node from the blocked list and place it in the ready
-    RemoveNode(&priorityListQueue[BLOCKED], pListNode);
-    InsertNode(&priorityListQueue[READY], pListNode);
+    // // explicitly set the status to READY
+    // ((Process *)pListNode->pData)->status = READY;
+    // // remove the node from the blocked list and place it in the ready
+    // RemoveNode(&priorityListQueue[BLOCKED], pListNode);
+    // InsertNode(&priorityListQueue[READY], pListNode);
+    changeProcessStatus(pListNode, READY);
     // enableInterrupts();
     // TODO: Call dispatch??
 
@@ -563,15 +572,11 @@ void dispatcher()
 
     if (runningProcess != NULL)
     {
-        // change the running process to READY
-        runningProcess->status = READY;
+
         // access the linked list node for the current process
         pNextLNode = priorityListQueue[RUNNING].pHead;
 
-        // removes the currently running process and adds it to the end of the READY list
-        // in a sorted manner
-        RemoveNode(&priorityListQueue[RUNNING], pNextLNode);
-        InsertNode(&priorityListQueue[READY], pNextLNode);
+        changeProcessStatus(pNextLNode, READY);
     }
 
     // go to the READY list, and grab the head, which is the next process to run
@@ -585,12 +590,7 @@ void dispatcher()
 
     // set the next process to run to RUNNING
     pCurrentProc = ((Process *)pNextLNode->pData);
-    pCurrentProc->status = RUNNING;
-
-    // remove the pCurrentProc from the READY list
-    RemoveNode(&priorityListQueue[READY], pNextLNode);
-    InsertNode(&priorityListQueue[RUNNING], pNextLNode);
-
+    changeProcessStatus(pNextLNode, RUNNING);
     // set the running process to the current process
     runningProcess = pCurrentProc;
 
@@ -781,4 +781,42 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
+}
+
+/**
+ * @brief Change the status of a process
+ *
+ * @param pListNode Pointer to the Linked List node containing the process
+ * @param status The new status to set
+ *
+ * @return void
+ * @note This function removes the process from the current status list
+ * and will place it into the new status list sorted by priority
+ */
+void changeProcessStatus(LinkedListNode *pListNode, int status)
+{
+    // if the pListNode is null return
+    if (pListNode == NULL)
+    {
+        return;
+    }
+
+    // validate the status
+    if (status < 0 || status > NUM_PROCESS_STATES)
+    {
+        return;
+    }
+
+    // check if we need a change
+    if (((Process *)pListNode->pData)->status == status)
+    {
+        return;
+    }
+
+    // remove the process from its current list
+    RemoveNode(&priorityListQueue[((Process *)pListNode->pData)->status], pListNode);
+    // move it to the new status i.e READY -> RUNNING etc.
+    InsertNode(&priorityListQueue[status], pListNode);
+    // update the process status
+    ((Process *)pListNode->pData)->status = status;
 }
