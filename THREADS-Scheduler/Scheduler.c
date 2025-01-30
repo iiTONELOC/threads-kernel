@@ -10,19 +10,16 @@
 #include "Scheduler.h"
 #include "Processes.h"
 #include "StringUtils.h"
-#include "LinkedListArray.h" // imports LinkedList.h as well
+#include "PriorityProcessQueue.h"
 
-int nextPid = 1;                                   // next process id
-int debugFlag = 1;                                 // debug flag
-int inBootStrap = 0;                               // flag to indicate if the system is in bootstrap
-Process *runningProcess = NULL;                    // tra cks current running process
-Process processTable[MAX_PROCESSES];               // process table
-interrupt_handler_t *interruptHandlers = NULL;     // interrupt handlers from THREADS API
-LinkedList priorityListQueue[NUM_PROCESS_STATES];  // Priority list queue for process states
-LinkedListNode procTableListBucket[MAX_PROCESSES]; // Storage for process state linked list
-LinkedListArray processStateArray = {0ULL,         // Process state linked list array
-                                     &priorityListQueue[0],
-                                     &procTableListBucket[0]};
+int nextPid = 1;                                        // next process id
+int debugFlag = 0;                                      // debug flag
+int inBootStrap = 0;                                    // flag to indicate if the system is in bootstrap
+Process *runningProcess = NULL;                         // tracks current running process
+Process processTable[MAX_PROCESSES];                    // process table
+interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
+DoublyLinkedList priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue for process states
+DoublyLinkedNode procTableListBucket[MAX_PROCESSES];    // Storage for process state linked list
 
 void time_slice();
 void dispatcher();
@@ -32,7 +29,6 @@ static void check_deadlock();
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
-void changeProcessStatus(LinkedListNode *pListNode, int newStatus);
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
 
 /* DO NOT REMOVE */
@@ -78,15 +74,15 @@ int bootstrap(void *pArgs)
     /* set this to the scheduler version of this function.*/
     check_io = check_io_scheduler;
 
-    /* Initialize the process table. */
-    InitializeProcessTable(processTable, MAX_PROCESSES);
+    /* Initialize the process table */
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        InitializeProcessToDefault(&processTable[i]);
+        InitializeDoublyLinkedNode(&procTableListBucket[i]);
+    }
 
-    /* Initialize the Ready list, etc. */
-    InitializeLinkedListArray(&processStateArray,
-                              &priorityListQueue[0],
-                              &procTableListBucket[0],
-                              MAX_PROCESSES,
-                              OrderFunction);
+    /* Initialize the priority list queue */
+    InitializePriorityProcessQueueArray(priorityListQueue, NUM_PROCESS_STATES);
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
@@ -143,8 +139,9 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     disableInterrupts();
     int result = 0;
     int proc_slot;
-    struct _process *pNewProc;
-    struct _linkedListNode *pRunningProcessLinkedListNode;
+    Process *pNewProc;
+    DoublyLinkedNode *pNewChildProcNode = NULL;
+    DoublyLinkedNode *pRunningProcessLinkedListNode = NULL;
 
     /*Validate all of the parameters, starting with the name. */
     if (name == NULL)
@@ -218,32 +215,34 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     }
 
     // add the process to node storage and the ready list
-    result = InsertDataIntoLinkedListArray(&processStateArray, pNewProc);
-
-    if (result != proc_slot)
-    {
-        console_output(debugFlag, "spawn(): Error: Process Table and linked list node storage is out-of-sync.\n");
-        return -5;
-    }
+    procTableListBucket[proc_slot].pData = pNewProc;
+    AddNodeToPriorityProcessQueue(priorityListQueue, &procTableListBucket[proc_slot]);
 
     /* If there is a parent process, add this to its list of children. */
     if (runningProcess != NULL)
     {
-        // get the Linked List Node for the Current Running Process
-        pRunningProcessLinkedListNode = &procTableListBucket[runningProcess->processTableIndex];
+        // dynamically allocate a new linked list node for the parent's children list
+        // this keeps from mutating the priority list queue
+        pNewChildProcNode = CreateDoublyLinkedNode(pNewProc);
 
-        InsertNode(
-            &((Process *)(LinkedListNode *)pRunningProcessLinkedListNode->pData)->pChildren,
-            &procTableListBucket[proc_slot]);
+        // if the linked list node is NULL, return an error
+        if (pNewChildProcNode == NULL)
+        {
+            console_output(debugFlag, "spawn(): Error: Could not create a new linked list node for the child process.\n");
+            return -6;
+        }
 
-        // add the parent link list node to the child process' pParent
-        pNewProc->pParent = pRunningProcessLinkedListNode;
+        // add the child process to the parent's children list
+        InsertDoublyLinkedNode(&runningProcess->pChildren, pNewChildProcNode);
+
+        // add the parent process to the child process' pParent
+        pNewProc->pParent = runningProcess;
     }
 
     /* Initialize context for this process, but use launch function pointer for
      * the initial value of the process's program counter (PC)
      */
-    pNewProc->context = context_initialize(launch, stacksize, &arg);
+    pNewProc->context = context_initialize(launch, stacksize, pNewProc->startArgs);
 
     /* Increment the process id for the next process */
     nextPid++;
@@ -295,10 +294,10 @@ static int launch(void *args)
 int k_wait(int *code)
 {
     disableInterrupts();
-    int result = 0;                   // return value
-    Process *pChild = NULL;           // Child process
-    LinkedListNode *pNextNode;        // Used for traversal
-    LinkedListNode *pTempNode = NULL; // Linked List Node for the Running Process
+    int result = 0;                     // return value
+    Process *pChild = NULL;             // Child process
+    DoublyLinkedNode *pNextNode;        // Used for traversal
+    DoublyLinkedNode *pTempNode = NULL; // Linked List Node for the Running Process
 
     // Look for a running process, if there is a running process then it is the parent of the
     // current process that is trying to exit.
@@ -318,7 +317,10 @@ int k_wait(int *code)
     if (runningProcess->pDeadChildren.count > 0)
     {
         // FIFO - removes the first child from the list
-        RemoveNode(&runningProcess->pDeadChildren, runningProcess->pDeadChildren.pHead);
+        // TODO: FIX THIS so that if a parent detects that a child quit before it called wait,
+        // it needs to clean up the child process and return the exit code
+        // RemoveDoublyLinkedNode(&runningProcess->pDeadChildren, runningProcess->pDeadChildren.pHead);
+        console_output(debugFlag, "k_wait(): Error: Dead Child Found! - PRE-BLOCK - Likely a child w/higher priority than parent!\n");
     }
     else
     {
@@ -328,29 +330,30 @@ int k_wait(int *code)
         // This should not happen, but if it does, return an error
         if (pTempNode == NULL)
         {
-            console_output(debugFlag, "k_wait(): Error: Corresponding Linked List Node for Process was not found!");
+            console_output(debugFlag, "k_wait(): Error: Corresponding Linked List Node for Process was not found!\n");
             return -1;
         }
 
         // remove the process from the ready list and place it in the blocked list
-        changeProcessStatus(pTempNode, BLOCKED);
+        ChangeProcessStatus(priorityListQueue, pTempNode, BLOCKED);
 
         // set the running process to NULL so the dispatcher can find the next process to run
         runningProcess = NULL;
+
         // call the dispatcher to update the running process to blocked
         dispatcher();
     }
 
     // AFTER BLOCK - Parent needs to clean up for children
     // look in the Quit list for a child of this
-    pTempNode = runningProcess->pChildren.pHead; // first child in the running process's children list
-    pChild = (Process *)pTempNode->pData;        // get the process from the linked list node
+    pTempNode = runningProcess->pDeadChildren.pHead; // first child in the running process's dead children list
+    pChild = (Process *)pTempNode->pData;            // get the process from the linked list node
 
     while (pTempNode != NULL)
     {
         if (pChild == NULL)
         {
-            console_output(debugFlag, "k_wait(): Error: pChild not found!");
+            console_output(debugFlag, "k_wait(): Error: pChild not found!\n");
             return -1;
         }
 
@@ -372,14 +375,23 @@ int k_wait(int *code)
         }
     }
 
-    // remove child from quit list
-    RemoveNode(&priorityListQueue[QUIT], pTempNode);
-    // remove the child from the parent's children list
-    RemoveNode(&runningProcess->pChildren, pTempNode);
+    if (result == 0)
+    {
+        console_output(debugFlag, "k_wait(): Error: No child found in the quit list!\n");
+        return -4;
+    }
+
+    pNextNode = FindProcessNodeByPid(result, procTableListBucket);
+    // remove child from quit list - HAVE to use the status to remove the child from the quit list
+    RemoveDoublyLinkedNode(&priorityListQueue[QUIT], pNextNode);
+    // remove the child from the parent's children list - Dynamic allocation
+    RemoveDoublyLinkedNode(&runningProcess->pDeadChildren, pTempNode);
     // reinitialize the process structure
     InitializeProcessToDefault(pChild);
     // reinitialize the linked list node by setting all values to NULL
-    InitializeNode(pTempNode);
+    InitializeDoublyLinkedNode(pNextNode);
+    // free the memory for the linked list node
+    DestroyDoublyLinkedNode(pTempNode);
 
     return result;
 }
@@ -397,14 +409,14 @@ int k_wait(int *code)
 *************************************************************************/
 void k_exit(int code)
 {
-    LinkedListNode *pListNode = NULL;
-
     disableInterrupts();
+    DoublyLinkedNode *pListNode = NULL;
+
     // terminate the process and set its exit code
     // set the status to QUIT
     if (runningProcess == NULL)
     {
-        console_output(debugFlag, "k_exit(), running process not found!!");
+        console_output(debugFlag, "k_exit(), running process not found!!\n");
         stop(1);
     }
 
@@ -421,7 +433,7 @@ void k_exit(int code)
     pListNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
 
     // set the status to QUIT
-    changeProcessStatus(pListNode, QUIT);
+    ChangeProcessStatus(priorityListQueue, pListNode, QUIT);
 
     // UNBLOCK PARENT IF PARENT EXISTS
     if (runningProcess->pParent != NULL)
@@ -429,16 +441,15 @@ void k_exit(int code)
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
         // with a higher priority than the parent process
-        if (((Process *)runningProcess->pParent->pData)->status == BLOCKED)
+        if (((Process *)runningProcess->pParent)->status == BLOCKED)
         {
-            changeProcessStatus(runningProcess->pParent, READY);
+            ChangeProcessStatus(priorityListQueue, FindProcessNodeByPid(runningProcess->pParent->pid, procTableListBucket), READY);
         }
-        else
-        {
-            // place into parent's dead children list
-            // but do not change the status
-            InsertNode(&((Process *)runningProcess->pParent->pData)->pDeadChildren, pListNode);
-        }
+
+        // place into parent's dead children list
+        // but do not change the status
+        RemoveDoublyLinkedNode(&runningProcess->pParent->pChildren, pListNode);
+        InsertDoublyLinkedNode(&runningProcess->pParent->pDeadChildren, pListNode);
     }
     // set the current running process to NULL
     runningProcess = NULL;
@@ -484,7 +495,7 @@ int unblock(int pid)
 {
     // disableInterrupts();
     // get the process from the process table
-    LinkedListNode *pListNode = FindProcessNodeByPid(pid, procTableListBucket);
+    DoublyLinkedNode *pListNode = FindProcessNodeByPid(pid, procTableListBucket);
 
     // if invalid or process is not blocked, return -1
     if (pListNode == NULL || ((Process *)pListNode->pData)->status != BLOCKED)
@@ -492,12 +503,7 @@ int unblock(int pid)
         return -1;
     }
 
-    // // explicitly set the status to READY
-    // ((Process *)pListNode->pData)->status = READY;
-    // // remove the node from the blocked list and place it in the ready
-    // RemoveNode(&priorityListQueue[BLOCKED], pListNode);
-    // InsertNode(&priorityListQueue[READY], pListNode);
-    changeProcessStatus(pListNode, READY);
+    ChangeProcessStatus(priorityListQueue, pListNode, READY);
     // enableInterrupts();
     // TODO: Call dispatch??
 
@@ -551,9 +557,9 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-
+    disableInterrupts();
     Process *pCurrentProc = NULL;
-    LinkedListNode *pNextLNode = NULL;
+    DoublyLinkedNode *pNextLNode = NULL;
 
     // if we are in bootstrap, we need to return
     if (inBootStrap)
@@ -567,8 +573,6 @@ void dispatcher()
         return;
     }
 
-    disableInterrupts();
-
     // get the next ready process
     pNextLNode = priorityListQueue[READY].pHead;
 
@@ -581,19 +585,16 @@ void dispatcher()
     // change the status of the running process to ready
     if (runningProcess != NULL)
     {
-        pNextLNode = FindProcessNodeByPid(runningProcess->pid, procTableListBucket);
-        changeProcessStatus(pNextLNode, READY);
+        ChangeProcessStatus(priorityListQueue, FindProcessNodeByPid(runningProcess->pid, procTableListBucket), READY);
     }
 
     // get the next process to run
-    pNextLNode = priorityListQueue[READY].pHead;
+    runningProcess = (Process *)pNextLNode->pData;
 
     // set its status to running
-    changeProcessStatus(pNextLNode, RUNNING);
+    ChangeProcessStatus(priorityListQueue, pNextLNode, RUNNING);
     // set the running process to the current process
-    runningProcess = ((Process *)pNextLNode->pData);
-
-    context_switch(((Process *)pNextLNode->pData)->context);
+    context_switch(runningProcess->context);
 }
 
 /**************************************************************************
@@ -610,7 +611,7 @@ void dispatcher()
 static int watchdog(void *dummy)
 {
     Process *pNextReadyProc = NULL;
-    LinkedListNode *pNode = priorityListQueue[READY].pHead;
+    DoublyLinkedNode *pNode = priorityListQueue[READY].pHead;
 
     if (inBootStrap)
     {
@@ -643,7 +644,7 @@ static void check_deadlock()
 {
     int i = 0;
     Process *pCurrentProc = NULL;
-    LinkedListNode *pNextLNode = NULL;
+    DoublyLinkedNode *pNextLNode = NULL;
 
     // determine why the watchdog was called
     for (i = RUNNING, i <= BLOCKED; i++;)
@@ -659,8 +660,7 @@ static void check_deadlock()
     // if we are here, then there are no processes in the system
     // and we are not in bootstrap
     console_output(debugFlag, "check_deadlock(): no processes detected, stopping...\n");
-    // log how many processes are in the process table
-    console_output(debugFlag, "check_deadlock(): %lld processes in the process table\n", processStateArray.pLinkedList->count);
+
     stop(1);
 }
 
@@ -731,10 +731,10 @@ int check_io_scheduler()
 void time_slice()
 {
 
-    static int elapsed = 0;                          // time elapsed since last context switch
-    static int lastTime = 0;                         // last time the clock interrupt was called
-    int currentTime = system_clock();                // current time in μs but
-                                                     // the week1 THREADSDemo says 1000 = 1 second so it has to be in milliseconds
+    static int elapsed = 0;           // time elapsed since last context switch
+    static int lastTime = 0;          // last time the clock interrupt was called
+    int currentTime = system_clock(); // current time in μs but
+    // the week1 THREADSDemo says 1000 = 1 second so it has to be in milliseconds
     int minQuantumUs = MIN_TIME_SLICE_MS * MS_TO_US; // 20 ms , should be 20-50 ms according to the book
 
     // if there is a running process and it doesn't have a start time, set it
@@ -780,47 +780,4 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
-}
-
-/**
- * @brief Change the status of a process
- *
- * @param pListNode Pointer to the Linked List node containing the process
- * @param status The new status to set
- *
- * @return void
- * @note This function removes the process from the current status list
- * and will place it into the new status list sorted by priority
- */
-void changeProcessStatus(LinkedListNode *pListNode, int status)
-{
-    // if the pListNode is null return
-    if (pListNode == NULL)
-    {
-        return;
-    }
-
-    if (pListNode->pData == NULL)
-    {
-        return;
-    }
-
-    // validate the status
-    if (status < 0 || status > NUM_PROCESS_STATES)
-    {
-        return;
-    }
-
-    // check if we need a change
-    if (((Process *)pListNode->pData)->status == status)
-    {
-        return;
-    }
-
-    // remove the process from its current list
-    RemoveNode(&priorityListQueue[((Process *)pListNode->pData)->status], pListNode);
-    // move it to the new status i.e READY -> RUNNING etc.
-    InsertNode(&priorityListQueue[status], pListNode);
-    // update the process status
-    ((Process *)pListNode->pData)->status = status;
 }
