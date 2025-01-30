@@ -186,16 +186,15 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
     // if the node is in the middle of the list
     else
     {
-        while (current != pNode)
+        while (current != NULL)
         {
+            if (current == pNode)
+            {
+                current->pPrev->pNext = current->pNext;
+                current->pNext->pPrev = current->pPrev;
+                break;
+            }
             current = current->pNext;
-        }
-        current->pPrev->pNext = current->pNext; // update the previous node's next pointer
-
-        // if the current.next is not null, update the next node's previous pointer
-        if (current->pNext != NULL)
-        {
-            current->pNext->pPrev = current->pPrev;
         }
 
         current = NULL;
