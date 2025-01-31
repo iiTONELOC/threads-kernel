@@ -607,8 +607,81 @@ DWORD read_clock()
 
 void display_process_table()
 {
-}
+    // Print header
+    console_output(FALSE, "PID     Parent   Priority  Status         # Kids   CPUtime  Name\n");
 
+    // Loop through process table
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        char statusBuffer[20]; // Buffer for converting status numbe to a string 
+        Process* pProcess = &processTable[i];
+
+        // Skip empty process slots
+        if (pProcess->context == NULL)
+        {
+            continue;
+        }
+
+        // Convert status code to string
+        char* statusStr;
+        if (pProcess->status == READY)
+        {
+            statusStr = "READY";
+        }
+        else if (pProcess->status == RUNNING)
+        {
+            statusStr = "RUNNING";
+        }
+        else if (pProcess->status == BLOCKED)
+        {
+            statusStr = "WAIT BLOCK";
+        }
+        else if (pProcess->status == QUIT)
+        {
+            statusStr = "QUIT";
+        }
+        else if (pProcess->status == 14)
+        {  // Special case for JOIN BLOCK
+            statusStr = "JOIN BLOCK";
+        }
+        else if (pProcess->status > 10)
+        {
+            snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
+            statusStr = statusBuffer;
+        }
+        else
+        {
+            statusStr = "UNKNOWN";
+        }
+
+        // Get parent PID
+        int parentPid;
+        if (pProcess->pParent != NULL)
+        {
+            parentPid = pProcess->pParent->pid;
+        }
+        else
+        {
+            parentPid = -1;
+        }
+
+        // Count number of children
+        int numChildren = pProcess->pChildren.count;
+
+        // Print process information
+        console_output(FALSE, "%-8d%-9d%-11d%-14s%-9d%-9llu%s\n",
+            pProcess->pid,
+            parentPid,
+            pProcess->priority,
+            statusStr,
+            numChildren,
+            pProcess->cpuTime,
+            pProcess->name
+        );
+    }
+    console_output(FALSE, "\n");
+}
+        
 /**************************************************************************
    Name - dispatcher
 
