@@ -613,8 +613,8 @@ void display_process_table()
     // Loop through process table
     for (int i = 0; i < MAX_PROCESSES; i++)
     {
-        char statusBuffer[20]; // Buffer for converting status numbe to a string 
-        Process* pProcess = &processTable[i];
+        char statusBuffer[20]; // Buffer for converting status numbe to a string
+        Process *pProcess = &processTable[i];
 
         // Skip empty process slots
         if (pProcess->context == NULL)
@@ -623,25 +623,25 @@ void display_process_table()
         }
 
         // Convert status code to string
-        char* statusStr;
-        if (pProcess->status == READY)
+        char *statusStr;
+        if (pProcess->status == STATUS_READY)
         {
             statusStr = "READY";
         }
-        else if (pProcess->status == RUNNING)
+        else if (pProcess->status == STATUS_RUNNING)
         {
             statusStr = "RUNNING";
         }
-        else if (pProcess->status == BLOCKED)
+        else if (pProcess->status == STATUS_BLOCKED_WAIT)
         {
             statusStr = "WAIT BLOCK";
         }
-        else if (pProcess->status == QUIT)
+        else if (pProcess->status == STATUS_QUIT)
         {
             statusStr = "QUIT";
         }
         else if (pProcess->status == 14)
-        {  // Special case for JOIN BLOCK
+        { // Special case for JOIN BLOCK
             statusStr = "JOIN BLOCK";
         }
         else if (pProcess->status > 10)
@@ -670,18 +670,17 @@ void display_process_table()
 
         // Print process information
         console_output(FALSE, "%-8d%-9d%-11d%-14s%-9d%-9llu%s\n",
-            pProcess->pid,
-            parentPid,
-            pProcess->priority,
-            statusStr,
-            numChildren,
-            pProcess->cpuTime,
-            pProcess->name
-        );
+                       pProcess->pid,
+                       parentPid,
+                       pProcess->priority,
+                       statusStr,
+                       numChildren,
+                       pProcess->cpuTime,
+                       pProcess->name);
     }
     console_output(FALSE, "\n");
 }
-        
+
 /**************************************************************************
    Name - dispatcher
 
