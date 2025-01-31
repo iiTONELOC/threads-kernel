@@ -1,6 +1,6 @@
-
-#include "DoublyLinkedList.h"
 #include "Constants.h"
+#include "Processes.h"
+#include "DoublyLinkedList.h"
 
 // __________________________ Function Definitions __________________________
 
@@ -181,8 +181,7 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
         return;
     }
 
-    // if the node is the head of the list
-    if (current == pList->pHead)
+    if (current == pList->pHead) // if the node is the head of the list
     {
         // set the head of the list to the next node
         pList->pHead = current->pNext;
@@ -192,7 +191,7 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
             current->pNext->pPrev = NULL;
         }
     }
-    else if (current == pList->pTail)
+    else if (current == pList->pTail) // if the node is the tail of the list
     {
         // set the tail of the list to the previous node
         pList->pTail = current->pPrev;
@@ -202,17 +201,15 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
             current->pPrev->pNext = NULL;
         }
     }
-    else
+    else // remove somewhere between two ferns
     {
-        // remove somewhere between two ferns
-
         // set the next pointer of the previous node to the next node
         current->pPrev->pNext = current->pNext;
         // set the previous pointer of the next node to the previous node
         current->pNext->pPrev = current->pPrev;
     }
 
-    // set the next and previous pointers of the current node to null
+    // explicit reset the pointers of the current node
     current->pNext = NULL;
     current->pPrev = NULL;
 
@@ -247,8 +244,8 @@ DoublyLinkedNode *CreateDoublyLinkedNode(void *pData)
 
     // Initialize the new node
     InitializeDoublyLinkedNode(pNode);
-    pNode->pData = pData;
-    pNode->dynamic = 1;
+    pNode->pData = pData; // attach the data to the node
+    pNode->dynamic = 1;   // set the dynamic flag to 1
 
     // Return a pointer to the new node
     return pNode;
@@ -291,6 +288,33 @@ DoublyLinkedNode *FindDoublyLinkedNode(void *pValue, DoublyLinkedList *pList)
     }
 
     // If the value is not found, return NULL
+    return NULL;
+}
+
+DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket)
+{
+    int i = 0;
+
+    // loop over the array of nodes and look for a process with the
+    // corresponding pid
+    for (i = 0; i < MAXPROC; i++)
+    {
+
+        // If we have NULL data just skip to the next node
+        if (((DoublyLinkedNode *)&pNodeBucket[i])->pData == NULL)
+        {
+            continue;
+        }
+
+        // Non-NULL data, check the pid
+        if (((Process *)((DoublyLinkedNode *)&pNodeBucket[i])->pData)->pid == withPid)
+        {
+            // match found
+            return &pNodeBucket[i];
+        }
+    }
+
+    // no match found
     return NULL;
 }
 

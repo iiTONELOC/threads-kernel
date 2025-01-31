@@ -61,6 +61,23 @@ int OrderFunction(void *pNode1, void *pNode2);
 void InitializeProcessToDefault(Process *usingProcessPtr);
 
 /**
+ * @brief Initialize a new process
+ *
+ * @param usingProcessPtr The process to initialize
+ * @param name The name of the process
+ * @param entryPoint The entry point of the process
+ * @param arg The arguments to pass to the process
+ * @param stacksize The size of the stack
+ * @param priority The priority of the process
+ * @param procSlot The slot in the process table
+ * @param nextPid The next process id
+ */
+void InitializeNewProcess(Process *usingProcessPtr, char *name,
+						  int (*entryPoint)(void *), void *arg,
+						  int stacksize, int priority, int procSlot,
+						  int nextPid);
+
+/**
  * @brief Retrieve the next empty process slot from the proccess table
  *
  * @param fromProcessTablePtr Pointer to the process table
@@ -80,20 +97,30 @@ int GetEmptyControlBlockIndex(Process *fromProcessTablePtr);
 void InitializeProcessTable(Process *usingTablePtr, int size);
 
 /**
- * @brief Find a Linked List Node using the process id
+ * @brief Get the next ready process from the READY queue
  *
- * @param pid The process id to search for
- * @param pNodeBucket The linked list node bucket to search
+ * @param pRunningProcess Pointer to the currently running process
+ * @param pPriorityListQueue Pointer to the priority list queue
+ * @param pWatchdog Pointer to the watchdog function
  *
- * @return The linked list node or NULL if not found
- * @note
- *  - A pointer to the Process is contained within the pData member of the linked list node.
- *
- *  - A Linked List Node rather than a Process is returned so that the priority list queue can be
- *   updated accordingly
- *
- *  - This relies on a linked list node rather than the bare process.
+ * @return Pointer to the next ready process or NULL if there are none
  */
-DoublyLinkedNode *FindProcessNodeByPid(int pid, DoublyLinkedNode *pNodeBucket);
+Process *GetNextReadyProcess(Process *pRunningProcess,
+							 DoublyLinkedList *pPriorityListQueue, int (*pWatchdog)(void *));
 
+/**
+ * @brief Clean up after exited children
+ *
+ * @param pRunningProcess Pointer to the currently running process
+ * @param pChildList Pointer to the list of children
+ * @param pStaticStorage Pointer to the static storage array
+ * @param pPriorityListQueue Pointer to the priority list queue
+ * @param pCode Pointer to the exit code
+ * @param pResult Pointer to the result
+ */
+void CleanUpAfterChild(Process *pRunningProcess,
+					   DoublyLinkedList *pChildList,
+					   DoublyLinkedNode *pStaticStorage,
+					   DoublyLinkedList *pPriorityListQueue,
+					   int *pCode, int *pResult);
 #endif

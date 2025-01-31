@@ -26,11 +26,11 @@
 #pragma pack(1)
 typedef struct DoublyLinkedList
 {
-    int count;                                     // Number of nodes in the list
+    int count;                                        // Number of nodes in the list
     unsigned short dynamic;                           // Dynamic allocation ?
-    DoublyLinkedNode* pHead;                          // Pointer to the head of the list
-    DoublyLinkedNode* pTail;                          // Pointer to the tail of the list
-    int (*OrderFunction)(void* pNode1, void* pNode2); // Pointer to an OrderFunction
+    DoublyLinkedNode *pHead;                          // Pointer to the head of the list
+    DoublyLinkedNode *pTail;                          // Pointer to the tail of the list
+    int (*OrderFunction)(void *pNode1, void *pNode2); // Pointer to an OrderFunction
 } DoublyLinkedList;
 
 // __________________________ Function Prototypes __________________________
@@ -43,8 +43,8 @@ typedef struct DoublyLinkedList
  * @param pList Pointer to the DoublyLinkedList structure.
  * @param OrderFunction Pointer to the function used to order the list.
  */
-void InitializeDoublyLinkedList(DoublyLinkedList* pList,
-    int (*OrderFunction)(void* pNode1, void* pNode2));
+void InitializeDoublyLinkedList(DoublyLinkedList *pList,
+                                int (*OrderFunction)(void *pNode1, void *pNode2));
 
 /**
  * @brief Initializes an array of doubly linked list nodes.
@@ -54,7 +54,7 @@ void InitializeDoublyLinkedList(DoublyLinkedList* pList,
  * @param pNode Pointer to the DoublyLinkedNode structure.
  * @param size The size of the array.
  */
-void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode* pNode, int size);
+void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, int size);
 
 /**
  * @brief Get the next empty linked node storage index.
@@ -65,7 +65,7 @@ void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode* pNode, int size);
  *
  * @return The index into the linked list node bucket or -1 if the bucket is full.
  */
-int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode* fromNodeBucket);
+int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode *fromNodeBucket);
 
 /**
  * @brief Initializes a doubly linked list node.
@@ -74,7 +74,7 @@ int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode* fromNodeBucket);
  *
  * @param pNode Pointer to the DoublyLinkedNode structure.
  */
-void InitializeDoublyLinkedNode(DoublyLinkedNode* pNode);
+void InitializeDoublyLinkedNode(DoublyLinkedNode *pNode);
 
 /**
  * @brief Inserts a node into a doubly linked list.
@@ -85,7 +85,7 @@ void InitializeDoublyLinkedNode(DoublyLinkedNode* pNode);
  * @param pList Pointer to the DoublyLinkedList structure.
  * @param pNode Pointer to the node to be inserted.
  */
-void InsertDoublyLinkedNode(DoublyLinkedList* pList, DoublyLinkedNode* pNode);
+void InsertDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode);
 
 /**
  * @brief Removes a node from a doubly linked list.
@@ -95,7 +95,7 @@ void InsertDoublyLinkedNode(DoublyLinkedList* pList, DoublyLinkedNode* pNode);
  * @param pList Pointer to the DoublyLinkedList structure.
  * @param pNode Pointer to the node to be removed.
  */
-void RemoveDoublyLinkedNode(DoublyLinkedList* pList, DoublyLinkedNode* pNode);
+void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode);
 
 /**
  * @brief Creates a new doubly linked list node.
@@ -106,7 +106,7 @@ void RemoveDoublyLinkedNode(DoublyLinkedList* pList, DoublyLinkedNode* pNode);
  *
  * @return Pointer to the newly created node or NULL if the memory allocation fails.
  */
-DoublyLinkedNode* CreateDoublyLinkedNode(void* pData);
+DoublyLinkedNode *CreateDoublyLinkedNode(void *pData);
 
 /**
  * @brief Destroys a doubly linked list node.
@@ -115,7 +115,7 @@ DoublyLinkedNode* CreateDoublyLinkedNode(void* pData);
  *
  * @param pNode Pointer to the node to be destroyed.
  */
-void DestroyDoublyLinkedNode(DoublyLinkedNode* pNode);
+void DestroyDoublyLinkedNode(DoublyLinkedNode *pNode);
 
 /**
  * @brief Finds a node in a doubly linked list by a specified value.
@@ -127,7 +127,17 @@ void DestroyDoublyLinkedNode(DoublyLinkedNode* pNode);
  *
  * @return Pointer to the node containing the value or NULL if the value is not found.
  */
-DoublyLinkedNode* FindDoublyLinkedNode(void* pValue, DoublyLinkedList* pList);
+DoublyLinkedNode *FindDoublyLinkedNode(void *pValue, DoublyLinkedList *pList);
+
+/**
+ * @brief Find a static Linked List Node using the process id
+ *
+ * @param withPid The process id to search for
+ * @param pNodeBucket The node bucket, array of nodes, to search
+ *
+ * @return The linked list node or NULL if not found
+ */
+DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket);
 
 /**
  * @brief Creates a new doubly linked list.
@@ -138,7 +148,7 @@ DoublyLinkedNode* FindDoublyLinkedNode(void* pValue, DoublyLinkedList* pList);
  *
  * @return Pointer to the newly created doubly linked list or NULL if the memory allocation fails.
  */
-DoublyLinkedList* CreateDoublyLinkedList(int (*OrderFunction)(void* pNode1, void* pNode2));
+DoublyLinkedList *CreateDoublyLinkedList(int (*OrderFunction)(void *pNode1, void *pNode2));
 
 /**
  * @brief Destroys a doubly linked list.
@@ -147,7 +157,7 @@ DoublyLinkedList* CreateDoublyLinkedList(int (*OrderFunction)(void* pNode1, void
  *
  * @param pList Pointer to the DoublyLinkedList structure.
  */
-void DestroyDoublyLinkedList(DoublyLinkedList* pList);
+void DestroyDoublyLinkedList(DoublyLinkedList *pList);
 
 /**
  * @brief Displays the contents of a doubly linked list.
@@ -156,7 +166,6 @@ void DestroyDoublyLinkedList(DoublyLinkedList* pList);
  *
  * @param pList Pointer to the DoublyLinkedList structure.
  */
-void DisplayDoublyLinkedList(DoublyLinkedList* pList);
+void DisplayDoublyLinkedList(DoublyLinkedList *pList);
 
 #endif
-
