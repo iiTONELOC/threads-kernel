@@ -23,10 +23,10 @@
 
 /* Process status */
 #define NUM_PROCESS_STATES 4
-#define READY 0
-#define RUNNING 1
-#define BLOCKED 2
-#define QUIT 3
+#define STATUS_READY 0
+#define STATUS_RUNNING 1
+#define STATUS_BLOCKED_WAIT 2
+#define STATUS_QUIT 3
 
 /* Max Processes*/
 #ifndef MAX_PROCESSES
@@ -41,6 +41,6 @@
 #define MIN_TIME_SLICE_MS 20
 #define MAX_TIME_SLICE_MS 50
 #define DEFAULT_TIME_SLICE_MS 20
-#define MS_TO_US 1000
+#define NUM_MILLI_SEC_IN_MICRO_SEC 1000
 
 #endif

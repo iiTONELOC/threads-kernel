@@ -38,6 +38,7 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     usingProcessPtr->processTableIndex = -1;
     InitializeDoublyLinkedList(&usingProcessPtr->pChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pDeadChildren, NULL);
+    InitializeDoublyLinkedList(&usingProcessPtr->pExitingChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pJoiningProcesses, NULL);
 }
 

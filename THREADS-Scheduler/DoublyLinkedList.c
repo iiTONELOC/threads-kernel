@@ -81,69 +81,73 @@ void InsertDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
         // If there is no order function, insert at the end
         if (pList->OrderFunction == NULL)
         {
-            pNode->pPrev = pList->pTail; // Set prev pointer to tail
-            pNode->pNext = NULL;         // Set next pointer to NULL
+            // this new node is the new tail of the list
 
-            if (pList->pTail != NULL)
-            {
-                pList->pTail->pNext = pNode; // Update tail's next pointer
-            }
-            pList->pTail = pNode; // Set new tail of the list
+            // set the next pointer of the current tail to the new node
+            pList->pTail->pNext = pNode;
+            // set the previous pointer of the new node to the current tail
+            pNode->pPrev = pList->pTail;
+            // set the tail of the list to the new node
+            pList->pTail = pNode;
         }
         else if (pList->OrderFunction(pNode, pList->pHead) < 0)
         {
-            // The new node has a lower order than the current head
-            pNode->pNext = pList->pHead; // Set next pointer to the current head
-            pNode->pPrev = NULL;         // Set prev pointer to NULL
-            pList->pHead->pPrev = pNode; // Update the current head's previous pointer
-            pList->pHead = pNode;        // Set the head of the list to the new node
+            // The new node is the new head of the list
+
+            // set the next pointer of the new node to the current head
+            pNode->pNext = pList->pHead;
+            // set the previous pointer of the current head to the new node
+            pList->pHead->pPrev = pNode;
+            // set the head of the list to the new node
+            pList->pHead = pNode;
         }
         else if (pList->OrderFunction(pNode, pList->pTail) > 0)
         {
             // The new node has a higher order than the current tail
-            pNode->pPrev = pList->pTail; // Set prev pointer to the current tail
-            pNode->pNext = NULL;         // Set next pointer to NULL
-            pList->pTail->pNext = pNode; // Update current tail's next pointer
-            pList->pTail = pNode;        // Set the tail of the list to the new node
+
+            // set the next pointer of the current tail to the new node
+            pList->pTail->pNext = pNode;
+            // set the previous pointer of the new node to the current tail
+            pNode->pPrev = pList->pTail;
+            // set the tail of the list to the new node
+            pList->pTail = pNode;
         }
         else
         {
-            // Insert somewhere in between two nodes
+            // The new node is somewhere in between the head and tail
+            // we need to insert the new node between the current node and the previous node
             while (current != NULL)
             {
-                // Is the value of the new node less than the current node?
                 if (pList->OrderFunction(pNode, current) < 0)
                 {
-                    pNode->pNext = current;        // Set next pointer to the current node
-                    pNode->pPrev = current->pPrev; // Set prev pointer to the current node's previous
-
-                    // update the current node's previous node's next pointer
-                    if (current->pPrev != NULL)
-                    {
-                        current->pPrev->pNext = pNode; // Update the previous node's next pointer
-                    }
-                    else
-                    {
-                        pList->pHead = pNode; // Inserting at the head, update list head
-                    }
-
-                    current->pPrev = pNode; // Update the current node's previous pointer
-                    break;                  // Exit the loop once inserted
+                    break;
                 }
-                // Not less than, move to the next node
-                current = current->pNext; // Move to the next node
+                current = current->pNext;
             }
 
-            // If we finished the loop without inserting, insert at the end
+            // if the current node is NULL, the new node is the new tail
+            // Shouldn't happen, as we check for this case above, but...
             if (current == NULL)
             {
-                pNode->pPrev = pList->pTail; // Set prev pointer to current tail
-                pNode->pNext = NULL;         // Set next pointer to NULL
-                if (pList->pTail != NULL)
-                {
-                    pList->pTail->pNext = pNode; // Update current tail's next pointer
-                }
-                pList->pTail = pNode; // Set the tail of the list to the new node
+                // set the previous pointer of the new node to the current tail
+                pNode->pPrev = pList->pTail;
+                // set the next pointer of the current tail to the new node
+                pList->pTail->pNext = pNode;
+                // set the tail of the list to the new node
+                pList->pTail = pNode;
+            }
+            else
+            {
+                // the new node is somewhere in between the head and tail
+                // we need to insert the new node between the current node and the previous node
+                // set the next pointer of the new node to the current node
+                pNode->pNext = current;
+                // set the previous pointer of the new node to the previous node
+                pNode->pPrev = current->pPrev;
+                // set the next pointer of the previous node to the new node
+                current->pPrev->pNext = pNode;
+                // set the previous pointer of the current node to the new node
+                current->pPrev = pNode;
             }
         }
     }
@@ -156,55 +160,71 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
 
     DoublyLinkedNode *current = pList->pHead;
     // if the list is empty, return
-    if (pList == NULL || pList->count == 0)
+    if (pList == NULL || pList->count == 0 || pNode == NULL)
     {
         return;
     }
 
-    // if the head and the tail are the same, remove the node
-    if (pList->pHead == pList->pTail)
+    // look for the node in the list
+    while (current != NULL)
     {
-        pList->pHead = NULL;
-        pList->pTail = NULL;
+        if (current == pNode)
+        {
+            break;
+        }
+        current = current->pNext;
     }
 
-    // if the node is at the end of the list
-    else if (pNode == pList->pTail)
+    // if the node is not found, return
+    if (current == NULL)
     {
-        pList->pTail = pNode->pPrev; // set the tail to the previous node
-        pNode->pPrev->pNext = NULL;  // set the next pointer of the previous node to NULL
+        return;
     }
 
-    // if the node is at the beginning of the list
-
-    else if (pNode == pList->pHead)
+    // if the node is the head of the list
+    if (current == pList->pHead)
     {
-        pList->pHead = pNode->pNext; // set the head to the next node
-        pNode->pNext->pPrev = NULL;  // set the previous pointer of the next node to NULL
+        // set the head of the list to the next node
+        pList->pHead = current->pNext;
+        // if the next node is not null, set the previous pointer of the current node to null
+        if (current->pNext != NULL)
+        {
+            current->pNext->pPrev = NULL;
+        }
     }
-
-    // if the node is in the middle of the list
+    else if (current == pList->pTail)
+    {
+        // set the tail of the list to the previous node
+        pList->pTail = current->pPrev;
+        // if the previous node is not null, set the next pointer to null
+        if (current->pPrev != NULL)
+        {
+            current->pPrev->pNext = NULL;
+        }
+    }
     else
     {
-        while (current != NULL)
-        {
-            if (current == pNode)
-            {
-                current->pPrev->pNext = current->pNext;
-                current->pNext->pPrev = current->pPrev;
-                break;
-            }
-            current = current->pNext;
-        }
+        // remove somewhere between two ferns
 
-        current = NULL;
+        // set the next pointer of the previous node to the next node
+        current->pPrev->pNext = current->pNext;
+        // set the previous pointer of the next node to the previous node
+        current->pNext->pPrev = current->pPrev;
     }
 
-    pNode->pNext = NULL;
-    pNode->pPrev = NULL;
+    // set the next and previous pointers of the current node to null
+    current->pNext = NULL;
+    current->pPrev = NULL;
 
-    // Decrement the count of nodes in the list
-    pList->count--;
+    pList->count--; // decrement the count of nodes in the list
+
+    // if the head is null and the count is 1, move the tail to the head
+    if (pList->pHead == NULL && pList->count == 1)
+    {
+        pList->pHead = pList->pTail;
+        pList->pHead->pPrev = NULL;
+        pList->pHead->pNext = NULL;
+    }
 
     // If the list is empty now, set both head and tail to NULL
     if (pList->count == 0)

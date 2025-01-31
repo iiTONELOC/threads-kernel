@@ -12,6 +12,7 @@ typedef struct _process
 {
 	DoublyLinkedList pChildren;
 	DoublyLinkedList pDeadChildren;
+	DoublyLinkedList pExitingChildren;
 	DoublyLinkedList pJoiningProcesses;
 
 	// LinkedListNode *pParent;
