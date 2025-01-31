@@ -35,21 +35,21 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Constants.h" />
     <ClInclude Include="DoublyLinkedList.h" />
-    <ClInclude Include="Include\Constants.h" />
     <ClInclude Include="Include\Scheduler.h" />
-    <ClInclude Include="Include\StringUtils.h" />
     <ClInclude Include="Include\THREADSLib.h" />
     <ClInclude Include="Lists.h" />
     <ClInclude Include="PriorityProcessQueue.h" />
     <ClInclude Include="Processes.h" />
+    <ClInclude Include="StringUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DoublyLinkedList.c" />
     <ClCompile Include="PriorityProcessQueue.c" />
     <ClCompile Include="Process.c" />
     <ClCompile Include="Scheduler.c" />
-    <ClCompile Include="Utils\Strings\StringUtils.c" />
+    <ClCompile Include="StringUtils.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
