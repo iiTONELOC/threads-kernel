@@ -1,3 +1,4 @@
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
@@ -295,8 +296,6 @@ int k_wait(int *code)
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
 
-    // set the running process NULL
-    runningProcess = NULL;
     dispatcher();
 
     disableInterrupts();
@@ -318,7 +317,6 @@ int k_wait(int *code)
         console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
     }
 
-    enableInterrupts();
     return result;
 }
 
@@ -412,8 +410,6 @@ void k_exit(int code)
         InitializeDoublyLinkedNode(pStaticListNode);
     }
 
-    // set the running process to NULL
-    runningProcess = NULL;
     dispatcher();
 }
 
@@ -428,7 +424,7 @@ void k_exit(int code)
 *************************************************************************/
 int k_kill(int pid, int signal)
 {
-    disableInterrupts();
+
     int result = 0;
     DoublyLinkedNode *pListNode = NULL;
 
@@ -445,7 +441,6 @@ int k_kill(int pid, int signal)
 
     // set the signal for the process
     ((Process *)pListNode->pData)->signal = signal;
-    enableInterrupts();
     return 0;
 }
 
@@ -535,23 +530,40 @@ DWORD read_clock()
 
 void display_process_table()
 {
+
+    /**
+     *  In C - Variables should be declared before you use them.
+     *    This is different from Python because in Python there is no way to declare a variable.
+     *
+     *    Also, you shouldn't decare variables inside of a loop,
+     *    because it will be redeclared every time the loop runs
+     *
+     *    Declare them outside the loop and update the values as needed
+     *
+     * It is always a good practice to declare variables at the beginning of the function
+     * it is up for debate on variable initialization, I feel for best practice and to ensure
+     * that you dont have any garbage values, you should initialize your variables when declaring them
+     * */
+
+    int parentPid = -1;
+    int numChildren = 0;
+    char *statusStr = NULL;
+    Process *pProcess = NULL;
+    char statusBuffer[20] = {0}; // Buffer for converting status number to a string
+
     // Print header
     console_output(FALSE, "PID     Parent   Priority  Status         # Kids   CPUtime  Name\n");
 
     // Loop through process table
     for (int i = 0; i < MAX_PROCESSES; i++)
     {
-        char statusBuffer[20]; // Buffer for converting status numbe to a string
-        Process *pProcess = &processTable[i];
-
+        pProcess = &processTable[i];
         // Skip empty process slots
         if (pProcess->context == NULL)
         {
             continue;
         }
 
-        // Convert status code to string
-        char *statusStr;
         if (pProcess->status == STATUS_READY)
         {
             statusStr = "READY";
@@ -583,7 +595,7 @@ void display_process_table()
         }
 
         // Get parent PID
-        int parentPid;
+
         if (pProcess->pParent != NULL)
         {
             parentPid = pProcess->pParent->pid;
@@ -594,7 +606,8 @@ void display_process_table()
         }
 
         // Count number of children
-        int numChildren = pProcess->pChildren.count;
+        // Might need to count the other lists as well
+        numChildren = pProcess->pChildren.count;
 
         // Print process information
         console_output(FALSE, "%-8d%-9d%-11d%-14s%-9d%-9llu%s\n",
@@ -641,6 +654,7 @@ void dispatcher()
         if (runningProcess != NULL &&
             pNextReadyProcess->pid == runningProcess->pid)
         {
+
             return;
         }
 
@@ -683,6 +697,10 @@ static int watchdog(void *dummy)
     {
         check_deadlock();
         console_output(FALSE, "All processes completed.\n");
+        // reset the tables
+        InitializeProcessTable(processTable, MAX_PROCESSES);
+        InitializePriorityProcessQueueArray(priorityListQueue, NUM_PROCESS_STATES);
+
         stop(0);
     }
 
@@ -776,10 +794,10 @@ int check_io_scheduler()
  */
 void time_slice()
 {
-    static int elapsed = 0;                                                // time elapsed since last context switch
-    static int lastTime = 0;                                               // last time the clock interrupt was called
-    int currentTime = system_clock();                                      // current time in μs but
-    int minQuantumUs = DEFAULT_TIME_SLICE_MS * NUM_MILLI_SEC_IN_MICRO_SEC; // 25 ms , should be 20-50 ms according to the book
+    static int elapsed = 0;                                            // time elapsed since last context switch
+    static int lastTime = 0;                                           // last time the clock interrupt was called
+    int currentTime = system_clock();                                  // current time in μs but
+    int minQuantumUs = MIN_TIME_SLICE_MS * NUM_MILLI_SEC_IN_MICRO_SEC; // 20 ms , should be 20-50 ms according to the book
 
     // if there is a running process and it doesn't have a start time, set it
     if (runningProcess != NULL && runningProcess->startTime == 0)

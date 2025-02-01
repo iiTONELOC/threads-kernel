@@ -117,7 +117,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
 
     // if the next process is NULL return the
     // current running process
-    if (pNextLNode == NULL)
+    if (pNextLNode == NULL && pRunningProcess != NULL)
     {
         return pRunningProcess;
     }
@@ -143,7 +143,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
         return (Process *)pNextLNode->pData;
     }
 
-    return pRunningProcess;
+    return NULL;
 }
 
 void CleanUpAfterChild(Process *pRunningProcess,
