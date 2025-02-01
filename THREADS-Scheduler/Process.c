@@ -1,5 +1,7 @@
 #include "Processes.h"
 #include "Constants.h"
+#include "StringUtils.h"
+#include "PriorityProcessQueue.h"
 
 /*_______________________Function  Definitions_______________________*/
 
@@ -98,8 +100,7 @@ int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
 }
 
 Process *GetNextReadyProcess(Process *pRunningProcess,
-                             DoublyLinkedList *pPriorityListQueue,
-                             int (*pWatchdog)(void *))
+                             DoublyLinkedList *pPriorityListQueue)
 {
     Process *pNextProcess = NULL;
     DoublyLinkedNode *pNextLNode = NULL;
@@ -142,8 +143,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
         return (Process *)pNextLNode->pData;
     }
 
-    // there is likely a deadlock or the watchdog is the last process to run
-    return pWatchdog(NULL);
+    return pRunningProcess;
 }
 
 void CleanUpAfterChild(Process *pRunningProcess,

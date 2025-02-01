@@ -5,7 +5,7 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
-#include "StringUtils.h"
+
 #include "PriorityProcessQueue.h"
 
 int nextPid = 1;                                        // next process id
@@ -17,6 +17,7 @@ interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers fr
 DoublyLinkedNode staticNodeStorage[MAX_PROCESSES];      // Storage for process state linked list
 DoublyLinkedList priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue for process states
 
+int cpu_time();
 void time_slice();
 void dispatcher();
 static int launch(void *);
@@ -256,10 +257,9 @@ static int launch(void *args)
 ************************************************************************ */
 int k_wait(int *code)
 {
-    disableInterrupts();
+
     int result = 0;                     // return value
     Process *pChild = NULL;             // Child process
-    DoublyLinkedNode *pNextNode;        // Used for traversal
     DoublyLinkedNode *pTempNode = NULL; // Linked List Node for the Running Process
 
     // Look for a running process, if there is a running process then it is the parent of the
@@ -275,7 +275,7 @@ int k_wait(int *code)
     {
         return -5;
     }
-
+    disableInterrupts();
     // check for dead children - children that have already quit
     if (runningProcess->pDeadChildren.count > 0)
     {
@@ -295,7 +295,11 @@ int k_wait(int *code)
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
 
+    // set the running process NULL
+    runningProcess = NULL;
     dispatcher();
+
+    disableInterrupts();
 
     // _______________AFTER PARENT WAS AWAKENED BY THEIR CHILD____________________
 
@@ -308,14 +312,13 @@ int k_wait(int *code)
                           priorityListQueue,
                           code,
                           &result);
-
-        return result;
     }
     else
     {
         console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
     }
 
+    enableInterrupts();
     return result;
 }
 
@@ -332,7 +335,6 @@ int k_wait(int *code)
 *************************************************************************/
 void k_exit(int code)
 {
-
     disableInterrupts();
     DoublyLinkedNode *pDynamicNode = NULL;
     DoublyLinkedNode *pStaticListNode = NULL;
@@ -353,11 +355,11 @@ void k_exit(int code)
         stop(1);
     }
 
-    // check for a signal event
-    if (runningProcess->signal)
+    // check for a signal event - Currently only SIG_TERM is supported
+    if (runningProcess->signal == SIG_TERM)
     {
         // if the process was signaled, set the exit code to the signal
-        code = -5;
+        runningProcess->exitCode = -5;
     }
     else
     {
@@ -410,6 +412,8 @@ void k_exit(int code)
         InitializeDoublyLinkedNode(pStaticListNode);
     }
 
+    // set the running process to NULL
+    runningProcess = NULL;
     dispatcher();
 }
 
@@ -424,31 +428,24 @@ void k_exit(int code)
 *************************************************************************/
 int k_kill(int pid, int signal)
 {
+    disableInterrupts();
     int result = 0;
     DoublyLinkedNode *pListNode = NULL;
 
-    // if the signal is invalid or the process is not found stop (1)
-    if (signal != SIG_TERM || (pListNode = FindDoublyLinkedNode(runningProcess,
-                                                                &priorityListQueue[STATUS_RUNNING])) == NULL)
+    // look for the process in the process table
+    pListNode = FindStaticStorageNode(pid, staticNodeStorage);
+
+    // if the process is not found or signal is not equal to SIG_TERM
+    if (pListNode == NULL ||
+        signal != SIG_TERM ||
+        (pListNode != NULL && ((Process *)pListNode->pData) == NULL))
     {
         stop(1);
     }
 
-    // check if the process has already been signaled, if so return 1
-    if (signaled())
-    {
-        return 1;
-    }
-
-    // set the signal
+    // set the signal for the process
     ((Process *)pListNode->pData)->signal = signal;
-
-    // if the process is blocked, unblock it
-    if (((Process *)pListNode->pData)->status == STATUS_BLOCKED_WAIT)
-    {
-        ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
-    }
-
+    enableInterrupts();
     return 0;
 }
 
@@ -485,7 +482,6 @@ int unblock(int pid)
 
     ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
     dispatcher();
-
     return 0;
 }
 
@@ -495,16 +491,16 @@ int unblock(int pid)
 int block(int newStatus)
 {
     // function blocks the calling process and sets the status in the process table to the value specified by newStatus
-    disableInterrupts();
-    // if the new status is between 0-10
-    if (newStatus < 0 || newStatus > 10)
-    {
-        console_output(debugFlag, "block(): Error: Invalid status value!\n");
-        stop(1);
-    }
+    // disableInterrupts();
+    // // if the new status is between 0-10
+    // if (newStatus < 0 || newStatus < 10)
+    // {
+    //     console_output(debugFlag, "block(): Error: Invalid status value!\n");
+    //     stop(1);
+    // }
 
-    DoublyLinkedNode *pListNode = FindStaticStorageNode(runningProcess->pid, staticNodeStorage);
-
+    // ChangeProcessStatus
+    // dispatcher();
     return 0;
 }
 
@@ -520,9 +516,15 @@ int signaled()
 *************************************************************************/
 int read_time()
 {
-    return 0;
+    return cpu_time();
 }
-
+/*************************************************************************
+   Name - cpu_time
+*************************************************************************/
+int cpu_time()
+{
+    return runningProcess ? runningProcess->cpuTime : 0;
+}
 /*************************************************************************
    Name - readClock
 *************************************************************************/
@@ -619,7 +621,7 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-    disableInterrupts();
+
     Process *pNextReadyProcess = NULL;
 
     // if we are in bootstrap, we need to return
@@ -628,8 +630,9 @@ void dispatcher()
         return;
     }
 
+    disableInterrupts();
     // get the next ready process
-    pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue, watchdog);
+    pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
 
     // if the next Ready process is null
     if (pNextReadyProcess != NULL)
@@ -638,7 +641,6 @@ void dispatcher()
         if (runningProcess != NULL &&
             pNextReadyProcess->pid == runningProcess->pid)
         {
-            enableInterrupts();
             return;
         }
 
@@ -647,6 +649,11 @@ void dispatcher()
 
         // set the running process to the current process
         context_switch(runningProcess->context);
+    }
+    else
+    {
+
+        watchdog(NULL);
     }
 }
 
@@ -769,20 +776,22 @@ int check_io_scheduler()
  */
 void time_slice()
 {
-    static int elapsed = 0;                                            // time elapsed since last context switch
-    static int lastTime = 0;                                           // last time the clock interrupt was called
-    int currentTime = system_clock();                                  // current time in μs but
-    int minQuantumUs = MIN_TIME_SLICE_MS * NUM_MILLI_SEC_IN_MICRO_SEC; // 20 ms , should be 20-50 ms according to the book
+    static int elapsed = 0;                                                // time elapsed since last context switch
+    static int lastTime = 0;                                               // last time the clock interrupt was called
+    int currentTime = system_clock();                                      // current time in μs but
+    int minQuantumUs = DEFAULT_TIME_SLICE_MS * NUM_MILLI_SEC_IN_MICRO_SEC; // 25 ms , should be 20-50 ms according to the book
 
     // if there is a running process and it doesn't have a start time, set it
     if (runningProcess != NULL && runningProcess->startTime == 0)
     {
+        // needs to be in μs
         runningProcess->startTime = currentTime;
     }
 
     // calculate the time elapsed since the last context switch
     if (lastTime != 0)
     {
+        // should be in μs
         elapsed += (currentTime - lastTime);
     }
 
@@ -793,7 +802,7 @@ void time_slice()
     if (runningProcess != NULL)
     {
         runningProcess->elapsedTime += elapsed;
-        runningProcess->cpuTime += elapsed;
+        runningProcess->cpuTime += (elapsed / NUM_MILLI_SEC_IN_MICRO_SEC);
     }
 
     // check if the elapsed time is greater than the minimum quantum

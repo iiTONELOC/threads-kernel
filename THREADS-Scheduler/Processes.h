@@ -101,12 +101,11 @@ void InitializeProcessTable(Process *usingTablePtr, int size);
  *
  * @param pRunningProcess Pointer to the currently running process
  * @param pPriorityListQueue Pointer to the priority list queue
- * @param pWatchdog Pointer to the watchdog function
  *
  * @return Pointer to the next ready process or NULL if there are none
  */
 Process *GetNextReadyProcess(Process *pRunningProcess,
-							 DoublyLinkedList *pPriorityListQueue, int (*pWatchdog)(void *));
+							 DoublyLinkedList *pPriorityListQueue);
 
 /**
  * @brief Clean up after exited children

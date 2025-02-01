@@ -40,7 +40,7 @@
 /* Time Slice */
 #define MIN_TIME_SLICE_MS 20
 #define MAX_TIME_SLICE_MS 50
-#define DEFAULT_TIME_SLICE_MS 20
+#define DEFAULT_TIME_SLICE_MS 25
 #define NUM_MILLI_SEC_IN_MICRO_SEC 1000
 
 #endif
