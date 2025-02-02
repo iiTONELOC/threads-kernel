@@ -6,12 +6,12 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
-
 #include "PriorityProcessQueue.h"
 
 int nextPid = 1;                                        // next process id
 int debugFlag = 0;                                      // debug flag
 int isBooting = 0;                                      // flag to indicate if the system is in bootstrap
+int inDispatcher = 0;                                   // flag to indicate if the system is in the dispatcher
 Process *runningProcess = NULL;                         // tracks current running process
 Process processTable[MAX_PROCESSES];                    // process table
 interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
@@ -119,7 +119,7 @@ int bootstrap(void *pArgs)
 ************************************************************************ */
 int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
 {
-    disableInterrupts();
+
     int result = 0;
     int proc_slot;
     Process *pNewProc;
@@ -161,7 +161,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         console_output(debugFlag, "spawn(): Priority is out of range.\n");
         return -3;
     }
-
+    disableInterrupts();
     /* Find an empty slot in the process table */
     proc_slot = GetEmptyControlBlockIndex(processTable);
 
@@ -211,7 +211,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 
     /* Increment the process id for the next process */
     nextPid++;
-
+    enableInterrupts();
     // call the dispatcher
     dispatcher();
     return pNewProc->pid;
@@ -276,28 +276,28 @@ int k_wait(int *code)
     {
         return -5;
     }
-    disableInterrupts();
     // check for dead children - children that have already quit
     if (runningProcess->pDeadChildren.count > 0)
     {
+        disableInterrupts();
         CleanUpAfterChild(runningProcess,
                           &runningProcess->pDeadChildren,
                           staticNodeStorage,
                           priorityListQueue,
                           code,
                           &result);
-
+        enableInterrupts();
         return result;
     }
 
+    disableInterrupts();
     // set status to blocked and call the dispatcher
     ChangeProcessStatus(priorityListQueue,
                         FindDoublyLinkedNode(runningProcess,
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
-
+    enableInterrupts();
     dispatcher();
-
     disableInterrupts();
 
     // _______________AFTER PARENT WAS AWAKENED BY THEIR CHILD____________________
@@ -317,6 +317,7 @@ int k_wait(int *code)
         console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
     }
 
+    enableInterrupts();
     return result;
 }
 
@@ -333,7 +334,7 @@ int k_wait(int *code)
 *************************************************************************/
 void k_exit(int code)
 {
-    disableInterrupts();
+
     DoublyLinkedNode *pDynamicNode = NULL;
     DoublyLinkedNode *pStaticListNode = NULL;
 
@@ -364,16 +365,17 @@ void k_exit(int code)
         // set the exit code
         runningProcess->exitCode = code;
     }
-
+    disableInterrupts();
     // Grab the static linked list node for the process from static node storage
     pStaticListNode = FindDoublyLinkedNode(runningProcess, &priorityListQueue[STATUS_RUNNING]);
 
     // set the status of the quitting process to QUIT - requires a static node
     ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
-
+    enableInterrupts();
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
+        disableInterrupts();
         pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
@@ -401,7 +403,7 @@ void k_exit(int code)
     }
     else
     {
-
+        disableInterrupts();
         // clean up the process since it has no parent - it needs to manage itself
         // not a child clean up the process
         // reinitialize the process structure
@@ -409,7 +411,7 @@ void k_exit(int code)
         // reinitialize the linked list node by setting all values to NULL
         InitializeDoublyLinkedNode(pStaticListNode);
     }
-
+    enableInterrupts();
     dispatcher();
 }
 
@@ -428,6 +430,7 @@ int k_kill(int pid, int signal)
     int result = 0;
     DoublyLinkedNode *pListNode = NULL;
 
+    disableInterrupts();
     // look for the process in the process table
     pListNode = FindStaticStorageNode(pid, staticNodeStorage);
 
@@ -441,6 +444,7 @@ int k_kill(int pid, int signal)
 
     // set the signal for the process
     ((Process *)pListNode->pData)->signal = signal;
+    enableInterrupts();
     return 0;
 }
 
@@ -476,6 +480,7 @@ int unblock(int pid)
     }
 
     ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
+    enableInterrupts();
     dispatcher();
     return 0;
 }
@@ -634,16 +639,16 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-
+    inDispatcher = 1;
     Process *pNextReadyProcess = NULL;
 
     // if we are in bootstrap, we need to return
     if (isBooting)
     {
+        inDispatcher = 0;
         return;
     }
 
-    disableInterrupts();
     // get the next ready process
     pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
 
@@ -654,7 +659,7 @@ void dispatcher()
         if (runningProcess != NULL &&
             pNextReadyProcess->pid == runningProcess->pid)
         {
-
+            inDispatcher = 0;
             return;
         }
 
@@ -666,7 +671,7 @@ void dispatcher()
     }
     else
     {
-
+        inDispatcher = 0;
         watchdog(NULL);
     }
 }
@@ -698,6 +703,7 @@ static int watchdog(void *dummy)
         check_deadlock();
         console_output(FALSE, "All processes completed.\n");
         // reset the tables
+        disableInterrupts();
         InitializeProcessTable(processTable, MAX_PROCESSES);
         InitializePriorityProcessQueueArray(priorityListQueue, NUM_PROCESS_STATES);
 
@@ -714,6 +720,7 @@ static void check_deadlock()
     Process *pCurrentProc = NULL;
     DoublyLinkedNode *pNextLNode = NULL;
 
+    disableInterrupts();
     // determine why the watchdog was called
     for (i = STATUS_RUNNING, i <= NUM_PROCESS_STATES - 1; i++;)
     {
@@ -721,6 +728,7 @@ static void check_deadlock()
         // to determine if there are processes in the system
         if (priorityListQueue[i].count > 0)
         {
+            enableInterrupts();
             return;
         }
     }
@@ -824,7 +832,7 @@ void time_slice()
     }
 
     // check if the elapsed time is greater than the minimum quantum
-    if (elapsed >= minQuantumUs)
+    if (elapsed >= minQuantumUs && !inDispatcher)
     {
         elapsed = 0;
         dispatcher();
