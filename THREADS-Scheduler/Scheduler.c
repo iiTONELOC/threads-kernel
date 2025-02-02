@@ -296,6 +296,7 @@ int k_wait(int *code)
                         FindDoublyLinkedNode(runningProcess,
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
+    runningProcess = NULL;
     enableInterrupts();
     dispatcher();
     disableInterrupts();
@@ -411,6 +412,8 @@ void k_exit(int code)
         // reinitialize the linked list node by setting all values to NULL
         InitializeDoublyLinkedNode(pStaticListNode);
     }
+    runningProcess = NULL;
+
     enableInterrupts();
     dispatcher();
 }
@@ -665,7 +668,7 @@ void dispatcher()
 
         // set the running process to the next ready process
         runningProcess = pNextReadyProcess;
-
+        inDispatcher = 0;
         // set the running process to the current process
         context_switch(runningProcess->context);
     }
@@ -802,10 +805,10 @@ int check_io_scheduler()
  */
 void time_slice()
 {
-    static int elapsed = 0;                                            // time elapsed since last context switch
-    static int lastTime = 0;                                           // last time the clock interrupt was called
-    int currentTime = system_clock();                                  // current time in μs but
-    int minQuantumUs = MIN_TIME_SLICE_MS * NUM_MILLI_SEC_IN_MICRO_SEC; // 20 ms , should be 20-50 ms according to the book
+    static int elapsed = 0;                             // time elapsed since last context switch
+    static int lastTime = 0;                            // last time the clock interrupt was called
+    int currentTime = system_clock();                   // current time in μs but
+    int minQuantumUs = 25 * NUM_MILLI_SEC_IN_MICRO_SEC; // 20 ms , should be 20-50 ms according to the book
 
     // if there is a running process and it doesn't have a start time, set it
     if (runningProcess != NULL && runningProcess->startTime == 0)
@@ -832,10 +835,15 @@ void time_slice()
     }
 
     // check if the elapsed time is greater than the minimum quantum
-    if (elapsed >= minQuantumUs && !inDispatcher)
+    if (runningProcess->elapsedTime >= minQuantumUs && !inDispatcher)
     {
         elapsed = 0;
+        runningProcess->elapsedTime = 0;
         dispatcher();
+    }
+    else
+    {
+        elapsed = 0;
     }
 }
 
