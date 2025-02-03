@@ -652,30 +652,40 @@ void dispatcher()
         return;
     }
 
-    // get the next ready process
-    pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
-
-    // if the next Ready process is null
-    if (pNextReadyProcess != NULL)
+    // determine if the currently running process has exceeded its quantum
+    if (runningProcess != NULL &&
+        (runningProcess->elapsedTime >= MAX_PROC_QUANTUM))
     {
-        // if we get the same process back no need to context switch
-        if (runningProcess != NULL &&
-            pNextReadyProcess->pid == runningProcess->pid)
-        {
-            inDispatcher = 0;
-            return;
-        }
-
-        // set the running process to the next ready process
-        runningProcess = pNextReadyProcess;
-        inDispatcher = 0;
-        // set the running process to the current process
-        context_switch(runningProcess->context);
+        // let time slice update the elapsed time
+        time_slice();
     }
     else
     {
-        inDispatcher = 0;
-        watchdog(NULL);
+        // get the next ready process
+        pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
+
+        // if the next Ready process is null
+        if (pNextReadyProcess != NULL)
+        {
+            // if we get the same process back no need to context switch
+            if (runningProcess != NULL &&
+                pNextReadyProcess->pid == runningProcess->pid)
+            {
+                inDispatcher = 0;
+                return;
+            }
+
+            // set the running process to the next ready process
+            runningProcess = pNextReadyProcess;
+            inDispatcher = 0;
+            // set the running process to the current process
+            context_switch(runningProcess->context);
+        }
+        else
+        {
+            inDispatcher = 0;
+            watchdog(NULL);
+        }
     }
 }
 
@@ -805,10 +815,9 @@ int check_io_scheduler()
  */
 void time_slice()
 {
-    static int elapsed = 0;                             // time elapsed since last context switch
-    static int lastTime = 0;                            // last time the clock interrupt was called
-    int currentTime = system_clock();                   // current time in μs but
-    int minQuantumUs = 25 * NUM_MILLI_SEC_IN_MICRO_SEC; // 20 ms , should be 20-50 ms according to the book
+    static int elapsed = 0;           // time elapsed since last context switch
+    static int lastTime = 0;          // last time the clock interrupt was called
+    int currentTime = system_clock(); // current time in μs but
 
     // if there is a running process and it doesn't have a start time, set it
     if (runningProcess != NULL && runningProcess->startTime == 0)
@@ -835,7 +844,7 @@ void time_slice()
     }
 
     // check if the elapsed time is greater than the minimum quantum
-    if (runningProcess->elapsedTime >= minQuantumUs && !inDispatcher)
+    if (runningProcess->elapsedTime >= MAX_PROC_QUANTUM && !inDispatcher)
     {
         elapsed = 0;
         runningProcess->elapsedTime = 0;
