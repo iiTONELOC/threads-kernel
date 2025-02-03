@@ -1,8 +1,25 @@
-// #include "Processes.h"
-// #include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
 // __________________________ Function Definitions __________________________
+
+int GetStatusListIndex(int status)
+{
+    int safeStatus = status;
+
+    // if the status is less than 0 or greater than the number of process states
+    if (safeStatus < 0 || safeStatus > NUM_PROCESS_STATES)
+    {
+        return STATUS_USER_SET;
+    }
+
+    // if the status is greater than the number of process states and less than the number of reserved states
+    if (safeStatus > NUM_PROCESS_STATES && safeStatus < NUM_RESERVED_STATES)
+    {
+        return STATUS_USER_SET;
+    }
+
+    return safeStatus;
+}
 
 void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int numStates)
 {
@@ -46,11 +63,7 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
         return;
     }
 
-    if (newStatus < 0 || newStatus > NUM_PROCESS_STATES)
-    {
-        return;
-    }
-
+    newStatus = GetStatusListIndex(newStatus);
     if (((Process *)pListNode->pData)->status == newStatus)
     {
         return;

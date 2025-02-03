@@ -22,11 +22,15 @@
 #define SIG_TERM 15
 
 /* Process status */
-#define NUM_PROCESS_STATES 4
+
 #define STATUS_READY 0
 #define STATUS_RUNNING 1
 #define STATUS_BLOCKED_WAIT 2
-#define STATUS_QUIT 3
+#define STATUS_BLOCKED_JOIN 3
+#define STATUS_QUIT 4
+#define STATUS_USER_SET 5      // User defined status
+#define NUM_PROCESS_STATES 6   // Number of process states in use
+#define NUM_RESERVED_STATES 10 // Total number reserved for the kernel
 
 /* Max Processes*/
 #ifndef MAX_PROCESSES

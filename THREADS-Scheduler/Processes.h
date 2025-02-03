@@ -122,4 +122,14 @@ void CleanUpAfterChild(Process *pRunningProcess,
 					   DoublyLinkedNode *pStaticStorage,
 					   DoublyLinkedList *pPriorityListQueue,
 					   int *pCode, int *pResult);
+
+/**
+ * @brief Move a child from one list to another
+ *
+ * @param pFromList Pointer to the list to move from
+ * @param pToList Pointer to the list to move to
+ * @param pChild Pointer to the child to move
+ */
+void MoveChild(DoublyLinkedList *pFromList, DoublyLinkedList *pToList, Process *pChild);
+
 #endif

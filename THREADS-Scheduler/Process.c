@@ -124,7 +124,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
 
     // if the next process has a higher or equal priority
     // to the current running process, return the next process
-    if (((Process *)pNextLNode->pData)->priority >= higherThanPriority)
+    if (pNextLNode != NULL && ((Process *)pNextLNode->pData)->priority >= higherThanPriority)
     {
         // remove the currently running process from the running list
         // and place it into the ready list if it is still in a running state
@@ -177,4 +177,22 @@ void CleanUpAfterChild(Process *pRunningProcess,
     InitializeDoublyLinkedNode(pStaticNode);
     // Free the memory for dynamically created node for the parent to track its child
     DestroyDoublyLinkedNode(pDynamicNode);
+}
+
+void MoveChild(DoublyLinkedList *pFromList, DoublyLinkedList *pToList, Process *pChild)
+{
+    DoublyLinkedNode *pDynamicNode = NULL;
+
+    // find the child in the from list
+    pDynamicNode = FindDoublyLinkedNode(pChild, pFromList);
+
+    if (pDynamicNode == NULL)
+    {
+        return;
+    }
+
+    // remove the child from the from list
+    RemoveDoublyLinkedNode(pFromList, pDynamicNode);
+    // insert the child into the to list
+    InsertDoublyLinkedNode(pToList, pDynamicNode);
 }

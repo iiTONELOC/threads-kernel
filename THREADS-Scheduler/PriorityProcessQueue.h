@@ -4,15 +4,48 @@
 #include "Processes.h"
 #include "DoublyLinkedList.h"
 
-/*_______________________Function  Definitions_______________________*/
+/*_______________________Function  Prototypes_______________________*/
 
 /**
- * @brief Initializes an array of priority process queues.
+ * @brief Get the index of the status in the status list
  *
- * A priority process queue is a doubly linked list of processes that are sorted by priority.
+ * @param status The status to get the index for
+ *
+ * @return The index of the status list
  */
-void InitializePriorityProcessQueueArray(DoublyLinkedList* usingArrayPtr, int numStates);
-void AddNodeToPriorityProcessQueue(DoublyLinkedList* usingQueuePtr, DoublyLinkedNode* pListNode);
-void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList* usingListPtr, DoublyLinkedNode* pListNode);
-void ChangeProcessStatus(DoublyLinkedList* usingListPtr, DoublyLinkedNode* pListNode, int newStatus);
+int GetStatusListIndex(int status);
+
+/**
+ * @brief Initializes the priority process queue array
+ *
+ * @param usingArrayPtr The array of priority process queues
+ * @param numStates The number of states to initialize
+ */
+void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int numStates);
+
+/**
+ * @brief Add a node to the priority process queue
+ *
+ * @param usingQueuePtr The queue to add the node to
+ * @param pListNode The node to add
+ */
+void AddNodeToPriorityProcessQueue(DoublyLinkedList *usingQueuePtr, DoublyLinkedNode *pListNode);
+
+/**
+ * @brief Remove a node from the priority process queue
+ *
+ * @param usingListPtr The list to remove the node from
+ * @param pListNode The node to remove
+ */
+void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode);
+
+/**
+ * @brief Change the status of a process
+ *
+ * @param usingListPtr The list to change the status in
+ * @param pListNode The node to change the status of
+ * @param newStatus The new status to set
+ */
+void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode, int newStatus);
+
 #endif
