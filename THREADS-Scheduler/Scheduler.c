@@ -21,9 +21,11 @@ DoublyLinkedList priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue f
 int cpu_time();
 void time_slice();
 void dispatcher();
+void enforceKernelMode();
 static int launch(void *);
 static int watchdog(void *);
 static void check_deadlock();
+
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
@@ -119,7 +121,7 @@ int bootstrap(void *pArgs)
 ************************************************************************ */
 int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
 {
-
+    enforceKernelMode();
     int result = 0;
     int proc_slot;
     Process *pNewProc;
@@ -158,7 +160,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 
     if (priority < LOWEST_PRIORITY || priority > HIGHEST_PRIORITY)
     {
-        console_output(debugFlag, "spawn(): Priority is out of range.\n");
+        console_output(debugFlag, "spawn(): Priority out of range.\n");
         return -3;
     }
     disableInterrupts();
@@ -258,7 +260,8 @@ static int launch(void *args)
 ************************************************************************ */
 int k_wait(int *code)
 {
-
+    enforceKernelMode();
+    disableInterrupts();
     int result = 0;                     // return value
     Process *pChild = NULL;             // Child process
     DoublyLinkedNode *pTempNode = NULL; // Linked List Node for the Running Process
@@ -271,15 +274,9 @@ int k_wait(int *code)
         return -1;
     }
 
-    // if the process was signaled, return -5
-    if (runningProcess->signal)
-    {
-        return -5;
-    }
     // check for dead children - children that have already quit
     if (runningProcess->pDeadChildren.count > 0)
     {
-        disableInterrupts();
         CleanUpAfterChild(runningProcess,
                           &runningProcess->pDeadChildren,
                           staticNodeStorage,
@@ -290,19 +287,32 @@ int k_wait(int *code)
         return result;
     }
 
-    disableInterrupts();
+    // check for joining children - children that are waiting to join
+    if (runningProcess->pJoiningProcesses.count > 0)
+    {
+        // clean up after the child
+        CleanUpAfterChild(runningProcess,
+                          &runningProcess->pJoiningProcesses,
+                          staticNodeStorage,
+                          priorityListQueue,
+                          code,
+                          &result);
+        enableInterrupts();
+        return result;
+    }
+
+    // disableInterrupts();
     // set status to blocked and call the dispatcher
     ChangeProcessStatus(priorityListQueue,
                         FindDoublyLinkedNode(runningProcess,
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
     runningProcess = NULL;
-    enableInterrupts();
+    // enableInterrupts();
     dispatcher();
-    disableInterrupts();
 
     // _______________AFTER PARENT WAS AWAKENED BY THEIR CHILD____________________
-
+    disableInterrupts();
     // get the exit code of the child
     if (runningProcess->pExitingChildren.count > 0)
     {
@@ -317,8 +327,12 @@ int k_wait(int *code)
     {
         console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
     }
+    if (runningProcess->signal)
+    {
+        return -5;
+    }
+    // enableInterrupts();
 
-    enableInterrupts();
     return result;
 }
 
@@ -335,7 +349,9 @@ int k_wait(int *code)
 *************************************************************************/
 void k_exit(int code)
 {
-
+    enforceKernelMode();
+    disableInterrupts();
+    Process *pProcessINeedToJoin = NULL;
     DoublyLinkedNode *pDynamicNode = NULL;
     DoublyLinkedNode *pStaticListNode = NULL;
 
@@ -348,10 +364,9 @@ void k_exit(int code)
     }
 
     // check if the process has children
-    if (runningProcess->pChildren.count > 0 ||
-        runningProcess->pDeadChildren.count > 0)
+    if (runningProcess->pChildren.count > 0)
     {
-        console_output(debugFlag, "k_exit(): Error: Process has children!\n");
+        console_output(debugFlag, "quit(): Process with active children attempting to quit\n");
         stop(1);
     }
 
@@ -366,17 +381,17 @@ void k_exit(int code)
         // set the exit code
         runningProcess->exitCode = code;
     }
-    disableInterrupts();
+
     // Grab the static linked list node for the process from static node storage
     pStaticListNode = FindDoublyLinkedNode(runningProcess, &priorityListQueue[STATUS_RUNNING]);
 
     // set the status of the quitting process to QUIT - requires a static node
     ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
-    enableInterrupts();
+    // enableInterrupts();
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
-        disableInterrupts();
+        // disableInterrupts();
         pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
@@ -404,14 +419,63 @@ void k_exit(int code)
     }
     else
     {
-        disableInterrupts();
-        // clean up the process since it has no parent - it needs to manage itself
-        // not a child clean up the process
-        // reinitialize the process structure
-        InitializeProcessToDefault(runningProcess);
-        // reinitialize the linked list node by setting all values to NULL
-        InitializeDoublyLinkedNode(pStaticListNode);
+        if (runningProcess->pDeadChildren.count > 0)
+        {
+            console_output(debugFlag, "k_exit(): Process with dead children attempting to quit\n");
+        }
+
+        // if the process isnt joining another process, clean up after the child
+        if (runningProcess->pProcessToJoin.count == 0)
+        {
+            // reinitialize the process structure
+            InitializeProcessToDefault(runningProcess);
+            // reinitialize the linked list node by setting all values to NULL
+            InitializeDoublyLinkedNode(pStaticListNode);
+        }
     }
+
+    // check if the process needs to join a process
+    if (runningProcess->pProcessToJoin.count > 0)
+    {
+
+        // get dynamic node for the process to join
+        pDynamicNode = runningProcess->pProcessToJoin.pHead;
+
+        pProcessINeedToJoin = (Process *)pDynamicNode->pData;
+
+        // remove the process from the joining process list
+        RemoveDoublyLinkedNode(&runningProcess->pProcessToJoin, pDynamicNode);
+        DestroyDoublyLinkedNode(pDynamicNode);
+
+        // set the status of the process to join to ready
+        ChangeProcessStatus(priorityListQueue,
+                            FindStaticStorageNode(pProcessINeedToJoin->pid, staticNodeStorage),
+                            STATUS_READY);
+
+        // set the exit code of the running process
+        runningProcess->exitCode = code;
+
+        // create a new linked list node for the joining process list
+        pDynamicNode = CreateDoublyLinkedNode(runningProcess);
+
+        // if the linked list node is NULL, return an error
+        if (pDynamicNode == NULL)
+        {
+            console_output(debugFlag,
+                           "exit(): Error: Could not create a new linked list node for the joining process.\n");
+            return;
+        }
+
+        // if the running process was signaled, set the exit code to -5
+        if (runningProcess->signal == SIG_TERM)
+        {
+            runningProcess->exitCode = -5;
+        }
+
+        // add the process to the joining process list on the process it is trying to join
+        InsertDoublyLinkedNode(&pProcessINeedToJoin->pJoiningProcesses, pDynamicNode);
+    }
+
     runningProcess = NULL;
 
     enableInterrupts();
@@ -429,7 +493,7 @@ void k_exit(int code)
 *************************************************************************/
 int k_kill(int pid, int signal)
 {
-
+    enforceKernelMode();
     int result = 0;
     DoublyLinkedNode *pListNode = NULL;
 
@@ -456,6 +520,7 @@ int k_kill(int pid, int signal)
 *************************************************************************/
 int k_getpid()
 {
+    enforceKernelMode();
     return runningProcess ? runningProcess->pid : 0;
 }
 
@@ -464,7 +529,108 @@ int k_getpid()
 ***************************************************************************/
 int k_join(int pid, int *pChildExitCode)
 {
-    return 0;
+
+    enforceKernelMode();
+    disableInterrupts();
+
+    // waits for the specified child process to exit and retrieves the exit code
+    int result = 0;
+    Process *pProcessIWantToJoin = NULL;
+    DoublyLinkedNode *pStaticNode = NULL;
+    DoublyLinkedNode *pDynamicNode = NULL;
+
+    pStaticNode = FindStaticStorageNode(pid, staticNodeStorage);
+    pProcessIWantToJoin = (Process *)pStaticNode->pData;
+    // if the process is trying to join itself or the process is not found stop(1)
+    if (pid == k_getpid() || pStaticNode == NULL || pProcessIWantToJoin == NULL)
+    {
+        console_output(debugFlag, "join: attempting to join a process that does not exist.\n");
+        stop(1);
+    }
+
+    // if the process is trying to join its parent stop(2)
+    if (runningProcess->pParent != NULL && pid == runningProcess->pParent->pid)
+    {
+        console_output(debugFlag, "join: process attempted to join parent.\n");
+        stop(2);
+    }
+
+    // Otherwise, we need to block with a block join
+    ChangeProcessStatus(priorityListQueue,
+                        FindDoublyLinkedNode(runningProcess,
+                                             &priorityListQueue[STATUS_RUNNING]),
+                        STATUS_BLOCKED_JOIN);
+
+    // create a new linked list node for the joining process list
+    pDynamicNode = CreateDoublyLinkedNode(runningProcess);
+    // if the linked list node is NULL, return an error
+    if (pDynamicNode == NULL)
+    {
+        console_output(debugFlag,
+                       "join(): Error: Could not create a new linked list node for the joining process.\n");
+        return -6;
+    }
+
+    // add the running process to the joining process list on the process it is trying to join
+    InsertDoublyLinkedNode(&pProcessIWantToJoin->pProcessToJoin, pDynamicNode);
+    enableInterrupts();
+    // add the process to the joining process list
+    dispatcher();
+
+    // ___________ AFTER PARENT WAS AWAKENED BY THE JOINING PROCESS ______________________
+    disableInterrupts();
+    // console_output(debugFlag, "k_join(): Process awakened\n");
+
+    // look in the joining list
+    if (runningProcess->pJoiningProcesses.count > 0)
+    {
+        // console_output(debugFlag, "k_join(): Process found in the joining list\n");
+
+        // get the exit code of the joining process
+        pDynamicNode = runningProcess->pJoiningProcesses.pHead;
+        pProcessIWantToJoin = (Process *)pDynamicNode->pData;
+        *pChildExitCode = ((Process *)pDynamicNode->pData)->exitCode;
+        result = ((Process *)pDynamicNode->pData)->pid;
+
+        // check if the process has a parent
+        if (((Process *)pDynamicNode->pData)->pParent != NULL)
+        {
+            // remove the process from the joining process list
+            RemoveDoublyLinkedNode(&((Process *)pDynamicNode->pData)->pParent->pJoiningProcesses, pDynamicNode);
+            // place it in their dead children list
+            InsertDoublyLinkedNode(&((Process *)pDynamicNode->pData)->pParent->pDeadChildren, pDynamicNode);
+        }
+        else
+        {
+
+            // // print out information about the process
+            // console_output(debugFlag, "Process %s has no parent\n", ((Process *)pDynamicNode->pData)->name);
+            // console_output(debugFlag, "Process %s has exited with code %d\n",
+            //                ((Process *)pDynamicNode->pData)->name,
+            //                ((Process *)pDynamicNode->pData)->exitCode);
+
+            // see if the process had been signaled
+            if (((Process *)pDynamicNode->pData)->signal)
+            {
+                // set the exit code to -5
+                *pChildExitCode = -5;
+            }
+
+            // CleanUpAfterChild((Process *)pStaticNode->pData,
+            //                   &runningProcess->pJoiningProcesses,
+            //                   staticNodeStorage,
+            //                   priorityListQueue,
+            //                   pChildExitCode,
+            //                   &result);
+        }
+    }
+    else
+    {
+        // console_output(debugFlag, "k_join(): Process not found in the joining list\n");
+    }
+
+    enableInterrupts();
+    return result;
 }
 
 /**************************************************************************
@@ -472,12 +638,22 @@ int k_join(int pid, int *pChildExitCode)
 *************************************************************************/
 int unblock(int pid)
 {
+    int isBlocked = 0;
     disableInterrupts();
     // get the process from the process table
+    Process *pProcess = NULL;
     DoublyLinkedNode *pListNode = FindStaticStorageNode(pid, staticNodeStorage);
 
+    if (pListNode != NULL)
+    {
+        pProcess = (Process *)pListNode->pData;
+        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT ||
+                    pProcess->status == STATUS_BLOCKED_JOIN ||
+                    pProcess->status == STATUS_BLOCKED_IO;
+    }
+
     // if invalid or process is not blocked, return -1
-    if (pListNode == NULL || ((Process *)pListNode->pData)->status != STATUS_BLOCKED_WAIT)
+    if (pListNode == NULL || !isBlocked)
     {
         return -1;
     }
@@ -493,17 +669,22 @@ int unblock(int pid)
 *************************************************************************/
 int block(int newStatus)
 {
-    // function blocks the calling process and sets the status in the process table to the value specified by newStatus
-    // disableInterrupts();
-    // // if the new status is between 0-10
-    // if (newStatus < 0 || newStatus < 10)
-    // {
-    //     console_output(debugFlag, "block(): Error: Invalid status value!\n");
-    //     stop(1);
-    // }
 
-    // ChangeProcessStatus
-    // dispatcher();
+    // function blocks the calling process and sets the status in the process table to the value specified by newStatus
+
+    // if the new status is between 0-10
+    if (newStatus < 0 || newStatus < 10)
+    {
+        console_output(debugFlag, "block: function called with a reserved status value.\n");
+        stop(1);
+    }
+
+    disableInterrupts();
+    ChangeProcessStatus(priorityListQueue,
+                        FindDoublyLinkedNode(runningProcess,
+                                             &priorityListQueue[STATUS_RUNNING]),
+                        newStatus);
+    dispatcher();
     return 0;
 }
 
@@ -588,7 +769,7 @@ void display_process_table()
         {
             statusStr = "QUIT";
         }
-        else if (pProcess->status == 14)
+        else if (pProcess->status == STATUS_BLOCKED_JOIN)
         { // Special case for JOIN BLOCK
             statusStr = "JOIN BLOCK";
         }
@@ -654,9 +835,10 @@ void dispatcher()
 
     // determine if the currently running process has exceeded its quantum
     if (runningProcess != NULL &&
-        (runningProcess->elapsedTime >= MAX_PROC_QUANTUM))
+        (runningProcess->elapsedTime >= runningProcess->quantum))
     {
         // let time slice update the elapsed time
+        inDispatcher = 0;
         time_slice();
     }
     else
@@ -684,7 +866,7 @@ void dispatcher()
         else
         {
             inDispatcher = 0;
-            watchdog(NULL);
+            return;
         }
     }
 }
@@ -702,7 +884,10 @@ void dispatcher()
    *************************************************************************/
 static int watchdog(void *dummy)
 {
+
     Process *pNextReadyProc = NULL;
+    DoublyLinkedNode *pDynamicNode = NULL;
+    DoublyLinkedNode *pStaticListNode = NULL;
     DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
 
     if (isBooting)
@@ -714,13 +899,8 @@ static int watchdog(void *dummy)
     if (pNode == NULL || pNode->pData == NULL)
     {
         check_deadlock();
-        console_output(FALSE, "All processes completed.\n");
-        // reset the tables
-        disableInterrupts();
-        InitializeProcessTable(processTable, MAX_PROCESSES);
-        InitializePriorityProcessQueueArray(priorityListQueue, NUM_PROCESS_STATES);
-
-        stop(0);
+        console_output(FALSE, "Processes still exist.\n");
+        stop(1);
     }
 
     return 0;
@@ -735,18 +915,42 @@ static void check_deadlock()
 
     disableInterrupts();
     // determine why the watchdog was called
-    for (i = STATUS_RUNNING, i <= NUM_PROCESS_STATES - 1; i++;)
+    while (1)
     {
-        // check the count on each linked list
-        // to determine if there are processes in the system
-        if (priorityListQueue[i].count > 0)
+        // check for deadlock
+        // print out the number of ready processes
+
+        // loop over the priority list queue
+        for (i = 0; i < NUM_PROCESS_STATES; i++)
         {
-            enableInterrupts();
-            return;
+            // get the head of the list
+            pNextLNode = priorityListQueue[i].pHead;
+
+            // if the head is not null, we have a process
+            if (pNextLNode != NULL)
+            {
+                // get the process
+                pCurrentProc = (Process *)pNextLNode->pData;
+
+                // if the process is not null, we have a process
+                if (pCurrentProc != NULL && pCurrentProc->status != STATUS_RUNNING)
+                {
+                    // print the process name
+                    console_output(FALSE, "Current List is the %s list.\n", STATUS_STRINGS[i]);
+                    console_output(FALSE, "Current process is:  %s .\n", pCurrentProc->name);
+                    // print out the process
+                    pCurrentProc = (Process *)pNextLNode->pData;
+                    console_output(FALSE, "Process %s is ready.\n", pCurrentProc->name);
+                }
+            }
         }
+        break;
     }
+
+    console_output(FALSE, "All processes completed.\n");
+
     // we arrived here because there are no processes in the system
-    stop(1);
+    stop(0);
 }
 
 /*
@@ -756,12 +960,7 @@ static inline void disableInterrupts()
 {
 
     /* We ARE in kernel mode */
-
-    int psr = get_psr();
-
-    psr = psr & ~PSR_INTERRUPTS;
-
-    set_psr(psr);
+    set_psr(get_psr() & ~PSR_INTERRUPTS);
 
 } /* disableInterrupts */
 
@@ -770,13 +969,7 @@ static inline void disableInterrupts()
  */
 static inline void enableInterrupts()
 {
-
-    int psr = get_psr();
-
-    psr = psr | PSR_INTERRUPTS;
-
-    set_psr(psr);
-
+    set_psr(get_psr() | PSR_INTERRUPTS);
 } /*
 
 
@@ -843,8 +1036,8 @@ void time_slice()
         runningProcess->cpuTime += (elapsed / NUM_MILLI_SEC_IN_MICRO_SEC);
     }
 
-    // check if the elapsed time is greater than the minimum quantum
-    if (runningProcess->elapsedTime >= MAX_PROC_QUANTUM && !inDispatcher)
+    // check if the elapsed time is greater than the quantum for the running process
+    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum && !inDispatcher)
     {
         elapsed = 0;
         runningProcess->elapsedTime = 0;
@@ -869,4 +1062,15 @@ void time_slice()
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
     time_slice();
+}
+
+void enforceKernelMode()
+{
+    disableInterrupts();
+    if ((get_psr() & PSR_KERNEL_MODE) == 0)
+    {
+        console_output(debugFlag, "Kernel mode expected, but function called in user mode.\n");
+        stop(1);
+    }
+    enableInterrupts();
 }

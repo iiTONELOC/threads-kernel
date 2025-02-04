@@ -22,7 +22,7 @@
 #define SIG_TERM 15
 
 /* Process status */
-#define NUM_PROCESS_STATES 7
+#define NUM_PROCESS_STATES 11
 #define STATUS_READY 0
 #define STATUS_RUNNING 1
 #define STATUS_BLOCKED_WAIT 2

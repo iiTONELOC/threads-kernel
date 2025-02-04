@@ -1,9 +1,33 @@
-// #include "Processes.h"
-// #include "DoublyLinkedList.h"
+
 #include "PriorityProcessQueue.h"
 
+// __________________________ Constants __________________________
+
+const char *STATUS_STRINGS[NUM_PROCESS_STATES] = {
+    "READY",
+    "RUNNING",
+    "BLOCKED_WAIT",
+    "BLOCKED_JOIN",
+    "BLOCKED_IO",
+    "QUIT",
+    "UNKNOWN",
+    "UNKNOWN",
+    "UNKNOWN",
+    "UNKNOWN",
+    "USER_DEFINED"};
 // __________________________ Function Definitions __________________________
 
+int GetStatusListIndex(int status)
+{
+    int safeStatus = status;
+
+    if (safeStatus < 0 || safeStatus > NUM_PROCESS_STATES)
+    {
+        safeStatus = STATUS_USER_DEFINED;
+    }
+
+    return safeStatus;
+}
 void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int numStates)
 {
     int i = 0;
@@ -46,10 +70,7 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
         return;
     }
 
-    if (newStatus < 0 || newStatus > NUM_PROCESS_STATES)
-    {
-        return;
-    }
+    newStatus = GetStatusListIndex(newStatus);
 
     if (((Process *)pListNode->pData)->status == newStatus)
     {

@@ -7,6 +7,11 @@
 
 int OrderFunction(void *pNode1, void *pNode2)
 {
+    if (pNode1 == NULL || pNode2 == NULL)
+    {
+        return 0;
+    }
+
     Process *process1 = (Process *)((DoublyLinkedNode *)pNode1)->pData;
     Process *process2 = (Process *)((DoublyLinkedNode *)pNode2)->pData;
 
@@ -26,7 +31,6 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     usingProcessPtr->pid = -1;
     usingProcessPtr->status = -1;
     usingProcessPtr->signal = -1;
-    usingProcessPtr->quantum = 0; // not currently used by timeslice
     usingProcessPtr->cpuTime = 0;
     usingProcessPtr->stack = NULL;
     usingProcessPtr->exitCode = -1;
@@ -42,6 +46,7 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     InitializeDoublyLinkedList(&usingProcessPtr->pDeadChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pExitingChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pJoiningProcesses, NULL);
+    InitializeDoublyLinkedList(&usingProcessPtr->pProcessToJoin, NULL);
 }
 
 void InitializeNewProcess(Process *usingProcessPtr, char *name,
@@ -59,7 +64,7 @@ void InitializeNewProcess(Process *usingProcessPtr, char *name,
     usingProcessPtr->status = STATUS_READY;           // set the status to ready
     usingProcessPtr->entryPoint = entryPoint;         // set process entry point
     usingProcessPtr->processTableIndex = procSlot;    // set the table index
-    usingProcessPtr->quantum = DEFAULT_TIME_SLICE_MS; // set the time slice
+    usingProcessPtr->quantum = MAX_PROC_QUANTUM;      // set the time slice
     CopyString(name, usingProcessPtr->name, MAXNAME); // Copy process name - shouldn't be NULL
     // Copy process arguments - might be NULL
     if (arg != NULL)
