@@ -46,7 +46,6 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     InitializeDoublyLinkedList(&usingProcessPtr->pDeadChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pExitingChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pJoiningProcesses, NULL);
-    InitializeDoublyLinkedList(&usingProcessPtr->pProcessToJoin, NULL);
 }
 
 void InitializeNewProcess(Process *usingProcessPtr, char *name,

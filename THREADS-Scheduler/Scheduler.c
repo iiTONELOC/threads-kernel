@@ -6,6 +6,7 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
+#include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
 int nextPid = 1;                                        // next process id
@@ -287,19 +288,19 @@ int k_wait(int *code)
         return result;
     }
 
-    // check for joining children - children that are waiting to join
-    if (runningProcess->pJoiningProcesses.count > 0)
-    {
-        // clean up after the child
-        CleanUpAfterChild(runningProcess,
-                          &runningProcess->pJoiningProcesses,
-                          staticNodeStorage,
-                          priorityListQueue,
-                          code,
-                          &result);
-        enableInterrupts();
-        return result;
-    }
+    // // check for joining children - children that are waiting to join
+    // if (runningProcess->pJoiningProcesses.count > 0)
+    // {
+    //     // clean up after the child
+    //     CleanUpAfterChild(runningProcess,
+    //                       &runningProcess->pJoiningProcesses,
+    //                       staticNodeStorage,
+    //                       priorityListQueue,
+    //                       code,
+    //                       &result);
+    //     enableInterrupts();
+    //     return result;
+    // }
 
     // disableInterrupts();
     // set status to blocked and call the dispatcher
@@ -387,6 +388,29 @@ void k_exit(int code)
 
     // set the status of the quitting process to QUIT - requires a static node
     ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
+
+    // check if the process needs to join a process
+    if (runningProcess->pJoiningProcesses.count > 0)
+    {
+        // console_output(debugFlag, "k_exit(): Process is joining another process\n");
+        // for each process that is joining this process - set the status to ready
+        // and remove the process from the joining list
+        while (runningProcess->pJoiningProcesses.count > 0)
+        {
+            pDynamicNode = runningProcess->pJoiningProcesses.pHead;
+            RemoveDoublyLinkedNode(&runningProcess->pJoiningProcesses,
+                                   runningProcess->pJoiningProcesses.pHead);
+            pProcessINeedToJoin = (Process *)pDynamicNode->pData;
+            // set the status of the process to ready
+            ChangeProcessStatus(priorityListQueue,
+                                FindDoublyLinkedNode(pProcessINeedToJoin,
+                                                     &priorityListQueue[STATUS_BLOCKED_JOIN]),
+                                STATUS_READY);
+            // free the linked list node
+            DestroyDoublyLinkedNode(pDynamicNode);
+        }
+    }
+
     // enableInterrupts();
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
@@ -424,56 +448,14 @@ void k_exit(int code)
             console_output(debugFlag, "k_exit(): Process with dead children attempting to quit\n");
         }
 
-        // if the process isnt joining another process, clean up after the child
-        if (runningProcess->pProcessToJoin.count == 0)
-        {
-            // reinitialize the process structure
-            InitializeProcessToDefault(runningProcess);
-            // reinitialize the linked list node by setting all values to NULL
-            InitializeDoublyLinkedNode(pStaticListNode);
-        }
-    }
-
-    // check if the process needs to join a process
-    if (runningProcess->pProcessToJoin.count > 0)
-    {
-
-        // get dynamic node for the process to join
-        pDynamicNode = runningProcess->pProcessToJoin.pHead;
-
-        pProcessINeedToJoin = (Process *)pDynamicNode->pData;
-
-        // remove the process from the joining process list
-        RemoveDoublyLinkedNode(&runningProcess->pProcessToJoin, pDynamicNode);
-        DestroyDoublyLinkedNode(pDynamicNode);
-
-        // set the status of the process to join to ready
-        ChangeProcessStatus(priorityListQueue,
-                            FindStaticStorageNode(pProcessINeedToJoin->pid, staticNodeStorage),
-                            STATUS_READY);
-
-        // set the exit code of the running process
-        runningProcess->exitCode = code;
-
-        // create a new linked list node for the joining process list
-        pDynamicNode = CreateDoublyLinkedNode(runningProcess);
-
-        // if the linked list node is NULL, return an error
-        if (pDynamicNode == NULL)
-        {
-            console_output(debugFlag,
-                           "exit(): Error: Could not create a new linked list node for the joining process.\n");
-            return;
-        }
-
-        // if the running process was signaled, set the exit code to -5
-        if (runningProcess->signal == SIG_TERM)
-        {
-            runningProcess->exitCode = -5;
-        }
-
-        // add the process to the joining process list on the process it is trying to join
-        InsertDoublyLinkedNode(&pProcessINeedToJoin->pJoiningProcesses, pDynamicNode);
+        // // if the process isn't joining another process, clean up after the child
+        // if (runningProcess->pJoiningProcesses.count == 0)
+        // {
+        // reinitialize the process structure
+        InitializeProcessToDefault(runningProcess);
+        // reinitialize the linked list node by setting all values to NULL
+        InitializeDoublyLinkedNode(pStaticListNode);
+        // }
     }
 
     runningProcess = NULL;
@@ -532,104 +514,78 @@ int k_join(int pid, int *pChildExitCode)
 
     enforceKernelMode();
     disableInterrupts();
-
-    // waits for the specified child process to exit and retrieves the exit code
     int result = 0;
-    Process *pProcessIWantToJoin = NULL;
-    DoublyLinkedNode *pStaticNode = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
 
-    pStaticNode = FindStaticStorageNode(pid, staticNodeStorage);
-    pProcessIWantToJoin = (Process *)pStaticNode->pData;
-    // if the process is trying to join itself or the process is not found stop(1)
-    if (pid == k_getpid() || pStaticNode == NULL || pProcessIWantToJoin == NULL)
+    // get the process from the process table
+    Process *pProcess = NULL;
+    DoublyLinkedNode *pNewJoiningProcessNode = NULL;
+    DoublyLinkedNode *pStaticListNode = FindStaticStorageNode(pid, staticNodeStorage);
+
+    if (pStaticListNode != NULL)
     {
-        console_output(debugFlag, "join: attempting to join a process that does not exist.\n");
+        pProcess = (Process *)pStaticListNode->pData;
+    }
+    else
+    {
+        console_output(debugFlag, "join(): Process not found in the process table.\n");
         stop(1);
     }
 
-    // if the process is trying to join its parent stop(2)
-    if (runningProcess->pParent != NULL && pid == runningProcess->pParent->pid)
+    // ensure that the process is not trying to join itself
+    if (pProcess->pid == runningProcess->pid)
     {
-        console_output(debugFlag, "join: process attempted to join parent.\n");
+        console_output(debugFlag, "join(): Process is trying to join itself.\n");
+        stop(1);
+    }
+
+    // ensure the process is not trying to join its parent
+    if (pid == runningProcess->pParent->pid)
+    {
+        console_output(debugFlag, "join(): Process is trying to join its parent.\n");
         stop(2);
     }
 
-    // Otherwise, we need to block with a block join
-    ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
-                        STATUS_BLOCKED_JOIN);
+    // create a new linked list node of the running process and add it to the joining processes list
+    // of the process we are trying to join
+    pNewJoiningProcessNode = CreateDoublyLinkedNode(runningProcess);
 
-    // create a new linked list node for the joining process list
-    pDynamicNode = CreateDoublyLinkedNode(runningProcess);
     // if the linked list node is NULL, return an error
-    if (pDynamicNode == NULL)
+    if (pNewJoiningProcessNode == NULL)
     {
         console_output(debugFlag,
                        "join(): Error: Could not create a new linked list node for the joining process.\n");
         return -6;
     }
 
-    // add the running process to the joining process list on the process it is trying to join
-    InsertDoublyLinkedNode(&pProcessIWantToJoin->pProcessToJoin, pDynamicNode);
-    enableInterrupts();
-    // add the process to the joining process list
+    // add the running process to the joining processes list of the process we are trying to join
+    InsertDoublyLinkedNode(&pProcess->pJoiningProcesses, pNewJoiningProcessNode);
+
+    // set the status of the running process to blocked join
+    ChangeProcessStatus(priorityListQueue,
+                        FindDoublyLinkedNode(runningProcess,
+                                             &priorityListQueue[STATUS_RUNNING]),
+                        STATUS_BLOCKED_JOIN);
+
     dispatcher();
 
-    // ___________ AFTER PARENT WAS AWAKENED BY THE JOINING PROCESS ______________________
     disableInterrupts();
-    // console_output(debugFlag, "k_join(): Process awakened\n");
 
-    // look in the joining list
-    if (runningProcess->pJoiningProcesses.count > 0)
-    {
-        // console_output(debugFlag, "k_join(): Process found in the joining list\n");
+    // _______________AFTER PROCESS WAS AWAKENED BY PROCESS THEY WANT TO JOIN____________________
 
-        // get the exit code of the joining process
-        pDynamicNode = runningProcess->pJoiningProcesses.pHead;
-        pProcessIWantToJoin = (Process *)pDynamicNode->pData;
-        *pChildExitCode = ((Process *)pDynamicNode->pData)->exitCode;
-        result = ((Process *)pDynamicNode->pData)->pid;
+    // console_output(debugFlag, "join(): Process was awakened by the process they wanted to join.\n");
+    // console_output(debugFlag, "join(): its exit code is %d\n", pProcess->exitCode);
 
-        // check if the process has a parent
-        if (((Process *)pDynamicNode->pData)->pParent != NULL)
-        {
-            // remove the process from the joining process list
-            RemoveDoublyLinkedNode(&((Process *)pDynamicNode->pData)->pParent->pJoiningProcesses, pDynamicNode);
-            // place it in their dead children list
-            InsertDoublyLinkedNode(&((Process *)pDynamicNode->pData)->pParent->pDeadChildren, pDynamicNode);
-        }
-        else
-        {
+    // look for the exit code of the process we want to join in the process table
+    *pChildExitCode = pProcess->exitCode;
 
-            // // print out information about the process
-            // console_output(debugFlag, "Process %s has no parent\n", ((Process *)pDynamicNode->pData)->name);
-            // console_output(debugFlag, "Process %s has exited with code %d\n",
-            //                ((Process *)pDynamicNode->pData)->name,
-            //                ((Process *)pDynamicNode->pData)->exitCode);
+    // wake the exiting process back up
+    ChangeProcessStatus(priorityListQueue,
+                        FindDoublyLinkedNode(pProcess,
+                                             &priorityListQueue[STATUS_BLOCKED_JOIN]),
+                        STATUS_READY);
+    // enableInterrupts();
+    dispatcher();
 
-            // see if the process had been signaled
-            if (((Process *)pDynamicNode->pData)->signal)
-            {
-                // set the exit code to -5
-                *pChildExitCode = -5;
-            }
-
-            // CleanUpAfterChild((Process *)pStaticNode->pData,
-            //                   &runningProcess->pJoiningProcesses,
-            //                   staticNodeStorage,
-            //                   priorityListQueue,
-            //                   pChildExitCode,
-            //                   &result);
-        }
-    }
-    else
-    {
-        // console_output(debugFlag, "k_join(): Process not found in the joining list\n");
-    }
-
-    enableInterrupts();
     return result;
 }
 
