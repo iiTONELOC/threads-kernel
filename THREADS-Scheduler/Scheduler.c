@@ -12,7 +12,6 @@
 int nextPid = 1;                                        // next process id
 int debugFlag = 0;                                      // debug flag
 int isBooting = 0;                                      // flag to indicate if the system is in bootstrap
-int inDispatcher = 0;                                   // flag to indicate if the system is in the dispatcher
 Process *runningProcess = NULL;                         // tracks current running process
 Process processTable[MAX_PROCESSES];                    // process table
 interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
@@ -269,14 +268,9 @@ int k_wait(int *code)
 
     // Look for a running process, if there is a running process then it is the parent of the
     // current process that is trying to exit.
-    if (runningProcess == NULL)
-    {
-        console_output(debugFlag, "k_wait(): Error: Running process not found!");
-        return -1;
-    }
 
     // check for dead children - children that have already quit
-    if (runningProcess->pDeadChildren.count > 0)
+    if (runningProcess != NULL && runningProcess->pDeadChildren.count > 0)
     {
         CleanUpAfterChild(runningProcess,
                           &runningProcess->pDeadChildren,
@@ -288,28 +282,18 @@ int k_wait(int *code)
         return result;
     }
 
-    // // check for joining children - children that are waiting to join
-    // if (runningProcess->pJoiningProcesses.count > 0)
-    // {
-    //     // clean up after the child
-    //     CleanUpAfterChild(runningProcess,
-    //                       &runningProcess->pJoiningProcesses,
-    //                       staticNodeStorage,
-    //                       priorityListQueue,
-    //                       code,
-    //                       &result);
-    //     enableInterrupts();
-    //     return result;
-    // }
+    if (runningProcess != NULL && runningProcess->pChildren.count == 0)
+    {
+        // no processes to wait for
+        return -1;
+    }
 
-    // disableInterrupts();
-    // set status to blocked and call the dispatcher
     ChangeProcessStatus(priorityListQueue,
                         FindDoublyLinkedNode(runningProcess,
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_WAIT);
     runningProcess = NULL;
-    // enableInterrupts();
+
     dispatcher();
 
     // _______________AFTER PARENT WAS AWAKENED BY THEIR CHILD____________________
@@ -332,7 +316,7 @@ int k_wait(int *code)
     {
         return -5;
     }
-    // enableInterrupts();
+    enableInterrupts();
 
     return result;
 }
@@ -408,6 +392,8 @@ void k_exit(int code)
                                 STATUS_READY);
             // free the linked list node
             DestroyDoublyLinkedNode(pDynamicNode);
+
+            pProcessINeedToJoin->joinStatus = runningProcess->exitCode;
         }
     }
 
@@ -534,14 +520,14 @@ int k_join(int pid, int *pChildExitCode)
     // ensure that the process is not trying to join itself
     if (pProcess->pid == runningProcess->pid)
     {
-        console_output(debugFlag, "join(): Process is trying to join itself.\n");
+        console_output(debugFlag, "join: process attempted to join itself.\n");
         stop(1);
     }
 
     // ensure the process is not trying to join its parent
     if (pid == runningProcess->pParent->pid)
     {
-        console_output(debugFlag, "join(): Process is trying to join its parent.\n");
+        console_output(debugFlag, "join: process attempted to join parent.\n");
         stop(2);
     }
 
@@ -576,14 +562,16 @@ int k_join(int pid, int *pChildExitCode)
     // console_output(debugFlag, "join(): its exit code is %d\n", pProcess->exitCode);
 
     // look for the exit code of the process we want to join in the process table
-    *pChildExitCode = pProcess->exitCode;
+    *pChildExitCode = runningProcess->joinStatus;
+
+    runningProcess->joinStatus = -99;
 
     // wake the exiting process back up
     ChangeProcessStatus(priorityListQueue,
                         FindDoublyLinkedNode(pProcess,
                                              &priorityListQueue[STATUS_BLOCKED_JOIN]),
                         STATUS_READY);
-    // enableInterrupts();
+
     dispatcher();
 
     return result;
@@ -779,13 +767,12 @@ void display_process_table()
 *************************************************************************/
 void dispatcher()
 {
-    inDispatcher = 1;
+
     Process *pNextReadyProcess = NULL;
 
     // if we are in bootstrap, we need to return
     if (isBooting)
     {
-        inDispatcher = 0;
         return;
     }
 
@@ -793,8 +780,6 @@ void dispatcher()
     if (runningProcess != NULL &&
         (runningProcess->elapsedTime >= runningProcess->quantum))
     {
-        // let time slice update the elapsed time
-        inDispatcher = 0;
         time_slice();
     }
     else
@@ -809,19 +794,18 @@ void dispatcher()
             if (runningProcess != NULL &&
                 pNextReadyProcess->pid == runningProcess->pid)
             {
-                inDispatcher = 0;
+
                 return;
             }
 
             // set the running process to the next ready process
             runningProcess = pNextReadyProcess;
-            inDispatcher = 0;
+
             // set the running process to the current process
             context_switch(runningProcess->context);
         }
         else
         {
-            inDispatcher = 0;
             return;
         }
     }
@@ -894,9 +878,6 @@ static void check_deadlock()
                     // print the process name
                     console_output(FALSE, "Current List is the %s list.\n", STATUS_STRINGS[i]);
                     console_output(FALSE, "Current process is:  %s .\n", pCurrentProc->name);
-                    // print out the process
-                    pCurrentProc = (Process *)pNextLNode->pData;
-                    console_output(FALSE, "Process %s is ready.\n", pCurrentProc->name);
                 }
             }
         }
@@ -964,6 +945,7 @@ int check_io_scheduler()
  */
 void time_slice()
 {
+    disableInterrupts();
     static int elapsed = 0;           // time elapsed since last context switch
     static int lastTime = 0;          // last time the clock interrupt was called
     int currentTime = system_clock(); // current time in μs but
@@ -993,15 +975,17 @@ void time_slice()
     }
 
     // check if the elapsed time is greater than the quantum for the running process
-    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum && !inDispatcher)
+    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
     {
         elapsed = 0;
         runningProcess->elapsedTime = 0;
+        enableInterrupts();
         dispatcher();
     }
     else
     {
         elapsed = 0;
+        enableInterrupts();
     }
 }
 

@@ -25,6 +25,7 @@ typedef struct _process
 	char *stack;				/* Process stack */
 	int exitCode;				/* Process exit code */
 	int priority;				/* Process priority */
+	int joinStatus;				/*Status from a process this process is trying to join*/
 	void *context;				/* Process's current context */
 	char name[MAXNAME];			/* Process name */
 	unsigned int quantum;		/* Time slice */

@@ -39,9 +39,11 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     usingProcessPtr->stacksize = -1;
     usingProcessPtr->context = NULL;
     usingProcessPtr->pParent = NULL;
+    usingProcessPtr->joinStatus = -99;
     usingProcessPtr->elapsedTime = -1;
     usingProcessPtr->entryPoint = NULL;
     usingProcessPtr->processTableIndex = -1;
+    usingProcessPtr->quantum = MAX_PROC_QUANTUM;
     InitializeDoublyLinkedList(&usingProcessPtr->pChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pDeadChildren, NULL);
     InitializeDoublyLinkedList(&usingProcessPtr->pExitingChildren, NULL);
@@ -58,6 +60,7 @@ void InitializeNewProcess(Process *usingProcessPtr, char *name,
     usingProcessPtr->pid = nextPid;                   // set process id
     usingProcessPtr->startTime = 0;                   // set the start time to an initial value
     usingProcessPtr->elapsedTime = 0;                 // set the elapsed time to an initial value
+    usingProcessPtr->joinStatus = -99;                // explicitly reset the join
     usingProcessPtr->priority = priority;             // set process priority
     usingProcessPtr->stacksize = stacksize;           // set process stack size
     usingProcessPtr->status = STATUS_READY;           // set the status to ready

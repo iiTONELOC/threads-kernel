@@ -22,10 +22,10 @@
 #pragma pack(1)
 typedef struct DoublyLinkedNode
 {
-    void* pData;
+    void *pData;
     unsigned short dynamic;
-    struct DoublyLinkedNode* pNext;
-    struct DoublyLinkedNode* pPrev;
+    struct DoublyLinkedNode *pNext;
+    struct DoublyLinkedNode *pPrev;
 } DoublyLinkedNode;
 
 #endif
