@@ -1,3 +1,4 @@
+#include "THREADSLib.h"
 #include "Processes.h"
 #include "Constants.h"
 #include "StringUtils.h"
@@ -178,6 +179,8 @@ void CleanUpAfterChild(Process *pRunningProcess,
     RemoveDoublyLinkedNode(pChildList, pDynamicNode);
     // Remove the child from the priority quit list
     RemoveDoublyLinkedNode(&pPriorityListQueue[STATUS_QUIT], pStaticNode);
+    // reset the context
+    context_stop(pChild->context);
     // Reset the Process Control Block
     InitializeProcessToDefault(pChild);
     // Reset the static linked list node

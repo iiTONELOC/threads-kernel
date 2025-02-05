@@ -31,9 +31,9 @@ void InitializeDoublyLinkedNode(DoublyLinkedNode *pNode)
     pNode->pData = NULL;
 }
 
-void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, size_t size)
+void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, int size)
 {
-    size_t i = 0;
+    int i = 0;
     for (i = 0; i < size; i++)
     {
         InitializeDoublyLinkedNode(&pNode[i]);

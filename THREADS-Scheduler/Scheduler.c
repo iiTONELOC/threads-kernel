@@ -1,4 +1,3 @@
-
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
@@ -6,6 +5,7 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
+#include "Validators.h"
 #include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
@@ -36,28 +36,21 @@ int check_io_scheduler();
 check_io_function check_io;
 extern int SchedulerEntryPoint(void *pArgs);
 
-/*************************************************************************
-   bootstrap()
-
-   Purpose - This is the first function called by THREADS on startup.
-
-             The function must setup the OS scheduler and primitive
-             functionality and then spawn the first two processes.
-
-             The first two process are the watchdog process
-             and the startup process SchedulerEntryPoint.
-
-             The statup process is used to initialize additional layers
-             of the OS.  It is also used for testing the scheduler
-             functions.
-
-   Parameters - Arguments *pArgs - these arguments are unused at this time.
-
-   Returns - The function does not return!
-
-   Side Effects - The effects of this function is the launching of the kernel.
-
- *************************************************************************/
+/**
+ * @brief The bootstrap function for the scheduler
+ *
+ * @param pArgs The arguments to pass to the function
+ * @return int The return value of the function
+ *
+ * @note This function is the first function called by THREADS on startup.
+ *       This function must setup the OS scheduler and primitive functionality
+ *
+ *      The first two processes are the watchdog and the scheduler entry point
+ *
+ *      This function is used to init higher layers of the os and assist in testing
+ *      the scheduler functions.
+ *
+ */
 int bootstrap(void *pArgs)
 {
     int result; /* value returned by call to spawn() */
@@ -103,22 +96,6 @@ int bootstrap(void *pArgs)
     return 0;
 }
 
-/*************************************************************************
-   k_spawn()
-
-   Purpose - spawns a new process.
-
-             Finds an empty entry in the process table and initializes
-             information of the process.  Updates information in the
-             parent process to reflect this child process creation.
-
-   Parameters - the process's entry point function, the stack size, and
-                the process's priority.
-
-   Returns - The Process ID (pid) of the new child process
-             The function must return if the process cannot be created.
-
-************************************************************************ */
 int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
 {
     enforceKernelMode();
@@ -128,48 +105,18 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     DoublyLinkedNode *pNewChildProcNode = NULL;
     DoublyLinkedNode *pRunningProcessLinkedListNode = NULL;
 
-    /*Validate all of the parameters, starting with the name. */
-    if (name == NULL)
+    result = ValidateKSpawnParams(name, entryPoint, arg, stacksize, priority, debugFlag);
+    if (result != 0)
     {
-        console_output(debugFlag, "spawn(): Name value is NULL.\n");
-        return -1;
-    }
-    if (strlen(name) >= (MAXNAME - 1))
-    {
-        console_output(debugFlag, "spawn(): Process name is too long.  Halting...\n");
-        stop(1);
+        return result;
     }
 
-    if (arg != NULL && strlen((char *)arg) >= (MAXARG - 1))
-    {
-        console_output(debugFlag, "spawn(): Process arg is too long.  Halting...\n");
-        stop(1);
-    }
-
-    if (entryPoint == NULL)
-    {
-        console_output(debugFlag, "spawn(): entryPoint is NULL.\n");
-        return -1;
-    }
-
-    if (stacksize < THREADS_MIN_STACK_SIZE)
-    {
-        console_output(debugFlag, "spawn(): Stack size is too small.\n");
-        return -2;
-    }
-
-    if (priority < LOWEST_PRIORITY || priority > HIGHEST_PRIORITY)
-    {
-        console_output(debugFlag, "spawn(): Priority out of range.\n");
-        return -3;
-    }
     disableInterrupts();
     /* Find an empty slot in the process table */
     proc_slot = GetEmptyControlBlockIndex(processTable);
 
     if (proc_slot < 0)
     {
-        console_output(debugFlag, "spawn(): No empty slots in the process table.\n");
         return -4;
     }
 
@@ -196,7 +143,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         {
             console_output(debugFlag,
                            "spawn(): Error: Could not create a new linked list node for the child process.\n");
-            return -6;
+            return -1;
         }
 
         // add the child process to the parent's children list
@@ -213,23 +160,17 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 
     /* Increment the process id for the next process */
     nextPid++;
-    enableInterrupts();
     // call the dispatcher
     dispatcher();
     return pNewProc->pid;
+}
 
-} /* spawn */
-
-/**************************************************************************
-   Name - launch
-
-   Purpose - Utility function that makes sure the environment is ready,
-             such as enabling interrupts, for the new process.
-
-   Parameters - none
-
-   Returns - nothing
-*************************************************************************/
+/**
+ * @brief Utility function that makes sure the environment is ready
+ *
+ * @param args The arguments to pass to the function
+ * @return int The return value of the function
+ */
 static int launch(void *args)
 {
     int result = 0;
@@ -245,19 +186,6 @@ static int launch(void *args)
     return 0;
 }
 
-/**************************************************************************
-   Name - k_wait
-
-   Purpose - Wait for a child process to quit.  Return right away if
-             a child has already quit.
-
-   Parameters - Output parameter for the child's exit code.
-
-   Returns - the pid of the quitting child, or
-        -4 if the process has no children
-        -5 if the process was signaled in the join
-
-************************************************************************ */
 int k_wait(int *code)
 {
     enforceKernelMode();
@@ -321,17 +249,6 @@ int k_wait(int *code)
     return result;
 }
 
-/**************************************************************************
-   Name - k_exit
-
-   Purpose - Exits a process and coordinates with the parent for cleanup
-             and return of the exit code.
-
-   Parameters - the code to return to the grieving parent
-
-   Returns - nothing
-
-*************************************************************************/
 void k_exit(int code)
 {
     enforceKernelMode();
@@ -342,11 +259,6 @@ void k_exit(int code)
 
     // terminate the process and set its exit code
     // set the status to QUIT
-    if (runningProcess == NULL)
-    {
-        console_output(debugFlag, "k_exit(), running process not found!!\n");
-        stop(1);
-    }
 
     // check if the process has children
     if (runningProcess->pChildren.count > 0)
@@ -397,11 +309,10 @@ void k_exit(int code)
         }
     }
 
-    // enableInterrupts();
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
-        // disableInterrupts();
+
         pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
@@ -429,72 +340,54 @@ void k_exit(int code)
     }
     else
     {
-        if (runningProcess->pDeadChildren.count > 0)
-        {
-            console_output(debugFlag, "k_exit(): Process with dead children attempting to quit\n");
-        }
-
-        // // if the process isn't joining another process, clean up after the child
-        // if (runningProcess->pJoiningProcesses.count == 0)
-        // {
-        // reinitialize the process structure
+        // process has no children and no parent, clean up after self
+        context_stop(runningProcess->context);
         InitializeProcessToDefault(runningProcess);
-        // reinitialize the linked list node by setting all values to NULL
         InitializeDoublyLinkedNode(pStaticListNode);
-        // }
     }
 
     runningProcess = NULL;
-
-    enableInterrupts();
     dispatcher();
 }
 
-/**************************************************************************
-   Name - k_kill
-
-   Purpose - Signals a process with the specified signal
-
-   Parameters - Signal to send
-
-   Returns -
-*************************************************************************/
 int k_kill(int pid, int signal)
 {
     enforceKernelMode();
     int result = 0;
+    Process *pProcess = NULL;
     DoublyLinkedNode *pListNode = NULL;
 
     disableInterrupts();
     // look for the process in the process table
     pListNode = FindStaticStorageNode(pid, staticNodeStorage);
+    pProcess = (Process *)pListNode->pData;
 
     // if the process is not found or signal is not equal to SIG_TERM
     if (pListNode == NULL ||
         signal != SIG_TERM ||
-        (pListNode != NULL && ((Process *)pListNode->pData) == NULL))
+        (pListNode != NULL && pProcess == NULL))
     {
         stop(1);
     }
 
+    // check if the process is already signaled
+    if (pProcess->signal)
+    {
+        return 1;
+    }
+
     // set the signal for the process
-    ((Process *)pListNode->pData)->signal = signal;
+    pProcess->signal = signal;
     enableInterrupts();
     return 0;
 }
 
-/**************************************************************************
-   Name - k_getpid
-*************************************************************************/
 int k_getpid()
 {
     enforceKernelMode();
     return runningProcess ? runningProcess->pid : 0;
 }
 
-/**************************************************************************
-   Name - k_join
-***************************************************************************/
 int k_join(int pid, int *pChildExitCode)
 {
 
@@ -552,34 +445,30 @@ int k_join(int pid, int *pChildExitCode)
                                              &priorityListQueue[STATUS_RUNNING]),
                         STATUS_BLOCKED_JOIN);
 
-    dispatcher();
+    // verify that our node made it the pJoiningProcesses list
+    if (FindDoublyLinkedNode(runningProcess, &pProcess->pJoiningProcesses) == NULL)
+    {
+        return -1;
+    }
 
-    disableInterrupts();
+    // call dispatcher to switch to the next process
+    dispatcher();
 
     // _______________AFTER PROCESS WAS AWAKENED BY PROCESS THEY WANT TO JOIN____________________
 
-    // console_output(debugFlag, "join(): Process was awakened by the process they wanted to join.\n");
-    // console_output(debugFlag, "join(): its exit code is %d\n", pProcess->exitCode);
+    disableInterrupts();
 
     // look for the exit code of the process we want to join in the process table
     *pChildExitCode = runningProcess->joinStatus;
 
+    // resetting the joinStatus to a known init value
     runningProcess->joinStatus = -99;
-
-    // wake the exiting process back up
-    ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(pProcess,
-                                             &priorityListQueue[STATUS_BLOCKED_JOIN]),
-                        STATUS_READY);
 
     dispatcher();
 
     return result;
 }
 
-/**************************************************************************
-   Name - unblock
-*************************************************************************/
 int unblock(int pid)
 {
     int isBlocked = 0;
@@ -602,14 +491,11 @@ int unblock(int pid)
     }
 
     ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
-    /*  enableInterrupts();*/
+
     dispatcher();
     return 0;
 }
 
-/*************************************************************************
-   Name - block
-*************************************************************************/
 int block(int newStatus)
 {
 
@@ -627,37 +513,40 @@ int block(int newStatus)
                         FindDoublyLinkedNode(runningProcess,
                                              &priorityListQueue[STATUS_RUNNING]),
                         newStatus);
+
     dispatcher();
+
+    if (runningProcess->signal)
+    {
+        return -5;
+    }
+
     return 0;
 }
 
-/*************************************************************************
-   Name - signaled
-*************************************************************************/
 int signaled()
 {
     return (runningProcess && runningProcess->signal) ? 1 : 0;
 }
-/*************************************************************************
-   Name - readtime
-*************************************************************************/
+
 int read_time()
 {
-    return cpu_time();
+    return cpu_time(); // ? Not sure if this is correct, read_time is not is the spec
 }
-/*************************************************************************
-   Name - cpu_time
-*************************************************************************/
+
 int cpu_time()
 {
     return runningProcess ? runningProcess->cpuTime : 0;
 }
-/*************************************************************************
-   Name - readClock
-*************************************************************************/
+
 DWORD read_clock()
 {
     return system_clock();
+}
+
+int get_start_time(void)
+{
+    return runningProcess->startTime;
 }
 
 void display_process_table()
@@ -754,16 +643,6 @@ void display_process_table()
     console_output(FALSE, "\n");
 }
 
-/**************************************************************************
-   Name - dispatcher
-
-   Purpose - This is where context changes to the next process to run.
-
-   Parameters - none
-
-   Returns - nothing
-
-*************************************************************************/
 void dispatcher()
 {
 
@@ -810,17 +689,15 @@ void dispatcher()
     }
 }
 
-/**************************************************************************
-   Name - watchdog
-
-   Purpose - The watchdog keeps the system going when all other
-         processes are blocked.  It can be used to detect when the system
-         is shutting down as well as when a deadlock condition arises.
-
-   Parameters - none
-
-   Returns - nothing
-   *************************************************************************/
+/**
+ * @brief Watchdog function
+ *
+ * The watchdog keeps the system going when all other processes are blocked.
+ * It can be used to detect when the system is shutting down as well as when a deadlock
+ * arises
+ *
+ * @param dummy A pointer to the dummy variable - use a void pointer or NULL
+ */
 static int watchdog(void *dummy)
 {
 
@@ -897,8 +774,7 @@ static inline void disableInterrupts()
 
     /* We ARE in kernel mode */
     set_psr(get_psr() & ~PSR_INTERRUPTS);
-
-} /* disableInterrupts */
+}
 
 /*
  * Enables the interrupts.
@@ -906,16 +782,18 @@ static inline void disableInterrupts()
 static inline void enableInterrupts()
 {
     set_psr(get_psr() | PSR_INTERRUPTS);
-} /*
+}
 
-
-/**************************************************************************
-   Name - DebugConsole
-   Purpose - Prints  the message to the console_output if in debug mode
-   Parameters - format string and va args
-   Returns - nothing
-   Side Effects -
-*************************************************************************/
+/**
+ * @brief Debug console function
+ *
+ * Prints the message to the console_output if in debug mode
+ *
+ * @param format a pointer to the format string
+ * @param ... a pointer to the va args
+ *
+ * @note This function is called when the debug flag is set
+ */
 static void DebugConsole(char *format, ...)
 {
     char buffer[2048];
@@ -936,12 +814,6 @@ int check_io_scheduler()
     return false;
 }
 
-/**
- * @brief Time slice function
- *
- * The time_slice function determines if the currently active process has exceeded its
- * current time slice. If the quantum value has been exceeded the dispatcher is called
- */
 void time_slice()
 {
     disableInterrupts();
@@ -978,7 +850,6 @@ void time_slice()
     {
         elapsed = 0;
         runningProcess->elapsedTime = 0;
-        enableInterrupts();
         dispatcher();
     }
     else
@@ -1003,6 +874,12 @@ void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
     time_slice();
 }
 
+/**
+ * @brief Enforces kernel mode
+ *
+ * This function checks to see if the processor is in kernel mode,
+ * if it isn't the kernel will halt with a status of 1.
+ */
 void enforceKernelMode()
 {
     disableInterrupts();

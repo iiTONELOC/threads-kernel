@@ -40,6 +40,10 @@
 #define NULL ((void *)0)
 #endif
 
+#ifndef THREADS_MIN_STACK_SIZE
+#define THREADS_MIN_STACK_SIZE 8192
+#endif
+
 /* Time Slice */
 #define MIN_TIME_SLICE_MS 20
 #define MAX_TIME_SLICE_MS 50
