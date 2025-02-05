@@ -513,7 +513,7 @@ int k_join(int pid, int *pChildExitCode)
     }
     else
     {
-        console_output(debugFlag, "join(): Process not found in the process table.\n");
+        console_output(debugFlag, "join: attempting to join a process that does not exist.\n");
         stop(1);
     }
 
@@ -591,9 +591,8 @@ int unblock(int pid)
     if (pListNode != NULL)
     {
         pProcess = (Process *)pListNode->pData;
-        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT ||
-                    pProcess->status == STATUS_BLOCKED_JOIN ||
-                    pProcess->status == STATUS_BLOCKED_IO;
+        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT || pProcess->status == STATUS_BLOCKED_IO ||
+                    (pProcess->status > NUM_PROCESS_STATES - 1);
     }
 
     // if invalid or process is not blocked, return -1
@@ -603,7 +602,7 @@ int unblock(int pid)
     }
 
     ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
-    enableInterrupts();
+    /*  enableInterrupts();*/
     dispatcher();
     return 0;
 }

@@ -60,6 +60,8 @@ void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLi
 
 void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode, int newStatus)
 {
+    int safeIndex = -1;
+
     if (usingListPtr == NULL || pListNode == NULL)
     {
         return;
@@ -70,14 +72,14 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
         return;
     }
 
-    newStatus = GetStatusListIndex(newStatus);
-
     if (((Process *)pListNode->pData)->status == newStatus)
     {
         return;
     }
 
-    RemoveNodeFromPriorityProcessQueue(&usingListPtr[((Process *)pListNode->pData)->status], pListNode);
-    AddNodeToPriorityProcessQueue(&usingListPtr[newStatus], pListNode);
+    safeIndex = GetStatusListIndex(newStatus);
+
+    RemoveNodeFromPriorityProcessQueue(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)], pListNode);
+    AddNodeToPriorityProcessQueue(&usingListPtr[safeIndex], pListNode);
     ((Process *)pListNode->pData)->status = newStatus;
 }
