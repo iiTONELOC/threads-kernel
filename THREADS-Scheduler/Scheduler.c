@@ -571,67 +571,134 @@ void display_process_table()
     char *statusStr = NULL;
     Process *pProcess = NULL;
     char statusBuffer[20] = {0}; // Buffer for converting status number to a string
+    int count = 0;
 
     // Print header
-    console_output(FALSE, "PID     Parent   Priority  Status         # Kids   CPUtime  Name\n");
+    console_output(FALSE, "PID     Parent   Priority  Status        # Kids   CPUtime  Name\n");
 
-    // Loop through process table
+    // Check if the table is full by counting processes 
     for (int i = 0; i < MAX_PROCESSES; i++)
     {
+        if (processTable[i].context != NULL)
+        {
+            count++;
+        }
+    }
+    // If the table is full, print last row first
+    if (count >= MAX_PROCESSES - 1) 
+    {
+        pProcess = &processTable[MAX_PROCESSES - 1];
+        if (pProcess->context != NULL) 
+        {
+            switch(pProcess->status) 
+            {
+            case STATUS_READY:
+                statusStr = "READY";
+                break;
+            case STATUS_RUNNING:
+                statusStr = "RUNNING";
+                break;
+            case STATUS_BLOCKED_WAIT:
+                statusStr = "WAIT BLOCK";
+                break;
+            case STATUS_BLOCKED_JOIN:
+                statusStr = "JOIN BLOCK";
+                break;
+            case STATUS_QUIT:
+                statusStr = "QUIT";
+                break;
+            default:
+                if (pProcess->status > 10) 
+                {
+                    snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
+                    statusStr = statusBuffer;
+                }
+                else {
+                    statusStr = "UNKNOWN";
+                }
+                break;
+            }
+
+            if (pProcess->pParent != NULL) 
+            {
+                parentPid = pProcess->pParent->pid;
+            }
+            else 
+            {
+                parentPid = -1;
+            }
+
+    
+
+            // Count number of children
+            // Might need to count the other lists as well
+            numChildren = pProcess->pChildren.count;
+
+            // Print process information
+            console_output(FALSE, "%-8d%-9d%-10d%-14s%-9d%-9llu%s\n",
+                           pProcess->pid,
+                           parentPid,
+                           pProcess->priority,
+                           statusStr,
+                           numChildren,
+                           pProcess->cpuTime,
+                           pProcess->name);
+        }
+    
+    }
+
+    // Print the rest in ascending order
+    for (int i = 0; i < MAX_PROCESSES - 1; i++) 
+    {
         pProcess = &processTable[i];
-        // Skip empty process slots
-        if (pProcess->context == NULL)
+
+        if (pProcess->context == NULL) 
         {
             continue;
         }
 
-        if (pProcess->status == STATUS_READY)
+        switch(pProcess->status) 
         {
+        case STATUS_READY:
             statusStr = "READY";
-        }
-        else if (pProcess->status == STATUS_RUNNING)
-        {
+            break;
+        case STATUS_RUNNING:
             statusStr = "RUNNING";
-        }
-        else if (pProcess->status == STATUS_BLOCKED_WAIT)
-        {
+            break;
+        case STATUS_BLOCKED_WAIT:
             statusStr = "WAIT BLOCK";
-        }
-        else if (pProcess->status == STATUS_QUIT)
-        {
-            statusStr = "QUIT";
-        }
-        else if (pProcess->status == STATUS_BLOCKED_JOIN)
-        { // Special case for JOIN BLOCK
+            break;
+        case STATUS_BLOCKED_JOIN:
             statusStr = "JOIN BLOCK";
-        }
-        else if (pProcess->status > 10)
-        {
-            snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
-            statusStr = statusBuffer;
-        }
-        else
-        {
-            statusStr = "UNKNOWN";
+            break;
+        case STATUS_QUIT:
+            statusStr = "QUIT";
+            break;
+        default:
+            if (pProcess->status > 10)
+            {
+                snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
+                statusStr = statusBuffer;
+            }
+            else 
+            {
+                statusStr = "UNKNOWN";
+            }
+            break;
         }
 
-        // Get parent PID
-
-        if (pProcess->pParent != NULL)
+        if (pProcess->pParent != NULL) 
         {
             parentPid = pProcess->pParent->pid;
         }
-        else
+        else 
         {
             parentPid = -1;
         }
 
-        // Count number of children
-        // Might need to count the other lists as well
         numChildren = pProcess->pChildren.count;
 
-        // Print process information
-        console_output(FALSE, "%-8d%-9d%-11d%-14s%-9d%-9llu%s\n",
+        console_output(FALSE, "%-8d%-9d%-10d%-14s%-9d%-9llu%s\n",
                        pProcess->pid,
                        parentPid,
                        pProcess->priority,
@@ -640,6 +707,7 @@ void display_process_table()
                        pProcess->cpuTime,
                        pProcess->name);
     }
+
     console_output(FALSE, "\n");
 }
 
