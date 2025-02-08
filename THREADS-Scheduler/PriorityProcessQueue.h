@@ -1,6 +1,7 @@
 #pragma once
 #ifndef PRIORITY_PROCESS_QUEUE
 #define PRIORITY_PROCESS_QUEUE
+#include "Constants.h"
 #include "Processes.h"
 #include "DoublyLinkedList.h"
 
@@ -51,5 +52,15 @@ void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLi
  * @param newStatus The new status to set
  */
 void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode, int newStatus);
+
+/**
+ * @brief Find a static Linked List Node using the process id
+ *
+ * @param withPid The process id to search for
+ * @param pNodeBucket The node bucket, array of nodes, to search
+ *
+ * @return The linked list node or NULL if not found
+ */
+DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket);
 
 #endif

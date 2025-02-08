@@ -1,4 +1,3 @@
-
 #include "PriorityProcessQueue.h"
 
 // __________________________ Constants __________________________
@@ -82,4 +81,31 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
     RemoveNodeFromPriorityProcessQueue(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)], pListNode);
     AddNodeToPriorityProcessQueue(&usingListPtr[safeIndex], pListNode);
     ((Process *)pListNode->pData)->status = newStatus;
+}
+
+DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket)
+{
+    int i = 0;
+
+    // loop over the array of nodes and look for a process with the
+    // corresponding pid
+    for (i = 0; i < MAXPROC; i++)
+    {
+
+        // If we have NULL data just skip to the next node
+        if (((DoublyLinkedNode *)&pNodeBucket[i])->pData == NULL)
+        {
+            continue;
+        }
+
+        // Non-NULL data, check the pid
+        if (((Process *)((DoublyLinkedNode *)&pNodeBucket[i])->pData)->pid == withPid)
+        {
+            // match found
+            return &pNodeBucket[i];
+        }
+    }
+
+    // no match found
+    return NULL;
 }

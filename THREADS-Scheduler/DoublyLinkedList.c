@@ -1,5 +1,3 @@
-#include "Constants.h"
-#include "Processes.h"
 #include "DoublyLinkedList.h"
 
 // __________________________ Function Definitions __________________________
@@ -40,11 +38,11 @@ void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, int size)
     }
 }
 
-int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode *fromNodeBucket)
+int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode *fromNodeBucket, int size)
 {
     int i;
 
-    for (i = 0; i < MAXPROC; i++)
+    for (i = 0; i < size; i++)
     { // if a pid hasn't been assigned and the context is NULL
         // we have a slot we can use - regardless of whatever else is in the slot
         if (fromNodeBucket[i].pData == NULL)
@@ -288,33 +286,6 @@ DoublyLinkedNode *FindDoublyLinkedNode(void *pValue, DoublyLinkedList *pList)
     }
 
     // If the value is not found, return NULL
-    return NULL;
-}
-
-DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket)
-{
-    int i = 0;
-
-    // loop over the array of nodes and look for a process with the
-    // corresponding pid
-    for (i = 0; i < MAXPROC; i++)
-    {
-
-        // If we have NULL data just skip to the next node
-        if (((DoublyLinkedNode *)&pNodeBucket[i])->pData == NULL)
-        {
-            continue;
-        }
-
-        // Non-NULL data, check the pid
-        if (((Process *)((DoublyLinkedNode *)&pNodeBucket[i])->pData)->pid == withPid)
-        {
-            // match found
-            return &pNodeBucket[i];
-        }
-    }
-
-    // no match found
     return NULL;
 }
 

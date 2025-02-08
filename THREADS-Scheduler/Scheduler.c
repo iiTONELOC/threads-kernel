@@ -5,7 +5,7 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
-#include "Validators.h"
+#include "SchedulerUtils.h"
 #include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
@@ -771,7 +771,6 @@ static void check_deadlock()
  */
 static inline void disableInterrupts()
 {
-
     /* We ARE in kernel mode */
     set_psr(get_psr() & ~PSR_INTERRUPTS);
 }

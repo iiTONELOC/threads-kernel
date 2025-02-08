@@ -1,10 +1,8 @@
-#ifndef STRINGUTILS_H
-#define STRINGUTILS_H
-
-#ifndef IMPORT_STDLIB
-#define IMPORT_STDLIB
+#pragma once
+#ifndef SCHEDULER_UTILS_H
+#define SCHEDULER_UTILS_H
 #include <stdlib.h>
-#endif
+#include "Constants.h"
 
 /*_______________________Function Prototypes_______________________*/
 
@@ -23,4 +21,7 @@ void TrimRight(char *pString);
  * @param size The size of the destination string
  */
 void CopyString(char *pSource, char *pDestination, size_t size);
+
+int ValidateKSpawnParams(char *name, int (*entryPoint)(void *), void *arg, int stacksize,
+                         int priority, int debugFlag);
 #endif

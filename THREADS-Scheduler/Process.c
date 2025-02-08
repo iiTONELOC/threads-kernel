@@ -1,7 +1,6 @@
 #include "THREADSLib.h"
 #include "Processes.h"
-#include "Constants.h"
-#include "StringUtils.h"
+#include "SchedulerUtils.h"
 #include "PriorityProcessQueue.h"
 
 /*_______________________Function  Definitions_______________________*/

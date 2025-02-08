@@ -39,19 +39,16 @@
     <ClInclude Include="DoublyLinkedList.h" />
     <ClInclude Include="Include\Scheduler.h" />
     <ClInclude Include="Include\THREADSLib.h" />
-    <ClInclude Include="Lists.h" />
     <ClInclude Include="PriorityProcessQueue.h" />
     <ClInclude Include="Processes.h" />
-    <ClInclude Include="StringUtils.h" />
-    <ClInclude Include="Validators.h" />
+    <ClInclude Include="SchedulerUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DoublyLinkedList.c" />
     <ClCompile Include="PriorityProcessQueue.c" />
     <ClCompile Include="Process.c" />
     <ClCompile Include="Scheduler.c" />
-    <ClCompile Include="StringUtils.c" />
-    <ClCompile Include="Validators.c" />
+    <ClCompile Include="SchedulerUtils.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
