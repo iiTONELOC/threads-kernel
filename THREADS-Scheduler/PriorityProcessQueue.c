@@ -5,9 +5,9 @@
 const char *STATUS_STRINGS[NUM_PROCESS_STATES] = {
     "READY",
     "RUNNING",
-    "BLOCKED_WAIT",
-    "BLOCKED_JOIN",
-    "BLOCKED_IO",
+    "WAIT BLOCK",
+    "JOIN BLOCK",
+    "IO BLOCK",
     "QUIT",
     "UNKNOWN",
     "UNKNOWN",
@@ -78,8 +78,9 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
 
     safeIndex = GetStatusListIndex(newStatus);
 
-    RemoveNodeFromPriorityProcessQueue(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)], pListNode);
-    AddNodeToPriorityProcessQueue(&usingListPtr[safeIndex], pListNode);
+    MoveDoublyLinkedNode(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)],
+                         &usingListPtr[safeIndex], pListNode);
+
     ((Process *)pListNode->pData)->status = newStatus;
 }
 
@@ -108,4 +109,13 @@ DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBuck
 
     // no match found
     return NULL;
+}
+
+void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList,
+                          DoublyLinkedNode *pNode)
+{
+    // remove the node from the from list
+    RemoveDoublyLinkedNode(pFromList, pNode);
+    // insert the node into the to list
+    InsertDoublyLinkedNode(pToList, pNode);
 }

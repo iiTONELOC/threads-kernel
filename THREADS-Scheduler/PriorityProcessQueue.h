@@ -63,4 +63,13 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
  */
 DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket);
 
+/**
+ * @brief Move a DoublyLinkedNode from one list to another
+ *
+ * @param pFromList Pointer to the list to move the node from
+ * @param pToList Pointer to the list to move the node to
+ * @param pNode Pointer to the node to move
+ */
+void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList, DoublyLinkedNode *pNode);
+
 #endif

@@ -178,12 +178,23 @@ void CleanUpAfterChild(Process *pRunningProcess,
     RemoveDoublyLinkedNode(pChildList, pDynamicNode);
     // Remove the child from the priority quit list
     RemoveDoublyLinkedNode(&pPriorityListQueue[STATUS_QUIT], pStaticNode);
+    // --- CAN BE MOVED TO A FUNCTION ----
     // reset the context
-    context_stop(pChild->context);
-    // Reset the Process Control Block
-    InitializeProcessToDefault(pChild);
-    // Reset the static linked list node
-    InitializeDoublyLinkedNode(pStaticNode);
+    // context_stop(pChild->context);
+    // // Reset the Process Control Block
+    // InitializeProcessToDefault(pChild);
+    // // Reset the static linked list node
+    // InitializeDoublyLinkedNode(pStaticNode);
+
+    CleanUpPCB(pChild, pStaticNode);
+    // -----------------------------------
     // Free the memory for dynamically created node for the parent to track its child
     DestroyDoublyLinkedNode(pDynamicNode);
+}
+
+void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
+{
+    context_stop(pProcessToClean->context);
+    InitializeProcessToDefault(pProcessToClean);
+    InitializeDoublyLinkedNode(pStaticStorageNode);
 }
