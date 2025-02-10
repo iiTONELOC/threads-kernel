@@ -5,13 +5,14 @@
 #include "Constants.h"
 #include "Scheduler.h"
 #include "Processes.h"
-#include "Validators.h"
+#include "SchedulerUtils.h"
 #include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
 int nextPid = 1;                                        // next process id
 int debugFlag = 0;                                      // debug flag
 int isBooting = 0;                                      // flag to indicate if the system is in bootstrap
+int currentNumProcesses = 0;                            // current number of processes
 Process *runningProcess = NULL;                         // tracks current running process
 Process processTable[MAX_PROCESSES];                    // process table
 interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
@@ -160,6 +161,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 
     /* Increment the process id for the next process */
     nextPid++;
+    currentNumProcesses++;
     // call the dispatcher
     dispatcher();
     return pNewProc->pid;
@@ -206,6 +208,7 @@ int k_wait(int *code)
                           priorityListQueue,
                           code,
                           &result);
+        currentNumProcesses--;
         enableInterrupts();
         return result;
     }
@@ -224,7 +227,7 @@ int k_wait(int *code)
 
     dispatcher();
 
-    // _______________AFTER PARENT WAS AWAKENED BY THEIR CHILD____________________
+    // AFTER PARENT WAS AWAKENED BY THEIR CHILD
     disableInterrupts();
     // get the exit code of the child
     if (runningProcess->pExitingChildren.count > 0)
@@ -235,6 +238,7 @@ int k_wait(int *code)
                           priorityListQueue,
                           code,
                           &result);
+        currentNumProcesses--;
     }
     else
     {
@@ -288,11 +292,11 @@ void k_exit(int code)
     // check if the process needs to join a process
     if (runningProcess->pJoiningProcesses.count > 0)
     {
-        // console_output(debugFlag, "k_exit(): Process is joining another process\n");
         // for each process that is joining this process - set the status to ready
         // and remove the process from the joining list
         while (runningProcess->pJoiningProcesses.count > 0)
         {
+            // get the dynamic linked list node for process
             pDynamicNode = runningProcess->pJoiningProcesses.pHead;
             RemoveDoublyLinkedNode(&runningProcess->pJoiningProcesses,
                                    runningProcess->pJoiningProcesses.pHead);
@@ -312,38 +316,36 @@ void k_exit(int code)
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
-
         pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
         // with a higher priority than the parent process
         if (((Process *)runningProcess->pParent)->status == STATUS_BLOCKED_WAIT)
         {
-            // // change the status of the parent to ready
+            // change the status of the parent to ready
             ChangeProcessStatus(priorityListQueue,
                                 FindDoublyLinkedNode(runningProcess->pParent,
                                                      &priorityListQueue[STATUS_BLOCKED_WAIT]),
                                 STATUS_READY);
 
             // place the child into parent's exiting children list
-            // but do not change the status of the child from QUIT
-            RemoveDoublyLinkedNode(&runningProcess->pParent->pChildren, pDynamicNode);
-            InsertDoublyLinkedNode(&runningProcess->pParent->pExitingChildren, pDynamicNode);
+            MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
+                                 &runningProcess->pParent->pExitingChildren,
+                                 pDynamicNode);
         }
         else
         {
             // place the child into parent's dead children list
-            // but do not change the status of the child from QUIT
-            RemoveDoublyLinkedNode(&runningProcess->pParent->pChildren, pDynamicNode);
-            InsertDoublyLinkedNode(&runningProcess->pParent->pDeadChildren, pDynamicNode);
+            MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
+                                 &runningProcess->pParent->pDeadChildren,
+                                 pDynamicNode);
         }
     }
     else
     {
         // process has no children and no parent, clean up after self
-        context_stop(runningProcess->context);
-        InitializeProcessToDefault(runningProcess);
-        InitializeDoublyLinkedNode(pStaticListNode);
+        CleanUpPCB(runningProcess, pStaticListNode);
+        currentNumProcesses--;
     }
 
     runningProcess = NULL;
@@ -390,7 +392,6 @@ int k_getpid()
 
 int k_join(int pid, int *pChildExitCode)
 {
-
     enforceKernelMode();
     disableInterrupts();
     int result = 0;
@@ -454,7 +455,7 @@ int k_join(int pid, int *pChildExitCode)
     // call dispatcher to switch to the next process
     dispatcher();
 
-    // _______________AFTER PROCESS WAS AWAKENED BY PROCESS THEY WANT TO JOIN____________________
+    // AFTER PROCESS WAS AWAKENED BY PROCESS THEY WANT TO JOIN
 
     disableInterrupts();
 
@@ -480,7 +481,8 @@ int unblock(int pid)
     if (pListNode != NULL)
     {
         pProcess = (Process *)pListNode->pData;
-        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT || pProcess->status == STATUS_BLOCKED_IO ||
+        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT ||
+                    pProcess->status == STATUS_BLOCKED_IO ||
                     (pProcess->status > NUM_PROCESS_STATES - 1);
     }
 
@@ -551,6 +553,7 @@ int get_start_time(void)
 
 void display_process_table()
 {
+<<<<<<< HEAD
 
     /**
      *  In C - Variables should be declared before you use them.
@@ -709,6 +712,9 @@ void display_process_table()
     }
 
     console_output(FALSE, "\n");
+=======
+    PrintProcessTable(processTable, MAX_PROCESSES, currentNumProcesses);
+>>>>>>> 26e99fa8e1a45cf54300edf0a1ac0ac9a4ce09b9
 }
 
 void dispatcher()
@@ -726,10 +732,13 @@ void dispatcher()
     if (runningProcess != NULL &&
         (runningProcess->elapsedTime >= runningProcess->quantum))
     {
+        disableInterrupts();
         time_slice();
+        enableInterrupts();
     }
     else
     {
+        disableInterrupts();
         // get the next ready process
         pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
 
@@ -740,7 +749,7 @@ void dispatcher()
             if (runningProcess != NULL &&
                 pNextReadyProcess->pid == runningProcess->pid)
             {
-
+                enableInterrupts();
                 return;
             }
 
@@ -748,11 +757,16 @@ void dispatcher()
             runningProcess = pNextReadyProcess;
 
             // set the running process to the current process
+            // will re-enable interrupts
             context_switch(runningProcess->context);
         }
         else
         {
-            return;
+            // if the next ready process is null, we have a deadlock
+            // GetNextReadyProcess should return the watchdog process
+            // So this should never be called from here unless there
+            // is a serious issue
+            watchdog(NULL);
         }
     }
 }
@@ -839,7 +853,6 @@ static void check_deadlock()
  */
 static inline void disableInterrupts()
 {
-
     /* We ARE in kernel mode */
     set_psr(get_psr() & ~PSR_INTERRUPTS);
 }
@@ -884,7 +897,6 @@ int check_io_scheduler()
 
 void time_slice()
 {
-    disableInterrupts();
     static int elapsed = 0;           // time elapsed since last context switch
     static int lastTime = 0;          // last time the clock interrupt was called
     int currentTime = system_clock(); // current time in μs but
@@ -923,7 +935,6 @@ void time_slice()
     else
     {
         elapsed = 0;
-        enableInterrupts();
     }
 }
 
@@ -939,7 +950,9 @@ void time_slice()
  */
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
+    disableInterrupts();
     time_slice();
+    enableInterrupts();
 }
 
 /**

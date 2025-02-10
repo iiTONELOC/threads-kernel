@@ -1,4 +1,3 @@
-
 #include "PriorityProcessQueue.h"
 
 // __________________________ Constants __________________________
@@ -6,9 +5,9 @@
 const char *STATUS_STRINGS[NUM_PROCESS_STATES] = {
     "READY",
     "RUNNING",
-    "BLOCKED_WAIT",
-    "BLOCKED_JOIN",
-    "BLOCKED_IO",
+    "WAIT BLOCK",
+    "JOIN BLOCK",
+    "IO BLOCK",
     "QUIT",
     "UNKNOWN",
     "UNKNOWN",
@@ -79,7 +78,44 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
 
     safeIndex = GetStatusListIndex(newStatus);
 
-    RemoveNodeFromPriorityProcessQueue(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)], pListNode);
-    AddNodeToPriorityProcessQueue(&usingListPtr[safeIndex], pListNode);
+    MoveDoublyLinkedNode(&usingListPtr[GetStatusListIndex(((Process *)pListNode->pData)->status)],
+                         &usingListPtr[safeIndex], pListNode);
+
     ((Process *)pListNode->pData)->status = newStatus;
+}
+
+DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket)
+{
+    int i = 0;
+
+    // loop over the array of nodes and look for a process with the
+    // corresponding pid
+    for (i = 0; i < MAXPROC; i++)
+    {
+
+        // If we have NULL data just skip to the next node
+        if (((DoublyLinkedNode *)&pNodeBucket[i])->pData == NULL)
+        {
+            continue;
+        }
+
+        // Non-NULL data, check the pid
+        if (((Process *)((DoublyLinkedNode *)&pNodeBucket[i])->pData)->pid == withPid)
+        {
+            // match found
+            return &pNodeBucket[i];
+        }
+    }
+
+    // no match found
+    return NULL;
+}
+
+void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList,
+                          DoublyLinkedNode *pNode)
+{
+    // remove the node from the from list
+    RemoveDoublyLinkedNode(pFromList, pNode);
+    // insert the node into the to list
+    InsertDoublyLinkedNode(pToList, pNode);
 }

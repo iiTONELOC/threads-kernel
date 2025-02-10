@@ -10,14 +10,12 @@
 #pragma pack(1)
 typedef struct _process
 {
+
+	struct _process *pParent;
 	DoublyLinkedList pChildren;
 	DoublyLinkedList pDeadChildren;
 	DoublyLinkedList pExitingChildren;
 	DoublyLinkedList pJoiningProcesses;
-
-	// LinkedListNode *pParent;
-	struct _process *pParent;
-	// DoublyLinkedNode* nextReadyProcess;
 
 	short pid;					/* Process id (pid) */
 	int status;					/* READY, QUIT, BLOCKED, etc. */
@@ -25,8 +23,8 @@ typedef struct _process
 	char *stack;				/* Process stack */
 	int exitCode;				/* Process exit code */
 	int priority;				/* Process priority */
-	int joinStatus;				/*Status from a process this process is trying to join*/
 	void *context;				/* Process's current context */
+	int joinStatus;				/*Status from a process this process is trying to join*/
 	char name[MAXNAME];			/* Process name */
 	unsigned int quantum;		/* Time slice */
 	int processTableIndex;		/* Index into the process table */
@@ -123,4 +121,15 @@ void CleanUpAfterChild(Process *pRunningProcess,
 					   DoublyLinkedNode *pStaticStorage,
 					   DoublyLinkedList *pPriorityListQueue,
 					   int *pCode, int *pResult);
+
+/**
+ * @brief Clean up after a process with no parent or children
+ *
+ * Removes the process context and initializes the PCB to default values
+ *
+ * @param pProcessToClean Pointer to the process to clean up
+ * @param pStaticStorageNode Pointer to the static storage node
+ */
+void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode);
+
 #endif
