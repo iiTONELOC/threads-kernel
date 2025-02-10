@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "PriorityProcessQueue.h"
 
-#define PROCESS_TABLE_ROW_FORMAT "%-7d %-8d %-9d %-13s %-8d %-8llu %-8s\n"
+#define PROCESS_TABLE_ROW_FORMAT "%-7d %-8d %-9d %-13s %-8d %-8llu %s\n"
 #define PROCESS_TABLE_HEADER_FORMAT "%-7s %-8s %-9s %-13s %-8s %-8s %-8s\n"
 
 /*_______________________Function Prototypes_______________________*/
