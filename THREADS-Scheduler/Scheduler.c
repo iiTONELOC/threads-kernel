@@ -1,711 +1,332 @@
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <stdio.h>
 #include "THREADSLib.h"
-#include "Constants.h"
 #include "Scheduler.h"
-#include "Processes.h"
-#include "SchedulerUtils.h"
-#include "DoublyLinkedList.h"
-#include "PriorityProcessQueue.h"
+#include "../LinkedProcessList/LinkedProcessList.h"
 
-int nextPid = 1;                                        // next process id
-int debugFlag = 0;                                      // debug flag
-int isBooting = 0;                                      // flag to indicate if the system is in bootstrap
-int currentNumProcesses = 0;                            // current number of processes
-Process *runningProcess = NULL;                         // tracks current running process
-Process processTable[MAX_PROCESSES];                    // process table
-interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
-DoublyLinkedNode staticNodeStorage[MAX_PROCESSES];      // Storage for process state linked list
-DoublyLinkedList priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue for process states
+Process processTable[MAX_PROCESSES];
+Process *runningProcess = NULL;
+int nextPid = 1;
+int debugFlag = 1;
 
-int cpu_time();
-void time_slice();
-void dispatcher();
-void enforceKernelMode();
-static int launch(void *);
-static int watchdog(void *);
-static void check_deadlock();
-
-static inline void enableInterrupts();
+static int watchdog(char*);
 static inline void disableInterrupts();
-static void DebugConsole(char *format, ...);
-void clockInterruptHandler(void *device, uint8_t command, uint32_t status);
+void dispatcher();
+static int launch(void *);
+static void check_deadlock();
+static void DebugConsole(char* format, ...);
 
 /* DO NOT REMOVE */
+extern int SchedulerEntryPoint(void* pArgs);
 int check_io_scheduler();
 check_io_function check_io;
-extern int SchedulerEntryPoint(void *pArgs);
 
-/**
- * @brief The bootstrap function for the scheduler
- *
- * @param pArgs The arguments to pass to the function
- * @return int The return value of the function
- *
- * @note This function is the first function called by THREADS on startup.
- *       This function must setup the OS scheduler and primitive functionality
- *
- *      The first two processes are the watchdog and the scheduler entry point
- *
- *      This function is used to init higher layers of the os and assist in testing
- *      the scheduler functions.
- *
- */
+
+/*************************************************************************
+   bootstrap()
+
+   Purpose - This is the first function called by THREADS on startup.
+
+             The function must setup the OS scheduler and primitive
+             functionality and then spawn the first two processes.  
+             
+             The first two process are the watchdog process 
+             and the startup process SchedulerEntryPoint.  
+             
+             The statup process is used to initialize additional layers
+             of the OS.  It is also used for testing the scheduler 
+             functions.
+
+   Parameters - Arguments *pArgs - these arguments are unused at this time.
+
+   Returns - The function does not return!
+
+   Side Effects - The effects of this function is the launching of the kernel.
+
+ *************************************************************************/
 int bootstrap(void *pArgs)
 {
     int result; /* value returned by call to spawn() */
 
-    isBooting = 1; // set isBooting flag to true - Won't allow the dispatcher to run
-
     /* set this to the scheduler version of this function.*/
     check_io = check_io_scheduler;
 
-    /* Initialize the process table */
-    InitializeProcessTable(processTable, MAX_PROCESSES);
-    /* Initialize the process table linked list bucket */
-    InitializeDoublyLinkedNodeStorage(staticNodeStorage, MAX_PROCESSES);
-    /* Initialize the priority list queue */
-    InitializePriorityProcessQueueArray(priorityListQueue, NUM_PROCESS_STATES);
+    /* Initialize the process table. */
+
+    /* Initialize the Ready list, etc. */
 
     /* Initialize the clock interrupt handler */
-    interruptHandlers = get_interrupt_handlers();
-    interruptHandlers[THREADS_TIMER_INTERRUPT] = (interrupt_handler_t)&clockInterruptHandler;
 
     /* startup a watchdog process */
     result = k_spawn("watchdog", watchdog, NULL, THREADS_MIN_STACK_SIZE, LOWEST_PRIORITY);
     if (result < 0)
     {
-        console_output(debugFlag,
-                       "Scheduler(): spawn for watchdog returned an error (%d), stopping...\n", result);
+        console_output(debugFlag, "Scheduler(): spawn for watchdog returned an error (%d), stopping...\n", result);
         stop(1);
     }
 
-    isBooting = 0; // set isBooting flag to false - Will allow the dispatcher to run
     /* start the test process, which is the main for each test program.  */
     result = k_spawn("Scheduler", SchedulerEntryPoint, NULL, 2 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
     if (result < 0)
     {
-        console_output(debugFlag,
-                       "Scheduler(): spawn for SchedulerEntryPoint returned an error (%d), stopping...\n", result);
+        console_output(debugFlag,"Scheduler(): spawn for SchedulerEntryPoint returned an error (%d), stopping...\n", result);
         stop(1);
     }
 
-    // Should not get here, the dispatcher should start from the last spawn call
+    /* Initialized and ready to go!! */
+
+    /* This should never return since we are not a real process. */
 
     stop(-3);
     return 0;
+
 }
 
-int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int priority)
-{
-    enforceKernelMode();
-    int result = 0;
-    int proc_slot;
-    Process *pNewProc;
-    DoublyLinkedNode *pNewChildProcNode = NULL;
-    DoublyLinkedNode *pRunningProcessLinkedListNode = NULL;
+/*************************************************************************
+   k_spawn()
 
-    result = ValidateKSpawnParams(name, entryPoint, arg, stacksize, priority, debugFlag);
-    if (result != 0)
-    {
-        return result;
-    }
+   Purpose - spawns a new process.
+   
+             Finds an empty entry in the process table and initializes
+             information of the process.  Updates information in the
+             parent process to reflect this child process creation.
+
+   Parameters - the process's entry point function, the stack size, and
+                the process's priority.
+
+   Returns - The Process ID (pid) of the new child process 
+             The function must return if the process cannot be created.
+
+************************************************************************ */
+int k_spawn(char* name, int (*entryPoint)(void *), void* arg, int stacksize, int priority)
+{
+    int proc_slot;
+    struct Process* pNewProc;
+
+    DebugConsole("spawn(): creating process %s\n", name);
 
     disableInterrupts();
-    /* Find an empty slot in the process table */
-    proc_slot = GetEmptyControlBlockIndex(processTable);
 
-    if (proc_slot < 0)
+    /* Validate all of the parameters, starting with the name. */
+    if (name == NULL)
     {
-        return -4;
+        console_output(debugFlag, "spawn(): Name value is NULL.\n");
+        return -1;
+    }
+    if (strlen(name) >= (MAXNAME - 1))
+    {
+        console_output(debugFlag, "spawn(): Process name is too long.  Halting...\n");
+        stop( 1);
     }
 
-    // Get a pointer to the new process
+
+    /* Find an empty slot in the process table */
+    
+    proc_slot = 1;  // just use 1 for now!
     pNewProc = &processTable[proc_slot];
 
-    /* Setup the new process in the process table. */
-    InitializeNewProcess(pNewProc, name, entryPoint, arg, stacksize, priority,
-                         proc_slot, nextPid);
+    /* Setup the entry in the process table. */
+    strcpy(pNewProc->name, name);
 
-    // add the process to static node storage (for priority list) and the priority list queue
-    staticNodeStorage[proc_slot].pData = pNewProc;
-    AddNodeToPriorityProcessQueue(priorityListQueue, &staticNodeStorage[proc_slot]);
-
-    /* If there is a parent process, add this to its list of children. */
+    /* If there is a parent process,add this to the list of children. */
     if (runningProcess != NULL)
     {
-        // dynamically allocate a new linked list node for the parent's children list
-        // this keeps from mutating the priority list queue
-        pNewChildProcNode = CreateDoublyLinkedNode(pNewProc);
-
-        // if the linked list node is NULL, return an error
-        if (pNewChildProcNode == NULL)
-        {
-            console_output(debugFlag,
-                           "spawn(): Error: Could not create a new linked list node for the child process.\n");
-            return -1;
-        }
-
-        // add the child process to the parent's children list
-        InsertDoublyLinkedNode(&runningProcess->pChildren, pNewChildProcNode);
-
-        // add the parent process to the child process' pParent
-        pNewProc->pParent = runningProcess;
     }
+
+    /* Add the process to the ready list. */
 
     /* Initialize context for this process, but use launch function pointer for
      * the initial value of the process's program counter (PC)
-     */
-    pNewProc->context = context_initialize(launch, stacksize, pNewProc->startArgs);
+    */
+    pNewProc->context = context_initialize(launch, stacksize, arg);
 
-    /* Increment the process id for the next process */
-    if (nextPid % MAX_PROCESSES == 0)
-    {
-        // This gives us the same output that the test program expects
-        // In reality, we can just increment the id, we save its index in the PCB
-        // If you have access to the process struct, you can get its index into
-        // the table AND linked list node static storage
-        nextPid = nextPid + 3;
-    }
-    else
-    {
-        nextPid++;
-    }
-
-    currentNumProcesses++;
-    // call the dispatcher
-    dispatcher();
     return pNewProc->pid;
-}
 
-/**
- * @brief Utility function that makes sure the environment is ready
- *
- * @param args The arguments to pass to the function
- * @return int The return value of the function
- */
+
+} /* spawn */
+
+/**************************************************************************
+   Name - launch
+
+   Purpose - Utility function that makes sure the environment is ready,
+             such as enabling interrupts, for the new process.  
+
+   Parameters - none
+
+   Returns - nothing
+*************************************************************************/
 static int launch(void *args)
 {
-    enforceKernelMode();
-    int result = 0;
+
+    DebugConsole("launch(): started: %s\n", runningProcess->name);
+
     /* Enable interrupts */
-    enableInterrupts();
 
     /* Call the function passed to spawn and capture its return value */
-    result = runningProcess->entryPoint(runningProcess->startArgs);
+    DebugConsole("Process %d returned to launch\n", runningProcess->pid);
 
     /* Stop the process gracefully */
-    k_exit(result);
 
     return 0;
-}
+} 
 
-int k_wait(int *code)
+/**************************************************************************
+   Name - k_wait
+
+   Purpose - Wait for a child process to quit.  Return right away if
+             a child has already quit.
+
+   Parameters - Output parameter for the child's exit code. 
+
+   Returns - the pid of the quitting child, or
+        -4 if the process has no children
+        -5 if the process was signaled in the join
+
+************************************************************************ */
+int k_wait(int* code)
 {
-    enforceKernelMode();
-    disableInterrupts();
-    int result = 0;                     // return value
-    Process *pChild = NULL;             // Child process
-    DoublyLinkedNode *pTempNode = NULL; // Linked List Node for the Running Process
-
-    // Look for a running process, if there is a running process then it is the parent of the
-    // current process that is trying to exit.
-
-    // check for dead children - children that have already quit
-    if (runningProcess != NULL && runningProcess->pDeadChildren.count > 0)
-    {
-        CleanUpAfterChild(runningProcess,
-                          &runningProcess->pDeadChildren,
-                          staticNodeStorage,
-                          priorityListQueue,
-                          code,
-                          &result);
-        currentNumProcesses--;
-        enableInterrupts();
-        return result;
-    }
-
-    if (runningProcess != NULL && runningProcess->pChildren.count == 0)
-    {
-        // no processes to wait for
-        return -1;
-    }
-
-    ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
-                        STATUS_BLOCKED_WAIT);
-    runningProcess = NULL;
-
-    dispatcher();
-
-    // AFTER PARENT WAS AWAKENED BY THEIR CHILD
-    disableInterrupts();
-    // get the exit code of the child
-    if (runningProcess->pExitingChildren.count > 0)
-    {
-        CleanUpAfterChild(runningProcess,
-                          &runningProcess->pExitingChildren,
-                          staticNodeStorage,
-                          priorityListQueue,
-                          code,
-                          &result);
-        currentNumProcesses--;
-    }
-    else
-    {
-        console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
-    }
-    if (runningProcess->signal)
-    {
-        return -5;
-    }
-    enableInterrupts();
-
+    int result = 0;
     return result;
-}
 
+} 
+
+/**************************************************************************
+   Name - k_exit
+
+   Purpose - Exits a process and coordinates with the parent for cleanup 
+             and return of the exit code.
+
+   Parameters - the code to return to the grieving parent
+
+   Returns - nothing
+   
+*************************************************************************/
 void k_exit(int code)
 {
-    enforceKernelMode();
-    disableInterrupts();
-    Process *pProcessINeedToJoin = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticListNode = NULL;
 
-    // terminate the process and set its exit code
-    // set the status to QUIT
 
-    // check if the process has children
-    if (runningProcess->pChildren.count > 0)
-    {
-        console_output(debugFlag, "quit(): Process with active children attempting to quit\n");
-        stop(1);
-    }
-
-    // check for a signal event - Currently only SIG_TERM is supported
-    if (runningProcess->signal == SIG_TERM)
-    {
-        // if the process was signaled, set the exit code to the signal
-        runningProcess->exitCode = -5;
-    }
-    else
-    {
-        // set the exit code
-        runningProcess->exitCode = code;
-    }
-
-    // Grab the static linked list node for the process from static node storage
-    pStaticListNode = FindDoublyLinkedNode(runningProcess, &priorityListQueue[STATUS_RUNNING]);
-
-    // set the status of the quitting process to QUIT - requires a static node
-    ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
-
-    // check if the process needs to join a process
-    if (runningProcess->pJoiningProcesses.count > 0)
-    {
-        // for each process that is joining this process - set the status to ready
-        // and remove the process from the joining list
-        while (runningProcess->pJoiningProcesses.count > 0)
-        {
-            // get the dynamic linked list node for process
-            pDynamicNode = runningProcess->pJoiningProcesses.pHead;
-            RemoveDoublyLinkedNode(&runningProcess->pJoiningProcesses,
-                                   runningProcess->pJoiningProcesses.pHead);
-            pProcessINeedToJoin = (Process *)pDynamicNode->pData;
-            // set the status of the process to ready
-            ChangeProcessStatus(priorityListQueue,
-                                FindDoublyLinkedNode(pProcessINeedToJoin,
-                                                     &priorityListQueue[STATUS_BLOCKED_JOIN]),
-                                STATUS_READY);
-            // free the linked list node
-            DestroyDoublyLinkedNode(pDynamicNode);
-
-            pProcessINeedToJoin->joinStatus = runningProcess->exitCode;
-        }
-    }
-
-    // The process has a parent so we need to inform the parent that the child has quit
-    if (runningProcess->pParent != NULL)
-    {
-        pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
-        // check if the parent is blocked before changing the status
-        // if the parent is still running, we have a child process
-        // with a higher priority than the parent process
-        if (((Process *)runningProcess->pParent)->status == STATUS_BLOCKED_WAIT)
-        {
-            // change the status of the parent to ready
-            ChangeProcessStatus(priorityListQueue,
-                                FindDoublyLinkedNode(runningProcess->pParent,
-                                                     &priorityListQueue[STATUS_BLOCKED_WAIT]),
-                                STATUS_READY);
-
-            // place the child into parent's exiting children list
-            MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
-                                 &runningProcess->pParent->pExitingChildren,
-                                 pDynamicNode);
-        }
-        else
-        {
-            // place the child into parent's dead children list
-            MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
-                                 &runningProcess->pParent->pDeadChildren,
-                                 pDynamicNode);
-        }
-    }
-    else
-    {
-        // process has no children and no parent, clean up after self
-        CleanUpPCB(runningProcess, pStaticListNode);
-        currentNumProcesses--;
-    }
-
-    runningProcess = NULL;
-    dispatcher();
 }
 
+/**************************************************************************
+   Name - k_kill
+
+   Purpose - Signals a process with the specified signal
+
+   Parameters - Signal to send
+
+   Returns -
+*************************************************************************/
 int k_kill(int pid, int signal)
 {
-    enforceKernelMode();
     int result = 0;
-    Process *pProcess = NULL;
-    DoublyLinkedNode *pListNode = NULL;
-
-    disableInterrupts();
-    // look for the process in the process table
-    pListNode = FindStaticStorageNode(pid, staticNodeStorage);
-    pProcess = (Process *)pListNode->pData;
-
-    // if the process is not found or signal is not equal to SIG_TERM
-    if (pListNode == NULL ||
-        signal != SIG_TERM ||
-        (pListNode != NULL && pProcess == NULL))
-    {
-        stop(1);
-    }
-
-    // check if the process is already signaled
-    if (pProcess->signal)
-    {
-        return 1;
-    }
-
-    // set the signal for the process
-    pProcess->signal = signal;
-    enableInterrupts();
     return 0;
 }
 
+/**************************************************************************
+   Name - k_getpid
+*************************************************************************/
 int k_getpid()
 {
-    enforceKernelMode();
-    return runningProcess ? runningProcess->pid : 0;
+    return 0;
 }
 
-int k_join(int pid, int *pChildExitCode)
+/**************************************************************************
+   Name - k_join
+***************************************************************************/
+int k_join(int pid, int* pChildExitCode)
 {
-    enforceKernelMode();
-    disableInterrupts();
-    int result = 0;
-
-    // get the process from the process table
-    Process *pProcess = NULL;
-    DoublyLinkedNode *pNewJoiningProcessNode = NULL;
-    DoublyLinkedNode *pStaticListNode = FindStaticStorageNode(pid, staticNodeStorage);
-
-    if (pStaticListNode != NULL)
-    {
-        pProcess = (Process *)pStaticListNode->pData;
-    }
-    else
-    {
-        console_output(debugFlag, "join: attempting to join a process that does not exist.\n");
-        stop(1);
-    }
-
-    // ensure that the process is not trying to join itself
-    if (pProcess->pid == runningProcess->pid)
-    {
-        console_output(debugFlag, "join: process attempted to join itself.\n");
-        stop(1);
-    }
-
-    // ensure the process is not trying to join its parent
-    if (pid == runningProcess->pParent->pid)
-    {
-        console_output(debugFlag, "join: process attempted to join parent.\n");
-        stop(2);
-    }
-
-    // create a new linked list node of the running process and add it to the joining processes list
-    // of the process we are trying to join
-    pNewJoiningProcessNode = CreateDoublyLinkedNode(runningProcess);
-
-    // if the linked list node is NULL, return an error
-    if (pNewJoiningProcessNode == NULL)
-    {
-        console_output(debugFlag,
-                       "join(): Error: Could not create a new linked list node for the joining process.\n");
-        return -6;
-    }
-
-    // add the running process to the joining processes list of the process we are trying to join
-    InsertDoublyLinkedNode(&pProcess->pJoiningProcesses, pNewJoiningProcessNode);
-
-    // set the status of the running process to blocked join
-    ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
-                        STATUS_BLOCKED_JOIN);
-
-    // verify that our node made it the pJoiningProcesses list
-    if (FindDoublyLinkedNode(runningProcess, &pProcess->pJoiningProcesses) == NULL)
-    {
-        return -1;
-    }
-
-    // call dispatcher to switch to the next process
-    dispatcher();
-
-    // AFTER PROCESS WAS AWAKENED BY PROCESS THEY WANT TO JOIN
-
-    disableInterrupts();
-
-    // look for the exit code of the process we want to join in the process table
-    *pChildExitCode = runningProcess->joinStatus;
-
-    // resetting the joinStatus to a known init value
-    runningProcess->joinStatus = -99;
-
-    dispatcher();
-
-    return result;
+    return 0;
 }
 
+/**************************************************************************
+   Name - unblock
+*************************************************************************/
 int unblock(int pid)
 {
-    enforceKernelMode();
-    int isBlocked = 0;
-    disableInterrupts();
-    // get the process from the process table
-    Process *pProcess = NULL;
-    DoublyLinkedNode *pListNode = FindStaticStorageNode(pid, staticNodeStorage);
-
-    if (pListNode != NULL)
-    {
-        pProcess = (Process *)pListNode->pData;
-        isBlocked = pProcess->status == STATUS_BLOCKED_WAIT ||
-                    pProcess->status == STATUS_BLOCKED_IO ||
-                    (pProcess->status > NUM_PROCESS_STATES - 1);
-    }
-
-    // if invalid or process is not blocked, return -1
-    if (pListNode == NULL || !isBlocked)
-    {
-        return -1;
-    }
-
-    ChangeProcessStatus(priorityListQueue, pListNode, STATUS_READY);
-
-    dispatcher();
     return 0;
 }
 
+/*************************************************************************
+   Name - block
+*************************************************************************/
 int block(int newStatus)
 {
-    enforceKernelMode();
-    // function blocks the calling process and sets the status in the process table to the value specified by newStatus
-
-    // if the new status is between 0-10
-    if (newStatus <= 10)
-    {
-        console_output(debugFlag, "block: function called with a reserved status value.\n");
-        stop(1);
-    }
-
-    disableInterrupts();
-    ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
-                        newStatus);
-
-    dispatcher();
-
-    if (runningProcess->signal)
-    {
-        return -5;
-    }
-
     return 0;
 }
 
+/*************************************************************************
+   Name - signaled
+*************************************************************************/
 int signaled()
 {
-    enforceKernelMode();
-    return (runningProcess && runningProcess->signal) ? 1 : 0;
+    return 0;
 }
-
+/*************************************************************************
+   Name - readtime
+*************************************************************************/
 int read_time()
 {
-    enforceKernelMode();
-    return cpu_time(); // ? Not sure if this is correct, read_time is not is the spec
+    return 0;
 }
 
-int cpu_time()
-{
-    enforceKernelMode();
-    return runningProcess ? runningProcess->cpuTime : 0;
-}
-
+/*************************************************************************
+   Name - readClock
+*************************************************************************/
 DWORD read_clock()
 {
-    enforceKernelMode();
     return system_clock();
-}
-
-int get_start_time(void)
-{
-    enforceKernelMode();
-    return runningProcess->startTime;
 }
 
 void display_process_table()
 {
-    enforceKernelMode();
-    PrintProcessTable(processTable, MAX_PROCESSES, currentNumProcesses);
+
 }
 
+/**************************************************************************
+   Name - dispatcher
+
+   Purpose - This is where context changes to the next process to run.
+
+   Parameters - none
+
+   Returns - nothing
+
+*************************************************************************/
 void dispatcher()
 {
-    enforceKernelMode();
-    Process *pNextReadyProcess = NULL;
+    Process *nextProcess = NULL;
 
-    // if we are in bootstrap, we need to return
-    if (isBooting)
-    {
-        return;
-    }
+    /* IMPORTANT: context switch enables interrupts. */
+    context_switch(nextProcess->context);
 
-    // determine if the currently running process has exceeded its quantum
-    if (runningProcess != NULL &&
-        (runningProcess->elapsedTime >= runningProcess->quantum))
-    {
-        disableInterrupts();
-        time_slice();
-        enableInterrupts();
-    }
-    else
-    {
-        disableInterrupts();
-        // get the next ready process
-        pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
+} 
 
-        // if the next Ready process is null
-        if (pNextReadyProcess != NULL)
-        {
-            // if we get the same process back no need to context switch
-            if (runningProcess != NULL &&
-                pNextReadyProcess->pid == runningProcess->pid)
-            {
-                enableInterrupts();
-                return;
-            }
+/**************************************************************************
+   Name - watchdog
 
-            // set the running process to the next ready process
-            runningProcess = pNextReadyProcess;
+   Purpose - The watchdoog keeps the system going when all other
+         processes are blocked.  It can be used to detect when the system
+         is shutting down as well as when a deadlock condition arises.
 
-            // set the running process to the current process
-            // will re-enable interrupts
-            context_switch(runningProcess->context);
-        }
-        else
-        {
-            // if the next ready process is null, we have a deadlock
-            // GetNextReadyProcess should return the watchdog process
-            // So this should never be called from here unless there
-            // is a serious issue
-            watchdog(NULL);
-        }
-    }
-}
+   Parameters - none
 
-/**
- * @brief Watchdog function
- *
- * The watchdog keeps the system going when all other processes are blocked.
- * It can be used to detect when the system is shutting down as well as when a deadlock
- * arises
- *
- * @param dummy A pointer to the dummy variable - use a void pointer or NULL
- */
-static int watchdog(void *dummy)
+   Returns - nothing
+   *************************************************************************/
+static int watchdog(char* dummy)
 {
-    enforceKernelMode();
-    Process *pNextReadyProc = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticListNode = NULL;
-    DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
-
-    if (isBooting)
-    {
-        // We are still booting up, so we need to wait for the system to be ready
-        return 0;
-    }
-
-    if (pNode == NULL || pNode->pData == NULL)
+    DebugConsole("watchdog(): called\n");
+    while (1)
     {
         check_deadlock();
-        console_output(FALSE, "Processes still exist.\n");
-        stop(1);
     }
-
     return 0;
-}
+} 
 
 /* check to determine if deadlock has occurred... */
 static void check_deadlock()
 {
-    enforceKernelMode();
-    int i = 0;
-    Process *pCurrentProc = NULL;
-    DoublyLinkedNode *pNextLNode = NULL;
-
-    disableInterrupts();
-    // determine why the watchdog was called
-    while (1)
-    {
-        // check for deadlock
-        // print out the number of ready processes
-
-        // loop over the priority list queue
-        for (i = 0; i < NUM_PROCESS_STATES; i++)
-        {
-            // get the head of the list
-            pNextLNode = priorityListQueue[i].pHead;
-
-            // if the head is not null, we have a process
-            if (pNextLNode != NULL)
-            {
-                // get the process
-                pCurrentProc = (Process *)pNextLNode->pData;
-
-                // if the process is not null, we have a process
-                if (pCurrentProc != NULL && pCurrentProc->status != STATUS_RUNNING)
-                {
-                    // print the process name
-                    console_output(FALSE, "Current List is the %s list.\n", STATUS_STRINGS[i]);
-                    console_output(FALSE, "Current process is:  %s .\n", pCurrentProc->name);
-                }
-            }
-        }
-        break;
-    }
-
-    console_output(FALSE, "All processes completed.\n");
-
-    // we arrived here because there are no processes in the system
-    stop(0);
 }
 
 /*
@@ -713,33 +334,26 @@ static void check_deadlock()
  */
 static inline void disableInterrupts()
 {
-    enforceKernelMode();
 
     /* We ARE in kernel mode */
-    set_psr(get_psr() & ~PSR_INTERRUPTS);
-}
 
-/*
- * Enables the interrupts.
- */
-static inline void enableInterrupts()
-{
-    enforceKernelMode();
 
-    set_psr(get_psr() | PSR_INTERRUPTS);
-}
+    int psr = get_psr();
 
-/**
- * @brief Debug console function
- *
- * Prints the message to the console_output if in debug mode
- *
- * @param format a pointer to the format string
- * @param ... a pointer to the va args
- *
- * @note This function is called when the debug flag is set
- */
-static void DebugConsole(char *format, ...)
+    psr = psr & ~PSR_INTERRUPTS;
+
+    set_psr( psr);
+
+} /* disableInterrupts */
+
+/**************************************************************************
+   Name - DebugConsole
+   Purpose - Prints  the message to the console_output if in debug mode
+   Parameters - format string and va args
+   Returns - nothing
+   Side Effects -
+*************************************************************************/
+static void DebugConsole(char* format, ...)
 {
     char buffer[2048];
     va_list argptr;
@@ -750,90 +364,13 @@ static void DebugConsole(char *format, ...)
         vsprintf(buffer, format, argptr);
         console_output(TRUE, buffer);
         va_end(argptr);
+
     }
 }
+
 
 /* there is no I/O yet, so return false. */
 int check_io_scheduler()
 {
-    enforceKernelMode();
     return false;
-}
-
-void time_slice()
-{
-
-    static int elapsed = 0;           // time elapsed since last context switch
-    static int lastTime = 0;          // last time the clock interrupt was called
-    int currentTime = system_clock(); // current time in μs but
-
-    // if there is a running process and it doesn't have a start time, set it
-    if (runningProcess != NULL && runningProcess->startTime == 0)
-    {
-        // needs to be in μs
-        runningProcess->startTime = currentTime;
-    }
-
-    // calculate the time elapsed since the last context switch
-    if (lastTime != 0)
-    {
-        // should be in μs
-        elapsed += (currentTime - lastTime);
-    }
-
-    // update the last time the clock interrupt was called
-    lastTime = currentTime;
-
-    // if there is a running process, update its elapsed and cpu time
-    if (runningProcess != NULL)
-    {
-        runningProcess->elapsedTime += elapsed;
-        runningProcess->cpuTime += (elapsed / NUM_MILLI_SEC_IN_MICRO_SEC);
-    }
-
-    // check if the elapsed time is greater than the quantum for the running process
-    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
-    {
-        elapsed = 0;
-        runningProcess->elapsedTime = 0;
-        dispatcher();
-    }
-    else
-    {
-        elapsed = 0;
-    }
-}
-
-/**
- * @brief Clock interrupt handler
- *
- * @param device A pointer to the device id
- * @param command The command to execute
- * @param status The status of the device
- *
- * @note This function is called when the clock interrupt is triggered, this function
- * should not be called directly.
- */
-void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
-{
-
-    disableInterrupts();
-    time_slice();
-    enableInterrupts();
-}
-
-/**
- * @brief Enforces kernel mode
- *
- * This function checks to see if the processor is in kernel mode,
- * if it isn't the kernel will halt with a status of 1.
- */
-void enforceKernelMode()
-{
-
-    if ((get_psr() & PSR_KERNEL_MODE) == 0)
-    {
-        console_output(debugFlag, "Kernel mode expected, but function called in user mode.\n");
-        stop(1);
-    }
 }
