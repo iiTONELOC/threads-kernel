@@ -8,6 +8,11 @@
 #define NULL (void *)0
 #endif
 
+// Process Lists
+
+#define MAX_LIST_TYPES 5
+#define LIST_TYPE_TO_PROC_MASTER_OFFSET 2
+
 enum ListType
 {
 	UNINITIALIZED_LIST,
@@ -25,8 +30,31 @@ typedef struct LinkedProcessList
 	int count;
 	Process *pHead;
 	Process *pTail;
+
 	enum ListType listType;
 } LinkedProcessList;
+
+LinkedProcessList GetMasterListForProcess(Process *pProcess);
+
+/**
+ * @brief Get the index for the list type
+ * Returns the adjusted index for the list type and the process's master list.
+ * There are 6 list types, but a process only manages 4 of them. Valid list types
+ * start with PROCESS_ and are in the range of 2 to 5.
+ *
+ * @param listType The type of list to get the index for
+ * @return int The index for the list type or -1 if the list type is invalid
+ *
+ * `Example Usage`
+ * ```c
+ * int result = GetProcessListIndex(PROCESS_CHILDREN_LIST);
+ * // result == 0
+ *
+ * int result = GetProcessListIndex(READY_PROCESSES_LIST);
+ * // result == -1
+ * ```
+ */
+int GetProcessListIndex(enum ListType listType);
 
 /**
  * @brief Initialize the linked list
@@ -44,7 +72,7 @@ void InitializeProcessList(LinkedProcessList *pList, enum ListType listType);
  * @param pProcess  Pointer to the process to get the next pointer for
  * @return void
  */
-Process *GetNextPtrForListType(enum ListType listType, Process *pProcess);
+Process *GetNextPtrForList(enum ListType listType, Process *pProcess);
 
 /**
  * @brief Pop a process from the front of the linked list

@@ -2,6 +2,15 @@
 
 enum ListType LIST_TYPE;
 
+int GetProcessListIndex(enum ListType listType)
+{
+    if (listType >= LIST_TYPE_TO_PROC_MASTER_OFFSET && listType <= MAX_LIST_TYPES)
+    {
+        return listType - LIST_TYPE_TO_PROC_MASTER_OFFSET;
+    }
+    return -1;
+}
+
 void InitializeProcessList(LinkedProcessList *pList, enum ListType listType)
 {
     pList->count = 0;
@@ -10,154 +19,176 @@ void InitializeProcessList(LinkedProcessList *pList, enum ListType listType)
     pList->listType = listType;
 }
 
-Process *GetNextPtrForListType(enum ListType listType, Process *pProcess)
+Process *GetNextPtrForList(enum ListType listType, Process *pProcess)
 {
-    Process *pNextPtr = NULL;
+    // validate the input
+    if (pProcess == NULL ||
+        listType == NULL ||
+        listType == UNINITIALIZED_LIST ||
+        listType > MAX_LIST_TYPES)
+    {
+        return NULL;
+    }
 
+    // return the correct pointer from the process for the list
+    // we want to interact with
     switch (listType)
     {
     case READY_PROCESSES_LIST:
-        pNextPtr = pProcess->pNextReadyProcess;
-        break;
+        return pProcess->pNextReadyProcess;
     case PROCESS_CHILDREN_LIST:
-        pNextPtr = pProcess->pNextChild;
-        break;
+        return pProcess->pNextChild;
     case PROCESS_ZOMBIE_CHILDREN_LIST:
-        pNextPtr = pProcess->pNextZombieChild;
-        break;
+        return pProcess->pNextZombieChild;
     case PROCESS_EXITING_CHILDREN_LIST:
-        pNextPtr = pProcess->pNextExitingChild;
-        break;
+        return pProcess->pNextExitingChild;
     case PROCESS_JOINING_PROCESSES_LIST:
-        pNextPtr = pProcess->pNextJoiner;
-        break;
+        return pProcess->pNextJoiner;
     default:
-        break;
+        return NULL;
     }
-
-    return pNextPtr;
 }
 
 Process *PopProcessFromList(LinkedProcessList *pList)
 {
-    Process *pProcess = NULL;
-    Process *pNextPtr = NULL;
+    Process *pProcess = pList->pHead; // Get the head of the list
 
-    if (pList->count > 0)
-    {
-        // Pop the process from the front of the list
-        pProcess = pList->pHead;
-        // Update the head pointer to the next process in the list
-        pNextPtr = GetNextPtrForListType(pList->listType, pProcess);
-        pList->pHead = pNextPtr;
-        // Adjust list count
-        pList->count--;
-
-        // If the list is now empty, update the tail pointer
-        if (pList->count == 0)
-        {
-            pList->pHead = pList->pTail = NULL;
-        }
-
-        // Clear the next pointer for the popped process
-        if (pNextPtr != NULL)
-        {
-            pNextPtr = NULL;
-        }
-    }
+    RemoveProcessFromList(pList, pList->pHead); // Remove it
 
     return pProcess;
 }
 
 void AddProcessToList(Process *pProcess, LinkedProcessList *pList)
 {
-    // Get the next pointer for the process we want to ad
-    Process *pNextPtr = GetNextPtrForListType(pList->listType, pProcess);
-
-    // Ensure the next pointer is null, we are appending to the end of the list
-    if (pNextPtr != NULL)
-    {
-        pNextPtr = NULL;
-    }
-
-    // If the head is null, the list is empty
-    if (pList->pHead == NULL)
+    // if the list is empty, set the head and tail to the new process
+    if (pList->count == 0)
     {
         pList->pHead = pList->pTail = pProcess;
+        // set the next pointer for the new process to NULL
+        Process *ppNextPtr = GetNextPtrForList(pList->listType, pProcess);
+        if (ppNextPtr != NULL)
+        {
+            ppNextPtr = NULL;
+        }
     }
     else
     {
-        // Update the next pointer for the current tail process
-        pNextPtr = GetNextPtrForListType(pList->listType, pList->pTail);
-        pNextPtr = pProcess;
-        // Update the tail pointer
+
+        // Get the next pointer for the tail process
+        Process *ppNextPtr = GetNextPtrForList(pList->listType, pList->pTail);
+
+        // set the current tail's next pointer to the new process
+        if (ppNextPtr != NULL)
+        {
+            ppNextPtr = pProcess;
+        }
+
+        // Update the tail pointer to the new process
         pList->pTail = pProcess;
     }
 
+    // Clear the next pointer for the new process
+    Process *ppNextPtr = GetNextPtrForList(pList->listType, pProcess);
+    if (ppNextPtr != NULL)
+    {
+        ppNextPtr = NULL;
+    }
     // Adjust list count
     pList->count++;
 }
 
 void RemoveProcessFromList(LinkedProcessList *pList, Process *pProcess)
 {
-    Process *pTemp = NULL;
-    Process *pCurrent = NULL;
-    Process *pPrevProcess = NULL;
-    Process *pNextProcess = NULL;
+    Process *pTemp = NULL;         // General pointer for traversing the list
+    Process *pPrevProcess = NULL;  // Pointer to the previous process of the process to remove
+    Process *ppNextProcess = NULL; // Pointer to the next process of the process to remove
 
-    // check if the pProcess is the head of the list
+    // Check if pProcess is the head of the list
     if (pList->pHead == pProcess)
     {
-        // remove the current head by setting the head to the next process
-        pList->pHead = GetNextPtrForListType(pList->listType, pProcess);
+        // Remove the head by setting the head to the next process
+        ppNextProcess = GetNextPtrForList(pList->listType, pProcess);
+        pList->pHead = (ppNextProcess != NULL) ? ppNextProcess : NULL;
     }
 
-    // traverse the list to find the process to remove, even if its at the tail we want the previous process
-
+    // Traverse the list to find the process to remove
+    // (keeps track of the previous process)
     pTemp = pList->pHead;
-
     while (pTemp != NULL)
     {
         if (pTemp == pProcess)
         {
-            pCurrent = pTemp;
+            // Found the process to remove
             break;
         }
+        // Update the previous process
         pPrevProcess = pTemp;
-        pTemp = GetNextPtrForListType(pList->listType, pTemp);
+        // Get the next process in the list
+        ppNextProcess = GetNextPtrForList(pList->listType, pTemp);
+        // Move to the next process
+        pTemp = (ppNextProcess != NULL) ? ppNextProcess : NULL;
     }
 
-    // check if the pProcess is the tail of the list
+    // Check if pProcess is the tail of the list
     if (pList->pTail == pProcess)
     {
-        // remove the current tail by setting the tail to the previous process
+        // Update the tail pointer to the previous process
         pList->pTail = pPrevProcess;
 
-        // update the next pointer for the new tail to NULL
-        pNextProcess = GetNextPtrForListType(pList->listType, pList->pTail);
-        pNextProcess = NULL;
+        // Ensure the new tail's next pointer is NULL
+        if (pPrevProcess != NULL)
+        {
+            ppNextProcess = GetNextPtrForList(pList->listType, pList->pTail);
+            if (ppNextProcess != NULL)
+            {
+                ppNextProcess = NULL;
+            }
+        }
     }
-    else
+    else if (pPrevProcess != NULL) // not head, not tail
     {
-        // remove the process from the list by updating the next pointer
-        // for the previous process to the next process of the process to remove
-        pNextProcess = GetNextPtrForListType(pList->listType, pCurrent);
-        pPrevProcess = pNextProcess;
-    }
+        // Remove the process by updating the previous process's next pointer
+        // to point to the current process's next pointer
+        ppNextProcess = GetNextPtrForList(pList->listType, pProcess);
+        Process *pNextProcess = (ppNextProcess != NULL) ? ppNextProcess : NULL;
 
-    // set the next pointer for the removed process to NULL
-    pTemp = NULL;
+        // Update the previous process to skip the process to remove
+        ppNextProcess = GetNextPtrForList(pList->listType, pPrevProcess);
+        if (ppNextProcess != NULL)
+        {
+            ppNextProcess = pNextProcess;
+        }
+    }
 
     // Adjust list count
     pList->count--;
 
-    // If the list is now empty, update the head and tail pointers
+    // If the list is empty, reset head and tail
     if (pList->count == 0)
     {
         pList->pHead = pList->pTail = NULL;
     }
 
+    // if there is only one node left
+    // ensure the head and tail are correct
+    if (pList->count == 1)
+    {
+        // if the head is null
+        if (pList->pHead == NULL)
+        {
+            pList->pHead = pList->pTail;
+        }
+        // if the tail is null
+        if (pList->pTail == NULL)
+        {
+            pList->pTail = pList->pHead;
+        }
+    }
+
     // Clear the next pointer for the removed process
-    pTemp = GetNextPtrForListType(pList->listType, pCurrent);
-    pTemp = NULL;
+    ppNextProcess = GetNextPtrForList(pList->listType, pProcess);
+    if (ppNextProcess != NULL)
+    {
+        ppNextProcess = NULL;
+    }
 }

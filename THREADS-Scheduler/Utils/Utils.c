@@ -7,7 +7,7 @@
  *
  * @param pString Pointer to the string to trim
  */
-void TrimRight(char* pString)
+void TrimRight(char *pString)
 {
     int i = 0;
     // while we haven't reached the end of the string
@@ -36,10 +36,17 @@ void TrimRight(char* pString)
  * @param pDestination Pointer to the destination string
  * @param size The size of the destination string
  */
-void CopyString(char* pSource, char* pDestination, size_t size)
+void CopyString(char *pSource, char *pDestination, size_t size)
 {
     // size_t is an unsigned long long integer
     unsigned long long i = 0ULL;
+
+    // if the source string is NULL, an empty string is copied to the destination
+    if (pSource == NULL)
+    {
+        pDestination[0] = '\0';
+        return;
+    }
 
     // Trim the right side of the string so we don't copy garbage
     TrimRight(pSource);

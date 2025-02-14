@@ -60,7 +60,6 @@ enum ProcessPriority
 
 typedef struct Process
 {
-
     // -- Managed by the Process in the Scheduler --
     struct Process *pParent;           /* Pointer to the parent process */
     struct Process *pNextChild;        /* Pointer to the next child process */
@@ -100,17 +99,18 @@ typedef struct NewProcessArgs
     int stacksize;
     Process *pNewProcess;
     int (*entryPoint)(void *);
+    void *masterList[NUM_UNIQUE_LISTS];
 } NewProcessArgs;
 
 // _______________________________ Function Prototypes _______________________________
 
 /**
- * @brief Initialize a new process
+ * @brief Create a new process
  *
  * @param pProps Pointer to the new process properties
  * @return void
  */
-void InitializeNewProcess(NewProcessArgs *pProps);
+void CreateNewProcess(NewProcessArgs *pProps);
 
 /**
  * @brief Retrieve the next empty process slot from the proccess table
