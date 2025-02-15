@@ -40,15 +40,10 @@ typedef struct LinkedProcessList
 // ______________________ Function Prototypes ______________________
 
 int GetProcessListIndex(enum ListType listType);
-
-void InitializeProcessList(LinkedProcessList *pList, enum ListType listType);
-
-Process *GetNextPtrForList(enum ListType listType, Process *pProcess);
-
 Process *PopProcessFromList(LinkedProcessList *pList);
-
 void AddProcessToList(Process *pProcess, LinkedProcessList *pList);
-
+Process **GetNextPtrForList(enum ListType listType, Process *pProcess);
 void RemoveProcessFromList(LinkedProcessList *pList, Process *pProcess);
+void InitializeProcessList(LinkedProcessList *pList, enum ListType listType);
 
 #endif

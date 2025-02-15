@@ -137,7 +137,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)\Lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>THREADS.lib;THREADSMain.lib</AdditionalDependencies>
+      <AdditionalDependencies>THREADS.lib;THREADSMain.lib;..\Utils\$(IntDir)Utils.obj;..\Processes\$(IntDir)Process.obj;..\LinkedProcessList\$(IntDir)LinkedProcessList.obj</AdditionalDependencies>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>

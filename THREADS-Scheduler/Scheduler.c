@@ -1,23 +1,17 @@
-
 #define _CRT_SECURE_NO_WARNINGS
 
-#include <stdio.h>
-#include "THREADSLib.h"
-#include "Scheduler.h"
-#include "../Utils/Utils.h"
-#include "../LinkedProcessList/LinkedProcessList.h"
-
-#define NUM_MILLI_SEC_IN_MICRO_SEC 1000
+#include "SchedulerHelpers.h"
 
 int nextPid = 1;
 int debugFlag = 1;
 int isBooting = 1;
 int processCount = 0;
+
+ReadyList readyList = {0};
 Process *runningProcess = NULL;
-Process processTable[MAX_PROCESSES] = {0};
+ProcessTable processTable = {0};
+MasterList linkedListMaster = {0};
 interrupt_handler_t *interruptHandlers = NULL; // interrupt handlers from THREADS API
-LinkedProcessList readyList[NUM_PRIORITIES] = {0};
-LinkedProcessList linkedListMaster[MAX_PROCESSES][NUM_UNIQUE_LISTS] = {0};
 
 int cpu_time();
 void time_slice();
@@ -28,8 +22,6 @@ static int launch(void *);
 static int watchdog(void *);
 static void check_deadlock();
 
-static void IncrementPid();
-static Process *GetNextProcess();
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
@@ -69,10 +61,7 @@ int bootstrap(void *pArgs)
     check_io = check_io_scheduler;
 
     /* Initialize the ready list */
-    for (int i = 0; i < NUM_PRIORITIES; i++)
-    {
-        InitializeProcessList(&readyList[i], READY_PROCESSES_LIST);
-    }
+    SchedulerInitReadyList();
 
     /* Initialize the clock interrupt handler */
     interruptHandlers = get_interrupt_handlers();
@@ -86,7 +75,9 @@ int bootstrap(void *pArgs)
         stop(1);
     }
 
+    /* Set booting to false so the dispatcher selects the next ready process*/
     isBooting = 0;
+
     /* start the test process, which is the main for each test program.  */
     result = k_spawn("Scheduler", SchedulerEntryPoint, NULL, 2 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
     if (result < 0)
@@ -138,7 +129,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     proc_slot = GetEmptyControlBlockIndex(&processTable[0]);
     pNewProc = &processTable[proc_slot];
 
-    /* Create a new process in the control block */
+    /* Create the arg struct*/
     newProcessArgs = (NewProcessArgs){
         .arg = arg,
         .name = name,
@@ -146,38 +137,14 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         .priority = priority,
         .procSlot = proc_slot,
         .stacksize = stacksize,
-        .pNewProcess = pNewProc,
         .entryPoint = entryPoint,
-    };
+        .pNewProcess = &processTable[proc_slot]};
 
-    CreateNewProcess(&newProcessArgs);
+    /* Create the new process */
+    SchedulerCreateNewProcess(&newProcessArgs);
 
-    /* Initialize the Process's Master List Entry*/
-    for (int i = 0; i < NUM_UNIQUE_LISTS; i++)
-    {
-        InitializeProcessList(&linkedListMaster[proc_slot][i], i + LIST_TYPE_TO_PROC_MASTER_OFFSET);
-    }
-
-    /* Increment the PID for the next process*/
-    IncrementPid();
-
-    /* If there is a parent process,add this to the list of children. */
-    if (runningProcess != NULL)
-    {
-        AddProcessToList(pNewProc, &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)]);
-        pNewProc->pParent = runningProcess;
-    }
-
-    /* Add the process to the ready list. */
-    AddProcessToList(pNewProc, &readyList[priority]);
-
-    /* Initialize context for this process, but use launch function pointer for
-     * the initial value of the process's program counter (PC)
-     */
+    /* Initialize the process' context */
     pNewProc->context = context_initialize(launch, stacksize, arg);
-
-    /* Increment the process count */
-    processCount++;
 
     /* Call the  dispatcher*/
     dispatcher();
@@ -231,14 +198,21 @@ int k_wait(int *code)
 
     int result = 0;
     Process *pChildProcess = NULL;
-    LinkedProcessList *pRunningProcessChildrenList =
-        &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)];
-    LinkedProcessList *pRunningProcessExitingChildrenList =
-        &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_EXITING_CHILDREN_LIST)];
+
+    // look for children that exited before the parent could wait for them
+    result = HandleZombieChildren(runningProcess, code);
+    if (result != -1500)
+    {
+        // zombie children were cleaned up, return the result
+        enableInterrupts();
+        return result;
+    }
 
     // if there are no child processes to wait for return -1
-    if (runningProcess != NULL && pRunningProcessChildrenList->count == 0)
+    if (runningProcess != NULL &&
+        linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count == 0)
     {
+        enableInterrupts();
         return -1;
     }
 
@@ -251,29 +225,15 @@ int k_wait(int *code)
     disableInterrupts();
 
     // get the exit code of the child process
-    pChildProcess = PopProcessFromList(pRunningProcessExitingChildrenList);
-    if (pChildProcess != NULL)
-    {
-        *code = pChildProcess->exitCode;
-        result = pChildProcess->pid;
+    result = HandleExitingChildren(runningProcess, code);
+    // if result is -1500, no exiting children were found
+    result = result == -1500 ? 0 : result;
 
-        // stop the context
-        context_stop(pChildProcess->context);
-        // reset the child process in the master list
-        memset(linkedListMaster[pChildProcess->processTableIndex], 0, sizeof(LinkedProcessList) * NUM_UNIQUE_LISTS);
-        // reset the child process in the process table
-        memset(pChildProcess, 0, sizeof(Process));
-        // decrement the process count
-        processCount--;
-    }
-    else
-    {
-        console_output(debugFlag, "k_wait(): No child process found in the exiting children list\n");
-    }
+    // call the  dispatcher to get the next process
+    dispatcher();
 
-    enableInterrupts();
-
-    return runningProcess->signal ? -5 : result;
+    // return the result or -5 if the process was signaled
+    return runningProcess->signal == SIG_TERM ? -5 : result;
 }
 
 /**************************************************************************
@@ -290,11 +250,10 @@ int k_wait(int *code)
 void k_exit(int code)
 {
     enforceKernelMode();
-    /* Check if the Process has Children */
-    LinkedProcessList *pRunningProcessChildrenList =
-        &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)];
+    disableInterrupts();
 
-    if (pRunningProcessChildrenList->count > 0)
+    // check if the process has children
+    if (linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count > 0)
     {
         console_output(debugFlag, "quit(): Process with active children attempting to quit\n");
         stop(1);
@@ -302,7 +261,7 @@ void k_exit(int code)
 
     // set the exit code of the running process
     // if it was signaled, set the exit code to -5
-    runningProcess->exitCode = runningProcess->signal ? -5 : code;
+    runningProcess->exitCode = runningProcess->signal == SIG_TERM ? -5 : code;
 
     /* Set the status of the process to quit */
     runningProcess->status = STATUS_QUIT;
@@ -314,20 +273,34 @@ void k_exit(int code)
     if (runningProcess->pParent != NULL)
     {
         // remove the process from the parent's children list
-        RemoveProcessFromList(&linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)], runningProcess);
+        RemoveProcessFromList(&linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)],
+                              runningProcess);
 
         // if the parent is blocked on a wait, unblock it
         if (runningProcess->pParent->status == STATUS_BLOCKED_ON_WAIT)
         {
             // add the process to the parent's exiting children list
-            AddProcessToList(runningProcess, &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_EXITING_CHILDREN_LIST)]);
+            AddProcessToList(runningProcess,
+                             &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_EXITING_CHILDREN_LIST)]);
+            // unblock the parent process
             unblock(runningProcess->pParent->pid);
         }
         else
         {
             // parent isn't blocked so move this process to the zombie list
-            AddProcessToList(runningProcess, &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_ZOMBIE_CHILDREN_LIST)]);
+            AddProcessToList(runningProcess,
+                             &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_ZOMBIE_CHILDREN_LIST)]);
         }
+    }
+    else
+    {
+        // if the process has no parent
+        // stop the context
+        context_stop(runningProcess->context);
+        // reset the child process in the process table
+        memset(runningProcess, 0, sizeof(Process));
+        // decrement the process count
+        processCount--;
     }
 
     /* Call the dispatcher */
@@ -346,7 +319,28 @@ void k_exit(int code)
 *************************************************************************/
 int k_kill(int pid, int signal)
 {
-    int result = 0;
+    enforceKernelMode();
+    disableInterrupts();
+
+    int index = SchedulerPidToIndex(pid);     // get the index of the process in the process table
+    Process *pProcess = &processTable[index]; // get the process from the process table
+
+    // if the process is not found OR the signal is not equal to SIG_TERM, stop(1)
+    if (pProcess == NULL || signal != SIG_TERM)
+    {
+        stop(1);
+    }
+
+    // if the process has already been signaled, return 1
+    if (pProcess->signal == SIG_TERM)
+    {
+        enableInterrupts();
+        return 1;
+    }
+
+    // set the signal of the process
+    pProcess->signal = signal;
+    dispatcher();
     return 0;
 }
 
@@ -355,7 +349,7 @@ int k_kill(int pid, int signal)
 *************************************************************************/
 int k_getpid()
 {
-    return 0;
+    return runningProcess != NULL ? runningProcess->pid : -1;
 }
 
 /**************************************************************************
@@ -373,9 +367,11 @@ int unblock(int pid)
 {
     enforceKernelMode();
     disableInterrupts();
-    Process *pProcess = &processTable[(pid % MAX_PROCESSES) - 1];
+    int index = SchedulerPidToIndex(pid);
+    Process *pProcess = &processTable[index];
     enum ProcessStatus status = pProcess->status;
 
+    // checks for a valid process and if it is blocked
     if (pProcess != NULL &&
         (status > STATUS_RUNNING && status < STATUS_QUIT))
     {
@@ -385,6 +381,7 @@ int unblock(int pid)
     else
     {
         // process  does not exist or is not blocked
+        enableInterrupts();
         return -1;
     }
 
@@ -407,14 +404,25 @@ int block(int newStatus)
 *************************************************************************/
 int signaled()
 {
-    return 0;
+    enforceKernelMode();
+    return (runningProcess && runningProcess->signal) ? 1 : 0;
 }
 /*************************************************************************
    Name - readtime
 *************************************************************************/
 int read_time()
 {
-    return 0;
+    enforceKernelMode();
+    return cpu_time();
+}
+
+/*************************************************************************
+   Name - cpu_time
+*************************************************************************/
+int cpu_time()
+{
+    enforceKernelMode();
+    return runningProcess ? runningProcess->cpuTime : 0;
 }
 
 /*************************************************************************
@@ -422,11 +430,26 @@ int read_time()
 *************************************************************************/
 DWORD read_clock()
 {
+    enforceKernelMode();
     return system_clock();
 }
 
+/**************************************************************************
+   Name - get_start_time
+*************************************************************************/
+int get_start_time(void)
+{
+    enforceKernelMode();
+    return runningProcess->startTime;
+}
+
+/**************************************************************************
+   Name - display_process_table
+*************************************************************************/
 void display_process_table()
 {
+    enforceKernelMode();
+    PrintProcessTable(processTable, MAX_PROCESSES);
 }
 
 /**************************************************************************
@@ -450,15 +473,17 @@ void dispatcher()
         return;
     }
 
-    disableInterrupts();
-    pNextProcess = GetNextProcess();
-    if (pNextProcess != NULL)
+    // if there is a running process, check to see if its quantum has expired
+
+    pNextProcess = SchedulerGetNextProcess();
+
+    // if a process is returned, handle the context switch
+    if (pNextProcess != NULL && pNextProcess != runningProcess)
     {
-        runningProcess = pNextProcess;
-        runningProcess->status = STATUS_RUNNING;
-        context_switch(runningProcess->context);
+        SchedulerHandleContextSwitch(pNextProcess);
     }
-    enableInterrupts();
+
+    return;
 }
 
 /**************************************************************************
@@ -472,6 +497,7 @@ void dispatcher()
 
    Returns - nothing
    *************************************************************************/
+
 static int watchdog(void *args)
 {
     enforceKernelMode();
@@ -484,16 +510,14 @@ static int watchdog(void *args)
         return 0;
     }
 
-    disableInterrupts();
-    pNextReadyProcess = GetNextProcess();
-    enableInterrupts();
+    pNextReadyProcess = SchedulerGetNextProcess();
 
     if (pNextReadyProcess == NULL)
     {
         // If there are no ready processes, we could be in a deadlock
         check_deadlock();
         console_output(debugFlag, "watchdog(): PROCESSES STILL EXIST\n");
-        stop(1);
+        stop(-3);
     }
     else
     {
@@ -578,11 +602,12 @@ static void DebugConsole(char *format, ...)
 /* there is no I/O yet, so return false. */
 int check_io_scheduler()
 {
+    enforceKernelMode();
     return false;
 }
 void time_slice()
 {
-
+    enforceKernelMode();
     static int elapsed = 0;           // time elapsed since last context switch
     static int lastTime = 0;          // last time the clock interrupt was called
     int currentTime = system_clock(); // current time in μs but
@@ -640,35 +665,6 @@ void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 }
 
 /**
- * @brief Get the next process to run
- *
- * @return Process* Pointer to the next process to run
- */
-static Process *GetNextProcess()
-{
-    Process *nextProcess = NULL;
-    int currentPriority = LOWEST_PRIORITY;
-
-    // if the running process is not null and its status is running
-    // use a priority floor when getting the next process to run
-    if (runningProcess != NULL)
-    {
-        currentPriority = runningProcess->priority;
-    }
-
-    for (int i = HIGHEST_PRIORITY; i >= currentPriority; i--)
-    {
-        if (readyList[i].count > 0)
-        {
-            nextProcess = PopProcessFromList(&readyList[i]);
-            break;
-        }
-    }
-
-    return nextProcess;
-}
-
-/**
  * @brief Enforces kernel mode
  *
  * This function checks to see if the processor is in kernel mode,
@@ -681,26 +677,5 @@ void enforceKernelMode()
     {
         console_output(debugFlag, "Kernel mode expected, but function called in user mode.\n");
         stop(1);
-    }
-}
-
-/**
- * @brief Increments the process id
- *1
- * This function increments the process id and sets the nextPid to the new value.
- */
-static void IncrementPid()
-{
-    if (nextPid % MAX_PROCESSES == 0)
-    {
-        // This gives us the same output that the test program expects
-        // In reality, we can just increment the id, we save its index in the PCB
-        // If you have access to the process struct, you can get its index into
-        // the table AND linked list node static storage
-        nextPid = nextPid + 3;
-    }
-    else
-    {
-        nextPid++;
     }
 }

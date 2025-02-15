@@ -1,6 +1,19 @@
 #include "Process.h"
 #include "../Utils/Utils.h"
 
+const char *STATUS_STRINGS[NUM_PROCESS_STATES] = {
+    "UNINITIALIZED",
+    "READY",
+    "RUNNING",
+    "IO BLOCK",
+    "JOIN BLOCK",
+    "WAIT BLOCK",
+    "QUIT",
+    "UNKNOWN",
+    "UNKNOWN",
+    "UNKNOWN",
+    "USER_DEFINED"};
+
 /**
  * @brief Create a new process
  *

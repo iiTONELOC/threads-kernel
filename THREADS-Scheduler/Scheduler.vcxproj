@@ -36,10 +36,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Include\Scheduler.h" />
+    <ClInclude Include="Include\SchedulerHelpers.h" />
     <ClInclude Include="Include\THREADSLib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Scheduler.c" />
+    <ClCompile Include="SchedulerHelpers.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="LinkedProcessList\LinkedProcessList.vcxproj">

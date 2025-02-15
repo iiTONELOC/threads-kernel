@@ -25,6 +25,7 @@
 // Process Status
 #define STATUS_LAST_RESERVED = 10;
 
+#define NUM_PROCESS_STATES 11
 enum ProcessStatus
 {
     STATUS_UNINITIALIZED,   // 0
@@ -55,6 +56,10 @@ enum ProcessPriority
 // Process Quantum
 #ifndef MAX_PROC_QUANTUM
 #define MAX_PROC_QUANTUM 80 * 1000 // 80 ms in microseconds
+
+// Process Table Format Strings
+#define PROCESS_TABLE_ROW_FORMAT "%-7d %-8d %-9d %-13s %-8d %-8llu %-8s\n"
+#define PROCESS_TABLE_HEADER_FORMAT "%-7s %-8s %-9s %-13s %-8s %-8s %-8s\n"
 #endif
 
 // _______________________________ Structures _______________________________
@@ -112,6 +117,10 @@ typedef struct NewProcessArgs
     Process *pNewProcess;
     int (*entryPoint)(void *);
 } NewProcessArgs;
+
+// _______________________________ Global Variables _______________________________
+
+const char *STATUS_STRINGS[NUM_PROCESS_STATES];
 
 // _______________________________ Function Prototypes _______________________________
 
