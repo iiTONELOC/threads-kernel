@@ -57,7 +57,6 @@ void test_CreateNewProcess(void)
 
 void test_GetEmptyControlBlockIndex(void)
 {
-	int i;
 	int index;
 
 	// we already have a process in the table

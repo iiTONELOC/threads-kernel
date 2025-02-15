@@ -1,6 +1,12 @@
 #include "Process.h"
 #include "../Utils/Utils.h"
 
+/**
+ * @brief Create a new process
+ *
+ * @param pProps Pointer to the new process properties
+ * @return void
+ */
 void CreateNewProcess(NewProcessArgs *pProps)
 {
     pProps->pNewProcess->signal = 0;                                 // set the signal to an initial value
@@ -21,6 +27,13 @@ void CreateNewProcess(NewProcessArgs *pProps)
     CopyString(pProps->arg, pProps->pNewProcess->startArgs, MAXARG); // copy the process arguments
 }
 
+/**
+ * @brief Retrieve the next empty process slot from the proccess table
+ *
+ * @param fromProcessTablePtr Pointer to the process table
+ *
+ * @return The index into the process table or -1 if the table is full
+ */
 int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
 {
     int i;

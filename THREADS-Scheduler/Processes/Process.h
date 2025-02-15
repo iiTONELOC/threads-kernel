@@ -27,23 +27,24 @@
 
 enum ProcessStatus
 {
-    STATUS_UNINITIALIZED,
-    STATUS_READY,
-    STATUS_BLOCKED_ON_IO,
-    STATUS_BLOCKED_ON_JOIN,
-    STATUS_BLOCKED_ON_WAIT,
-    STATUS_QUIT,
+    STATUS_UNINITIALIZED,   // 0
+    STATUS_READY,           // 1
+    STATUS_RUNNING,         // 2
+    STATUS_BLOCKED_ON_IO,   // 3
+    STATUS_BLOCKED_ON_JOIN, // 4
+    STATUS_BLOCKED_ON_WAIT, // 5
+    STATUS_QUIT,            // 6
 };
 
 // Process Priorities
 enum ProcessPriority
 {
-    PRIORITY_0,
-    PRIORITY_1,
-    PRIORITY_2,
-    PRIORITY_3,
-    PRIORITY_4,
-    PRIORITY_5
+    PRIORITY_0, // 0
+    PRIORITY_1, // 1
+    PRIORITY_2, // 2
+    PRIORITY_3, // 3
+    PRIORITY_4, // 4
+    PRIORITY_5  // 5
 };
 
 #define NUM_PRIORITIES 6
@@ -86,9 +87,20 @@ typedef struct Process
     unsigned int elapsedTime;   /* Process elapsed time */
     int (*entryPoint)(void *);  /* The entry point that is called from launch */
     unsigned long long cpuTime; /* Process CPU time */
-
 } Process;
 
+/**
+ * @brief Arguments for creating a new process
+ *
+ * @param pid The process id
+ * @param arg The process arguments
+ * @param name The process name
+ * @param priority The process priority
+ * @param procSlot The process slot
+ * @param stacksize The process stack size
+ * @param pNewProcess The new process
+ * @param entryPoint The process entry point
+ */
 typedef struct NewProcessArgs
 {
     int pid;
@@ -99,26 +111,12 @@ typedef struct NewProcessArgs
     int stacksize;
     Process *pNewProcess;
     int (*entryPoint)(void *);
-    void *masterList[NUM_UNIQUE_LISTS];
 } NewProcessArgs;
 
 // _______________________________ Function Prototypes _______________________________
 
-/**
- * @brief Create a new process
- *
- * @param pProps Pointer to the new process properties
- * @return void
- */
 void CreateNewProcess(NewProcessArgs *pProps);
 
-/**
- * @brief Retrieve the next empty process slot from the proccess table
- *
- * @param fromProcessTablePtr Pointer to the process table
- *
- * @return The index into the process table or -1 if the table is full
- */
 int GetEmptyControlBlockIndex(Process *fromProcessTablePtr);
 
 #endif
