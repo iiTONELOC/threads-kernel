@@ -26,9 +26,11 @@ void IncrementPid();
 void SchedulerInitReadyList();
 int SchedulerPidToIndex(int pid);
 Process *SchedulerGetNextProcess();
+
 void SchedulerCleanUpProcess(Process *pProcess);
 void SchedulerCreateNewProcess(NewProcessArgs *pProps);
 void SchedulerHandleContextSwitch(Process *pNextProcess);
+
 // -- Could arguably be moved to a ProcessHelpers --
 void PrintProcessRow(Process *pProcess);
 void PrintProcessTable(Process *usingTablePtr, int size);

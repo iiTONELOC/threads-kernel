@@ -13,14 +13,14 @@ enum ListType LIST_TYPE;
  *
  * `Example Usage`
  * ```c
- * int result = GetProcessListIndex(PROCESS_CHILDREN_LIST);
+ * int result = PLI(PROCESS_CHILDREN_LIST);
  * // result == 0
  *
- * int result = GetProcessListIndex(READY_PROCESSES_LIST);
+ * int result = PLI(READY_PROCESSES_LIST);
  * // result == -1
  * ```
  */
-int GetProcessListIndex(enum ListType listType)
+int PLI(enum ListType listType)
 {
     if (listType >= LIST_TYPE_TO_PROC_MASTER_OFFSET && listType <= MAX_LIST_TYPES)
     {
@@ -42,6 +42,43 @@ void InitializeProcessList(LinkedProcessList *pList, enum ListType listType)
     pList->pHead = NULL;
     pList->pTail = NULL;
     pList->listType = listType;
+}
+
+/**
+ * @brief Push a process to the front of the linked list
+ *
+ * @param pList  Pointer to the linked list to push the process to
+ * @param pProcess  Pointer to the process to push to the list
+ * @return void
+ */
+void PushProcessToList(LinkedProcessList *pList, Process *pProcess)
+{
+    // if the list is empty, set the head and tail to the new process
+    if (pList->count == 0)
+    {
+        pList->pHead = pList->pTail = pProcess;
+        // set the next pointer for the new process to NULL
+        Process **ppNextPtr = GetNextPtrForList(pList->listType, pProcess);
+        if (ppNextPtr != NULL)
+        {
+            *ppNextPtr = NULL;
+        }
+    }
+    else
+    {
+        // set the next pointer for the new process to the current head
+        Process **ppNextPtr = GetNextPtrForList(pList->listType, pList);
+        if (ppNextPtr != NULL)
+        {
+            *ppNextPtr = pList->pHead;
+        }
+
+        // set the head to the new process
+        pList->pHead = pProcess;
+    }
+
+    // Adjust list count
+    pList->count++;
 }
 
 /**

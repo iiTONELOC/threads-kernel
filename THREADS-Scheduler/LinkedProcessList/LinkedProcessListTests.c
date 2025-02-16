@@ -13,9 +13,10 @@ LinkedProcessList masterList[MAXPROC][NUM_UNIQUE_LISTS];
 int uniqueProcessLists[] = {PROCESS_CHILDREN_LIST, PROCESS_ZOMBIE_CHILDREN_LIST,
                             PROCESS_EXITING_CHILDREN_LIST, PROCESS_JOINING_PROCESSES_LIST};
 
+static void test_PLI(void);
 static void test_AddProcessToList(void);
+static void test_PushProcessToList(void);
 static void test_PopProcessFromList(void);
-static void test_GetProcessListIndex(void);
 static void test_InitializeProcessList(void);
 static void test_RemoveProcessFromList(void);
 
@@ -27,29 +28,30 @@ int main(void)
     memset(testProcessTable, 0, sizeof(testProcessTable));
 
     printf("\nRunning LinkedProcessList tests...\n");
-    test_GetProcessListIndex();
+    test_PLI();
     test_InitializeProcessList();
     test_AddProcessToList();
     test_RemoveProcessFromList();
     test_PopProcessFromList();
+    test_PushProcessToList();
 
     return 0;
 }
 
-static void test_GetProcessListIndex(void)
+static void test_PLI(void)
 {
     int i = 0;
     int result;
 
     for (i; i < NUM_UNIQUE_LISTS; i++)
     {
-        assert(GetProcessListIndex(uniqueProcessLists[i]) == i);
+        assert(PLI(uniqueProcessLists[i]) == i);
     }
 
     // ensure that the list is always in bounds regardless of the number provided
     for (i = 0; i < 10; i++)
     {
-        result = GetProcessListIndex(i);
+        result = PLI(i);
 
         if (i >= LIST_TYPE_TO_PROC_MASTER_OFFSET && i <= MAX_LIST_TYPES)
         {
@@ -61,7 +63,7 @@ static void test_GetProcessListIndex(void)
         }
     }
 
-    printf(" 1.  test_GetProcessListIndex passed\n");
+    printf(" 1.  test_PLI passed\n");
 }
 
 static void test_InitializeProcessList(void)
@@ -175,11 +177,11 @@ static void test_PopProcessFromList(void)
     int numProcessesPopped = 0;
 
     // Add the newTestProcess to the child list of the first process in the table
-    AddProcessToList(pNewTestProcess, &masterList[0][GetProcessListIndex(PROCESS_CHILDREN_LIST)]);
+    AddProcessToList(pNewTestProcess, &masterList[0][PLI(PROCESS_CHILDREN_LIST)]);
 
-    while (masterList[0][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count > 0)
+    while (masterList[0][PLI(PROCESS_CHILDREN_LIST)].count > 0)
     {
-        Process *poppedProcess = PopProcessFromList(&masterList[0][GetProcessListIndex(PROCESS_CHILDREN_LIST)]);
+        Process *poppedProcess = PopProcessFromList(&masterList[0][PLI(PROCESS_CHILDREN_LIST)]);
         numProcessesPopped++;
 
         // Ensure the process was popped from the list
@@ -190,4 +192,44 @@ static void test_PopProcessFromList(void)
     assert(numProcessesPopped == 2);
 
     printf(" 5.  test_PopProcessFromList passed\n");
+}
+
+static void test_PushProcessToList(void)
+{
+
+    Process *pTemp;
+    Process *pProcess = &testProcessTable[0];
+
+    // Create a new process
+    pNewTestProcess = &testProcessTable[6];
+    NewProcessArgs newProcessArgs = {
+        .pid = 7,
+        .arg = NULL,
+        .priority = 1,
+        .procSlot = 5,
+        .entryPoint = 0,
+        .stacksize = 1024,
+        .pNewProcess = pNewTestProcess,
+        .name = "TestProcess-7",
+    };
+
+    // Create the new process
+    CreateNewProcess(&newProcessArgs);
+
+    // add the process to the zombie list
+    AddProcessToList(pNewTestProcess, &masterList[0][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)]);
+
+    // remove the first process from the zombie list, should not be the one we added
+    pTemp = PopProcessFromList(&masterList[0][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)]);
+
+    // ensure the process was not the one we added
+    assert(pTemp != pNewTestProcess);
+
+    // add the zombie process back to the list using the push function
+    PushProcessToList(&masterList[0][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)], pNewTestProcess);
+
+    // ensure the process is now at the head of the list
+    assert(masterList[0][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)].pHead == pNewTestProcess);
+
+    printf(" 6.  test_PushProcessToList passed\n");
 }

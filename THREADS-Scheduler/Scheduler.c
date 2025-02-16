@@ -210,7 +210,7 @@ int k_wait(int *code)
 
     // if there are no child processes to wait for return -1
     if (runningProcess != NULL &&
-        linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count == 0)
+        linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_CHILDREN_LIST)].count == 0)
     {
         enableInterrupts();
         return -1;
@@ -251,9 +251,10 @@ void k_exit(int code)
 {
     enforceKernelMode();
     disableInterrupts();
+    int tableIndex = runningProcess->processTableIndex;
 
     // check if the process has children
-    if (linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count > 0)
+    if (linkedListMaster[tableIndex][PLI(PROCESS_CHILDREN_LIST)].count > 0)
     {
         console_output(debugFlag, "quit(): Process with active children attempting to quit\n");
         stop(1);
@@ -272,8 +273,9 @@ void k_exit(int code)
     */
     if (runningProcess->pParent != NULL)
     {
+        tableIndex = runningProcess->pParent->processTableIndex;
         // remove the process from the parent's children list
-        RemoveProcessFromList(&linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)],
+        RemoveProcessFromList(&linkedListMaster[tableIndex][PLI(PROCESS_CHILDREN_LIST)],
                               runningProcess);
 
         // if the parent is blocked on a wait, unblock it
@@ -281,7 +283,7 @@ void k_exit(int code)
         {
             // add the process to the parent's exiting children list
             AddProcessToList(runningProcess,
-                             &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_EXITING_CHILDREN_LIST)]);
+                             &linkedListMaster[tableIndex][PLI(PROCESS_EXITING_CHILDREN_LIST)]);
             // unblock the parent process
             unblock(runningProcess->pParent->pid);
         }
@@ -289,7 +291,7 @@ void k_exit(int code)
         {
             // parent isn't blocked so move this process to the zombie list
             AddProcessToList(runningProcess,
-                             &linkedListMaster[runningProcess->pParent->processTableIndex][GetProcessListIndex(PROCESS_ZOMBIE_CHILDREN_LIST)]);
+                             &linkedListMaster[tableIndex][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)]);
         }
     }
     else
@@ -467,23 +469,53 @@ void dispatcher()
     enforceKernelMode();
 
     Process *pNextProcess = NULL;
+    unsigned int curentTimeSlice = 0;
 
     if (isBooting)
     {
         return;
     }
 
-    // if there is a running process, check to see if its quantum has expired
-
+    disableInterrupts();
     pNextProcess = SchedulerGetNextProcess();
+    curentTimeSlice = SchedulerCalculateTimeSlice();
 
-    // if a process is returned, handle the context switch
-    if (pNextProcess != NULL && pNextProcess != runningProcess)
+    // Should not happen, its likely that this was called early and
+    // the system is still booting, at the very least the watchdog
+    // should always be available
+    if (pNextProcess == NULL)
+    {
+        return;
+    }
+
+    /* if there is a running process and its time slice is not up,
+     and the next process does not have a higher priority */
+    if (runningProcess != NULL && curentTimeSlice > 0 && pNextProcess->priority < runningProcess->priority)
+    {
+        /*put the pNextProcess back to the front of the ready list - we are not using it*/
+        if (pNextProcess != NULL)
+        {
+            pNextProcess->status = STATUS_READY;
+            PushProcessToList(&readyList[pNextProcess->priority], pNextProcess);
+        }
+
+        enableInterrupts();
+        return;
+    }
+
+    /* if there is no running process
+       or the time slice is up
+       or the next process is not the same as the running process
+       or the next process has a higher priority */
+    if (runningProcess == NULL ||
+        curentTimeSlice == 0 ||
+        pNextProcess->pid != runningProcess->pid ||
+        pNextProcess->priority > runningProcess->priority)
     {
         SchedulerHandleContextSwitch(pNextProcess);
     }
 
-    return;
+    enableInterrupts();
 }
 
 /**************************************************************************
@@ -516,11 +548,13 @@ static int watchdog(void *args)
     {
         // If there are no ready processes, we could be in a deadlock
         check_deadlock();
-        console_output(debugFlag, "watchdog(): PROCESSES STILL EXIST\n");
+        console_output(debugFlag, "watchdog(): CHECKED DEADLOCK - PROCESSES STILL EXIST\n");
         stop(-3);
     }
     else
     {
+        // put the process back in the ready list
+        PushProcessToList(&readyList[pNextReadyProcess->priority], pNextReadyProcess);
         dispatcher();
     }
 
@@ -540,7 +574,7 @@ static void check_deadlock()
         // check to see if there are more than 2 processes left in the system
         if (processCount > 2)
         {
-            console_output(debugFlag, "check_deadlock(): PROCESSES STILL EXIST\n");
+            console_output(debugFlag, "\n");
             enableInterrupts();
         }
         else
@@ -605,47 +639,19 @@ int check_io_scheduler()
     enforceKernelMode();
     return false;
 }
+
+/**
+ * @brief Looks at the time slice for the current process and determines if it should be preempted
+ */
 void time_slice()
 {
     enforceKernelMode();
-    static int elapsed = 0;           // time elapsed since last context switch
-    static int lastTime = 0;          // last time the clock interrupt was called
-    int currentTime = system_clock(); // current time in μs but
 
-    // if there is a running process and it doesn't have a start time, set it
-    if (runningProcess != NULL && runningProcess->startTime == 0)
+    // Calculates the remaining time slice for the current process
+    // If the time slice is 0, the process should be preempted
+    if (SchedulerCalculateTimeSlice() == 0)
     {
-        // needs to be in μs
-        runningProcess->startTime = currentTime;
-    }
-
-    // calculate the time elapsed since the last context switch
-    if (lastTime != 0)
-    {
-        // should be in μs
-        elapsed += (currentTime - lastTime);
-    }
-
-    // update the last time the clock interrupt was called
-    lastTime = currentTime;
-
-    // if there is a running process, update its elapsed and cpu time
-    if (runningProcess != NULL)
-    {
-        runningProcess->elapsedTime += elapsed;
-        runningProcess->cpuTime += (elapsed / NUM_MILLI_SEC_IN_MICRO_SEC);
-    }
-
-    // check if the elapsed time is greater than the quantum for the running process
-    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
-    {
-        elapsed = 0;
-        runningProcess->elapsedTime = 0;
         dispatcher();
-    }
-    else
-    {
-        elapsed = 0;
     }
 }
 

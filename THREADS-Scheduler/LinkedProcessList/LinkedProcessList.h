@@ -39,9 +39,10 @@ typedef struct LinkedProcessList
 
 // ______________________ Function Prototypes ______________________
 
-int GetProcessListIndex(enum ListType listType);
+int PLI(enum ListType listType);
 Process *PopProcessFromList(LinkedProcessList *pList);
 void AddProcessToList(Process *pProcess, LinkedProcessList *pList);
+void PushProcessToList(LinkedProcessList *pList, Process *pProcess);
 Process **GetNextPtrForList(enum ListType listType, Process *pProcess);
 void RemoveProcessFromList(LinkedProcessList *pList, Process *pProcess);
 void InitializeProcessList(LinkedProcessList *pList, enum ListType listType);

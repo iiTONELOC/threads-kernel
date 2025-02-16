@@ -79,6 +79,52 @@ Process *SchedulerGetNextProcess()
 }
 
 /**
+ * @brief Calculate the time slice for the current process
+ *
+ * @return unsigned int The time slice in ms for the current process
+ *         This is calculated by subtracting the elapsed time from the quantum
+ *         when this value is 0, the process should be preempted.
+ */
+unsigned int SchedulerCalculateTimeSlice()
+{
+    static int elapsed = 0;           // time elapsed since last context switch
+    static int lastTime = 0;          // last time the clock interrupt was called
+    int currentTime = system_clock(); // current time in μs
+
+    if (runningProcess == NULL)
+    {
+        return 0;
+    }
+
+    // if there is a running process and it doesn't have a start time, set it
+    if (runningProcess->startTime == 0)
+    {
+        // needs to be in μs
+        runningProcess->startTime = currentTime;
+    }
+
+    // calculate the time elapsed since the last context switch
+    if (lastTime != 0)
+    {
+        // should be in μs
+        elapsed += (currentTime - lastTime);
+    }
+
+    // update the last time the clock interrupt was called
+    lastTime = currentTime;
+
+    // if there is a running process, update its elapsed and cpu time
+
+    runningProcess->elapsedTime += elapsed;
+    runningProcess->cpuTime += (elapsed / NUM_MILLI_SEC_IN_MICRO_SEC);
+
+    // reset the elapsed time for the function
+    elapsed = 0;
+    // return the time slice for the current process
+    return (runningProcess->quantum > runningProcess->elapsedTime) ? (runningProcess->quantum - runningProcess->elapsedTime) : 0;
+}
+
+/**
  * @brief Cleans up an exited process
  *
  * This function cleans up a process by stopping its context and resetting the master list entry
@@ -115,7 +161,7 @@ void SchedulerCreateNewProcess(NewProcessArgs *pProps)
     if (runningProcess != NULL)
     {
         AddProcessToList(pProps->pNewProcess,
-                         &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)]);
+                         &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_CHILDREN_LIST)]);
         pProps->pNewProcess->pParent = runningProcess;
     }
 
@@ -145,6 +191,9 @@ void SchedulerHandleContextSwitch(Process *pNextProcess)
         runningProcess->status = STATUS_READY;
         AddProcessToList(runningProcess, &readyList[runningProcess->priority]);
     }
+
+    // reset the elapsed time for the process
+    runningProcess != NULL ? runningProcess->elapsedTime = 0 : 0;
 
     // set the next process to run
     runningProcess = pNextProcess;
@@ -177,7 +226,7 @@ void PrintProcessRow(Process *pProcess)
                    pProcess->pParent == NULL ? -1 : pProcess->pParent->pid,
                    pProcess->priority,
                    statusStr,
-                   linkedListMaster[pProcess->processTableIndex][GetProcessListIndex(PROCESS_CHILDREN_LIST)].count,
+                   linkedListMaster[pProcess->processTableIndex][PLI(PROCESS_CHILDREN_LIST)].count,
                    pProcess->cpuTime,
                    pProcess->name);
 }
@@ -231,7 +280,7 @@ int HandleZombieChildren(Process *pProcess, int *pExitCode)
     int result = -1500;
     Process *pChildProcess = NULL;
     LinkedProcessList *pRunningProcessZombieChildrenList =
-        &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_ZOMBIE_CHILDREN_LIST)];
+        &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)];
 
     // if there are zombie children, return the first one
     if (pRunningProcessZombieChildrenList->count > 0)
@@ -260,7 +309,7 @@ int HandleExitingChildren(Process *pProcess, int *pExitCode)
     int result = -1500;
     Process *pChildProcess = NULL;
     LinkedProcessList *pRunningProcessExitingChildrenList =
-        &linkedListMaster[runningProcess->processTableIndex][GetProcessListIndex(PROCESS_EXITING_CHILDREN_LIST)];
+        &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_EXITING_CHILDREN_LIST)];
 
     pChildProcess = PopProcessFromList(pRunningProcessExitingChildrenList);
     if (pChildProcess != NULL)
