@@ -45,7 +45,7 @@ void InitializeProcessList(LinkedProcessList *pList, enum ListType listType)
 }
 
 /**
- * @brief Get the next pointer for the list type
+ * @brief Get a pointer to the next pointer for the list type
  *
  * @param listType  The type of list to get the next pointer for
  * @param pProcess  Pointer to the process to get the next pointer for

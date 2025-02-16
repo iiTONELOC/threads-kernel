@@ -158,11 +158,20 @@
     <ClCompile Include="SchedulerTest29.c" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\LinkedProcessList\LinkedProcessList.vcxproj">
+      <Project>{5d5a225f-07df-495a-a3ac-0e249180fa0a}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Processes\Processes.vcxproj">
+      <Project>{b1d59a0c-5344-45b9-a985-f9096718a87e}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Scheduler.vcxproj">
       <Project>{9c3a6259-d35e-453a-9a17-62b44c793a76}</Project>
     </ProjectReference>
     <ProjectReference Include="..\SchedulerTestCommon\SchedulerTestCommon.vcxproj">
       <Project>{a35e905e-c6a4-416d-9217-02c0456e5cdd}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Utils\Utils.vcxproj">
+      <Project>{b7e41917-c664-4613-93e5-75c51f7e552f}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
