@@ -226,11 +226,13 @@ int k_wait(int *code)
 
     // get the exit code of the child process
     result = HandleExitingChildren(runningProcess, code);
+
     // if result is -1500, no exiting children were found
     result = result == -1500 ? 0 : result;
 
     // call the  dispatcher to get the next process
-    dispatcher();
+    enableInterrupts();
+  /*  dispatcher();*/
 
     // return the result or -5 if the process was signaled
     return runningProcess->signal == SIG_TERM ? -5 : result;
@@ -267,42 +269,24 @@ void k_exit(int code)
     /* Set the status of the process to quit */
     runningProcess->status = STATUS_QUIT;
 
+    /* If the process has processes waiting to join it */
+    if (linkedListMaster[tableIndex][PLI(PROCESS_JOINING_PROCESSES_LIST)].count > 0)
+    {
+        WakeUpJoiners();
+    }
+
     /*
-     If the process has a parent, add it to the parent's exiting children list
-     and unblock the parent process
+     If the process has a parent, notify the parent of the exit
     */
     if (runningProcess->pParent != NULL)
     {
-        tableIndex = runningProcess->pParent->processTableIndex;
-        // remove the process from the parent's children list
-        RemoveProcessFromList(&linkedListMaster[tableIndex][PLI(PROCESS_CHILDREN_LIST)],
-                              runningProcess);
-
-        // if the parent is blocked on a wait, unblock it
-        if (runningProcess->pParent->status == STATUS_BLOCKED_ON_WAIT)
-        {
-            // add the process to the parent's exiting children list
-            AddProcessToList(runningProcess,
-                             &linkedListMaster[tableIndex][PLI(PROCESS_EXITING_CHILDREN_LIST)]);
-            // unblock the parent process
-            unblock(runningProcess->pParent->pid);
-        }
-        else
-        {
-            // parent isn't blocked so move this process to the zombie list
-            AddProcessToList(runningProcess,
-                             &linkedListMaster[tableIndex][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)]);
-        }
+        /* A process' parent will wake up the child */
+        ChildNotifyParentOfExit();
     }
     else
     {
-        // if the process has no parent
-        // stop the context
-        context_stop(runningProcess->context);
-        // reset the child process in the process table
-        memset(runningProcess, 0, sizeof(Process));
-        // decrement the process count
-        processCount--;
+        /* Otherwise, clean up the process */
+        SchedulerCleanUpProcess(runningProcess);
     }
 
     /* Call the dispatcher */
@@ -359,6 +343,62 @@ int k_getpid()
 ***************************************************************************/
 int k_join(int pid, int *pChildExitCode)
 {
+    enforceKernelMode();
+    disableInterrupts();
+
+    int prevCount = 0;
+    int index = SchedulerPidToIndex(pid);           // get the index of the process in the process table
+    Process *pProcessToJoin = &processTable[index]; // get the process from the process table
+
+    // if the process is not found
+    if (pProcessToJoin == NULL)
+    {
+        console_output(debugFlag, "join: attempting to join a process that does not exist.\n");
+        stop(1);
+    }
+
+    // ensure the process is not trying to join itself
+    if (pProcessToJoin->pid == runningProcess->pid)
+    {
+        console_output(debugFlag, "join: process attempting to join itself.\n");
+        stop(1);
+    }
+
+    // ensure the process is not trying to join its parent
+    if (pid == runningProcess->pParent->pid)
+    {
+        console_output(debugFlag, "join: process attempting to join its parent.\n");
+        stop(2);
+    }
+
+    prevCount = linkedListMaster[index][PLI(PROCESS_JOINING_PROCESSES_LIST)].count;
+    // add the process to the joining list on the process to join
+    AddProcessToList(runningProcess,
+                     &linkedListMaster[index][PLI(PROCESS_JOINING_PROCESSES_LIST)]);
+
+    // set our status to blocked on join
+    runningProcess->status = STATUS_BLOCKED_ON_JOIN;
+
+    // verify we were added to the list
+    if (prevCount == linkedListMaster[index][PLI(PROCESS_JOINING_PROCESSES_LIST)].count)
+    {
+        return -1;
+    }
+    runningProcess = NULL;
+    // call the dispatcher
+    dispatcher();
+
+    // ----- AFTER PROCESS WAS AWAKENED BY THE PROCESS IT WANTS TO JOIN -----
+
+    disableInterrupts();
+
+    // get the exit code of the process
+    *pChildExitCode = runningProcess->joinStatus;
+    runningProcess->joinStatus = -99;
+
+    // call the dispatcher
+    dispatcher();
+
     return 0;
 }
 
@@ -387,6 +427,7 @@ int unblock(int pid)
         return -1;
     }
 
+    /*  enableInterrupts();*/
     dispatcher();
 
     return 0;
@@ -397,8 +438,23 @@ int unblock(int pid)
 *************************************************************************/
 int block(int newStatus)
 {
+    enforceKernelMode();
 
-    return 0;
+    /* if the new status is between 0 and 10 */
+    if (newStatus <= (NUM_PROCESS_STATES - 1))
+    {
+        console_output(debugFlag, "block: function called with a reserved status value.\n");
+        stop(1);
+    }
+
+    /* Change the status */
+    disableInterrupts();
+    runningProcess->status = newStatus;
+
+    /* Call the dispatcher */
+    dispatcher();
+
+    return runningProcess->signal == SIG_TERM ? -5 : 0;
 }
 
 /*************************************************************************
@@ -476,46 +532,103 @@ void dispatcher()
         return;
     }
 
-    disableInterrupts();
-    pNextProcess = SchedulerGetNextProcess();
     curentTimeSlice = SchedulerCalculateTimeSlice();
 
-    // Should not happen, its likely that this was called early and
-    // the system is still booting, at the very least the watchdog
-    // should always be available
-    if (pNextProcess == NULL)
+    if (curentTimeSlice == 0)
     {
-        return;
-    }
+        disableInterrupts();
+        // The current time has expired - grab the next process
+        pNextProcess = SchedulerGetNextProcess();
 
-    /* if there is a running process and its time slice is not up,
-     and the next process does not have a higher priority */
-    if (runningProcess != NULL && curentTimeSlice > 0 && pNextProcess->priority < runningProcess->priority)
-    {
-        /*put the pNextProcess back to the front of the ready list - we are not using it*/
-        if (pNextProcess != NULL)
+        // if the next process is NULL, we could be in a deadlock call watchdog
+        if (pNextProcess == NULL)
         {
-            pNextProcess->status = STATUS_READY;
-            PushProcessToList(&readyList[pNextProcess->priority], pNextProcess);
+             watchdog(NULL);
+            return;
         }
 
+        if (runningProcess != NULL && runningProcess->pid == pNextProcess->pid)
+        {
+            enableInterrupts();
+            return;
+        }
+
+        return SchedulerHandleContextSwitch(pNextProcess);
+    }
+    else
+    {
+        disableInterrupts();
+        /* Current Quantum has not expired, check for preemtion */
+        // TO DO: check the priority level of the next process on the ready list
+        pNextProcess = SchedulerGetNextProcess();
+
+        if (pNextProcess != NULL && pNextProcess->priority > runningProcess->priority)
+        {
+            // preempt the current process and let the higher priority proccess run
+            return SchedulerHandleContextSwitch(pNextProcess);
+        }
+        else if (pNextProcess != NULL && pNextProcess->priority <= runningProcess->priority)
+        {
+            // place the pNextProcess back on the ready list
+            PushProcessToList(&readyList[pNextProcess->priority], pNextProcess);
+        }
         enableInterrupts();
+
         return;
     }
 
-    /* if there is no running process
-       or the time slice is up
-       or the next process is not the same as the running process
-       or the next process has a higher priority */
-    if (runningProcess == NULL ||
-        curentTimeSlice == 0 ||
-        pNextProcess->pid != runningProcess->pid ||
-        pNextProcess->priority > runningProcess->priority)
-    {
-        SchedulerHandleContextSwitch(pNextProcess);
-    }
+    // If the current time slice is 0, there is no more time remaining
 
-    enableInterrupts();
+    // disableInterrupts();
+
+    // pNextProcess = SchedulerGetNextProcess();
+
+    // if (pNextProcess == NULL && runningProcess == NULL)
+    // {
+    //     enableInterrupts();
+    //     return;
+    // }
+
+    // if (runningProcess == NULL)
+    // {
+    //     return SchedulerHandleContextSwitch(pNextProcess);
+    // }
+
+    // // get the current time slice
+    // curentTimeSlice = SchedulerCalculateTimeSlice();
+
+    // /* if there is a running process and its time slice is not up,
+    //  and the next process has a lower priority, return */
+    // if (runningProcess != NULL &&
+    //     pNextProcess != NULL &&
+    //     curentTimeSlice > 0 &&
+    //     pNextProcess->priority < runningProcess->priority)
+    // {
+    //     /*put the pNextProcess back to the front of the ready list - we are not using it*/
+    //     if (pNextProcess != NULL)
+    //     {
+    //         pNextProcess->status = STATUS_READY;
+    //         PushProcessToList(&readyList[pNextProcess->priority], pNextProcess);
+    //     }
+
+    //     enableInterrupts();
+    //     return;
+    // }
+
+    // /* if there is no running process
+    //    or the time slice is up
+    //    or the next process is not the same as the running process
+    //    or the next process has a higher priority */
+    // if ((pNextProcess != NULL && pNextProcess->priority > runningProcess->priority) ||
+    //     (pNextProcess != NULL && curentTimeSlice == 0) ||
+    //     (pNextProcess != NULL && pNextProcess->pid != runningProcess->pid))
+    // {
+    //     return SchedulerHandleContextSwitch(pNextProcess);
+    // }
+    // else
+    // {
+    //     enableInterrupts();
+    // }
 }
 
 /**************************************************************************
@@ -542,6 +655,7 @@ static int watchdog(void *args)
         return 0;
     }
 
+    disableInterrupts();
     pNextReadyProcess = SchedulerGetNextProcess();
 
     if (pNextReadyProcess == NULL)
@@ -549,15 +663,14 @@ static int watchdog(void *args)
         // If there are no ready processes, we could be in a deadlock
         check_deadlock();
         console_output(debugFlag, "watchdog(): CHECKED DEADLOCK - PROCESSES STILL EXIST\n");
-        stop(-3);
+        stop(1);
     }
     else
     {
         // put the process back in the ready list
         PushProcessToList(&readyList[pNextReadyProcess->priority], pNextReadyProcess);
-        dispatcher();
     }
-
+    enableInterrupts();
     return 0;
 }
 
@@ -568,13 +681,30 @@ static void check_deadlock()
     int i = 0;
     Process *pCurrentProcess = NULL;
 
+    disableInterrupts();
     while (1)
     {
-        disableInterrupts();
+
         // check to see if there are more than 2 processes left in the system
         if (processCount > 2)
         {
-            console_output(debugFlag, "\n");
+            // process exist, enable interrupts and wait
+            // for the next process to run, or for the table to be empty
+            console_output(debugFlag, "check_deadlock(): PROCESSES STILL EXIST\n");
+
+            // look in the process table for aprocess that is blocked on a wait
+            for (i = 0; i < MAX_PROCESSES; i++)
+            {
+                pCurrentProcess = &processTable[i];
+                if (pCurrentProcess->status == STATUS_BLOCKED_ON_WAIT)
+                {
+                    // unblock the process
+                    pCurrentProcess->status = STATUS_READY;
+                    AddProcessToList(pCurrentProcess, &readyList[pCurrentProcess->priority]);
+                    dispatcher();
+                }
+            }
+
             enableInterrupts();
         }
         else

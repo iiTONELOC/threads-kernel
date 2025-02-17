@@ -203,12 +203,81 @@ void SchedulerHandleContextSwitch(Process *pNextProcess)
 
 // ________________________________ Process Helpers ________________________________
 
+/**
+ * @brief Wake Up Joiners
+ *
+ * This function handles joiners by checking if the process has any joiners
+ * and waking them up to join the process.
+ */
+void WakeUpJoiners()
+{
+    Process *pJoinerProcess = NULL;
+    JoinerList *pRunningProcessJoinerList =
+        &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_JOINING_PROCESSES_LIST)];
+
+    while (pRunningProcessJoinerList->count > 0)
+    {
+        // remove the process from its joining list
+        pJoinerProcess = PopProcessFromList(pRunningProcessJoinerList);
+        if (pJoinerProcess != NULL)
+        {
+            // set the joiner's status to my exit code
+            pJoinerProcess->joinStatus = runningProcess->exitCode;
+
+            pJoinerProcess->status = STATUS_READY;
+            AddProcessToList(pJoinerProcess, &readyList[pJoinerProcess->priority]);
+        }
+    }
+}
+
+/**
+ * @brief Notify the parent of a child's exit
+ *
+ * This function notifies the parent of a child's exit by removing the child from the parent's
+ * children list and adding it to the appropriate list. If the parent is blocked on a wait, the
+ * parent is unblocked and the child is added to the exiting children list. Otherwise, the child
+ * is added to the zombie children list and the parent's status is not updated.
+ */
+void ChildNotifyParentOfExit()
+{
+    // parent's index into the process table
+    int tableIndex = runningProcess->pParent->processTableIndex;
+
+    // remove the process from the parent's children list
+    RemoveProcessFromList(&linkedListMaster[tableIndex][PLI(PROCESS_CHILDREN_LIST)],
+                          runningProcess);
+
+    // if the parent is blocked on a wait, unblock it
+    if (runningProcess->pParent->status == STATUS_BLOCKED_ON_WAIT)
+    {
+        // add the process to the parent's exiting children list
+        AddProcessToList(runningProcess,
+                         &linkedListMaster[tableIndex][PLI(PROCESS_EXITING_CHILDREN_LIST)]);
+
+        runningProcess->pParent->status = STATUS_READY;
+        AddProcessToList(runningProcess->pParent, &readyList[runningProcess->pParent->priority]);
+    }
+    else
+    {
+        // parent isn't blocked so move this process to the zombie list
+        AddProcessToList(runningProcess,
+                         &linkedListMaster[tableIndex][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)]);
+    }
+}
+
+/**
+ * @brief Print a process row
+ *
+ * This function prints a process row to the console.
+ *
+ * @param pProcess A pointer to the process to print
+ */
 void PrintProcessRow(Process *pProcess)
 {
     char *statusStr = NULL;
     char statusBuffer[20] = {0};
 
-    // Grab the Status String
+    // Grab the Status String from a kernel defined array
     if (pProcess->status < NUM_PROCESS_STATES)
     {
         statusStr = STATUS_STRINGS[pProcess->status];
@@ -231,6 +300,14 @@ void PrintProcessRow(Process *pProcess)
                    pProcess->name);
 }
 
+/**
+ * @brief Print the process table
+ *
+ * This function prints the process table to the console.
+ *
+ * @param usingTablePtr A pointer to the process table to print
+ * @param size The size of the process table
+ */
 void PrintProcessTable(Process *usingTablePtr, int size)
 {
     int i = 0;
@@ -267,6 +344,7 @@ void PrintProcessTable(Process *usingTablePtr, int size)
         PrintProcessRow(pProcess);
     }
 }
+
 /**
  * @brief Handle zombie children
  *
@@ -279,7 +357,7 @@ int HandleZombieChildren(Process *pProcess, int *pExitCode)
 {
     int result = -1500;
     Process *pChildProcess = NULL;
-    LinkedProcessList *pRunningProcessZombieChildrenList =
+    ZombieChildrenList *pRunningProcessZombieChildrenList =
         &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_ZOMBIE_CHILDREN_LIST)];
 
     // if there are zombie children, return the first one
@@ -308,17 +386,21 @@ int HandleExitingChildren(Process *pProcess, int *pExitCode)
 {
     int result = -1500;
     Process *pChildProcess = NULL;
-    LinkedProcessList *pRunningProcessExitingChildrenList =
+    ExitingChildrenList *pRunningProcessExitingChildrenList =
         &linkedListMaster[runningProcess->processTableIndex][PLI(PROCESS_EXITING_CHILDREN_LIST)];
 
-    pChildProcess = PopProcessFromList(pRunningProcessExitingChildrenList);
-    if (pChildProcess != NULL)
+    if (pRunningProcessExitingChildrenList->count > 0)
     {
-        CleanUpChildProcess(pChildProcess, pExitCode, &result);
-    }
-    else
-    {
-        console_output(FALSE, "k_wait(): No child process found in the exiting children list\n");
+
+        pChildProcess = PopProcessFromList(pRunningProcessExitingChildrenList);
+        if (pChildProcess != NULL)
+        {
+            CleanUpChildProcess(pChildProcess, pExitCode, &result);
+        }
+        else
+        {
+            console_output(FALSE, "k_wait(): No child process found in the exiting children list\n");
+        }
     }
 
     return result;

@@ -13,6 +13,8 @@ typedef Process ProcessTable[MAX_PROCESSES];
 typedef LinkedProcessList MasterList[MAX_PROCESSES][NUM_UNIQUE_LISTS], ReadyList[NUM_PRIORITIES],
     ChildrenList, ExitingChildrenList, JoinerList, ZombieChildrenList;
 
+typedef void *(disableInterruptsFn)();
+
 #define NUM_MILLI_SEC_IN_MICRO_SEC 1000
 
 extern int nextPid;
@@ -26,12 +28,14 @@ void IncrementPid();
 void SchedulerInitReadyList();
 int SchedulerPidToIndex(int pid);
 Process *SchedulerGetNextProcess();
-
+unsigned int SchedulerCalculateTimeSlice();
 void SchedulerCleanUpProcess(Process *pProcess);
 void SchedulerCreateNewProcess(NewProcessArgs *pProps);
 void SchedulerHandleContextSwitch(Process *pNextProcess);
+// -- Could arguably be moved to a SchedulerProcessHelpers --
 
-// -- Could arguably be moved to a ProcessHelpers --
+void WakeUpJoiners();
+void ChildNotifyParentOfExit();
 void PrintProcessRow(Process *pProcess);
 void PrintProcessTable(Process *usingTablePtr, int size);
 int HandleZombieChildren(Process *pProcess, int *pExitCode);

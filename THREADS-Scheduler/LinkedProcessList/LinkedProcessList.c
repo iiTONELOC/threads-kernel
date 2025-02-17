@@ -67,7 +67,7 @@ void PushProcessToList(LinkedProcessList *pList, Process *pProcess)
     else
     {
         // set the next pointer for the new process to the current head
-        Process **ppNextPtr = GetNextPtrForList(pList->listType, pList);
+        Process **ppNextPtr = GetNextPtrForList(pList->listType, pProcess);
         if (ppNextPtr != NULL)
         {
             *ppNextPtr = pList->pHead;
