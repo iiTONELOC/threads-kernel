@@ -587,46 +587,35 @@ void dispatcher()
         return;
     }
 
-    // determine if the currently running process has exceeded its quantum
-    if (runningProcess != NULL &&
-        (runningProcess->elapsedTime >= runningProcess->quantum))
+    disableInterrupts();
+    // get the next ready process
+    pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
+
+    // if the next Ready process is null
+    if (pNextReadyProcess != NULL)
     {
-        disableInterrupts();
-        time_slice();
-        enableInterrupts();
+        // if we get the same process back no need to context switch
+        if (runningProcess != NULL &&
+            pNextReadyProcess->pid == runningProcess->pid)
+        {
+            enableInterrupts();
+            return;
+        }
+        // runningProcess->elapsedTime = 0;
+        // set the running process to the next ready process
+        runningProcess = pNextReadyProcess;
+
+        // set the running process to the current process
+        // will re-enable interrupts
+        context_switch(runningProcess->context);
     }
     else
     {
-        disableInterrupts();
-        // get the next ready process
-        pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
-
-        // if the next Ready process is null
-        if (pNextReadyProcess != NULL)
-        {
-            // if we get the same process back no need to context switch
-            if (runningProcess != NULL &&
-                pNextReadyProcess->pid == runningProcess->pid)
-            {
-                enableInterrupts();
-                return;
-            }
-
-            // set the running process to the next ready process
-            runningProcess = pNextReadyProcess;
-
-            // set the running process to the current process
-            // will re-enable interrupts
-            context_switch(runningProcess->context);
-        }
-        else
-        {
-            // if the next ready process is null, we have a deadlock
-            // GetNextReadyProcess should return the watchdog process
-            // So this should never be called from here unless there
-            // is a serious issue
-            watchdog(NULL);
-        }
+        // if the next ready process is null, we have a deadlock
+        // GetNextReadyProcess should return the watchdog process
+        // So this should never be called from here unless there
+        // is a serious issue
+        watchdog(NULL);
     }
 }
 

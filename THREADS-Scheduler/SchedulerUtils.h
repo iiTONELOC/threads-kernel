@@ -2,6 +2,7 @@
 #ifndef SCHEDULER_UTILS_H
 #define SCHEDULER_UTILS_H
 #include <stdlib.h>
+#include "THREADSLib.h"
 #include "PriorityProcessQueue.h"
 
 #define PROCESS_TABLE_ROW_FORMAT "%-7d %-8d %-9d %-13s %-8d %-8llu %s\n"
