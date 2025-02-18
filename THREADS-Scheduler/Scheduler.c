@@ -588,13 +588,14 @@ void dispatcher()
         return;
     }
 
+    disableInterrupts();
+
     // do bookkeeping for the running process
     if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
     {
         time_slice();
     }
 
-    disableInterrupts();
     // get the next ready process
     pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
 
@@ -621,6 +622,7 @@ void dispatcher()
         // GetNextReadyProcess should return the watchdog process
         // So this should never be called from here unless there
         // is a serious issue
+        enableInterrupts();
         watchdog(NULL);
     }
 }
@@ -640,13 +642,16 @@ static int watchdog(void *dummy)
     Process *pNextReadyProc = NULL;
     DoublyLinkedNode *pDynamicNode = NULL;
     DoublyLinkedNode *pStaticListNode = NULL;
-    DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
 
     if (isBooting)
     {
         // We are still booting up, so we need to wait for the system to be ready
         return 0;
     }
+
+    disableInterrupts();
+    DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
+    enableInterrupts();
 
     if (pNode == NULL || pNode->pData == NULL)
     {
@@ -675,6 +680,7 @@ static void check_deadlock()
         // loop over the priority list queue
         for (i = 0; i < NUM_PROCESS_STATES; i++)
         {
+            disableInterrupts();
             // get the head of the list
             pNextLNode = priorityListQueue[i].pHead;
 
@@ -693,6 +699,7 @@ static void check_deadlock()
                 }
             }
         }
+        enableInterrupts();
         break;
     }
 
@@ -753,7 +760,6 @@ int check_io_scheduler()
 
 void time_slice()
 {
-    disableInterrupts();
     static int elapsed = 0;           // time elapsed since last context switch
     static int lastTime = 0;          // last time the clock interrupt was called
     int currentTime = system_clock(); // current time in μs but
@@ -795,8 +801,6 @@ void time_slice()
     {
         elapsed = 0;
     }
-
-    enableInterrupts();
 }
 
 /**
