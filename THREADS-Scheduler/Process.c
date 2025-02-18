@@ -5,6 +5,14 @@
 
 /*_______________________Function  Definitions_______________________*/
 
+/**
+ * @brief Order function for the test data.
+ *
+ * @param pNode1 The first process to compare.
+ * @param pNode2 The second process to compare.
+ *
+ * @return The difference between the two priorites.
+ */
 int OrderFunction(void *pNode1, void *pNode2)
 {
     if (pNode1 == NULL || pNode2 == NULL)
@@ -26,6 +34,14 @@ int OrderFunction(void *pNode1, void *pNode2)
     return process2->priority - process1->priority;
 }
 
+/**
+ * @brief Initializes a process to Default values
+ *
+ * @param usingProcessPtr The node to initialize
+ *
+ * @note  Pointers are set to NULL, unsigned integers are set to 0, and signed
+ *        integers are set to -1. The LinkedLists are initialized. *
+ */
 void InitializeProcessToDefault(Process *usingProcessPtr)
 {
     usingProcessPtr->pid = -1;
@@ -50,6 +66,18 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     InitializeDoublyLinkedList(&usingProcessPtr->pJoiningProcesses, NULL);
 }
 
+/**
+ * @brief Initialize a new process
+ *
+ * @param usingProcessPtr The process to initialize
+ * @param name The name of the process
+ * @param entryPoint The entry point of the process
+ * @param arg The arguments to pass to the process
+ * @param stacksize The size of the stack
+ * @param priority The priority of the process
+ * @param procSlot The slot in the process table
+ * @param nextPid The next process id
+ */
 void InitializeNewProcess(Process *usingProcessPtr, char *name,
                           int (*entryPoint)(void *), void *arg,
                           int stacksize, int priority, int procSlot,
@@ -79,17 +107,54 @@ void InitializeNewProcess(Process *usingProcessPtr, char *name,
     }
 }
 
-void InitializeProcessTable(Process *usingTablePtr, int size)
+/**
+ * @brief Clean up after exited children
+ *
+ * @param pRunningProcess Pointer to the currently running process
+ * @param pChildList Pointer to the list of children
+ * @param pStaticStorage Pointer to the static storage array
+ * @param pPriorityListQueue Pointer to the priority list queue
+ * @param pCode Pointer to the exit code
+ * @param pResult Pointer to the result
+ */
+void CleanUpAfterChild(Process *pRunningProcess,
+                       DoublyLinkedList *pChildList,
+                       DoublyLinkedNode *pStaticStorage,
+                       DoublyLinkedList *pPriorityListQueue,
+                       int *pCode, int *pResult)
 {
-    int i = 0;
-    // loop over the array of nodes and initialize each node to
-    // NULL values
-    for (i = 0; i < size; i++)
-    {
-        InitializeProcessToDefault(&usingTablePtr[i]);
-    }
-}
+    Process *pChild = NULL;
+    DoublyLinkedNode *pDynamicNode = NULL;
+    DoublyLinkedNode *pStaticNode = NULL;
 
+    // get the first child in the children list
+    pDynamicNode = pChildList->pHead;
+    // get the pointer to the process from the linked list node
+    pChild = (Process *)pDynamicNode->pData;
+    // set the exit code
+    *pCode = pChild->exitCode;
+    // set the pid to the result
+    *pResult = pChild->pid;
+
+    // clean up after the child
+    pStaticNode = FindStaticStorageNode(pChild->pid, pStaticStorage);
+    // Remove the child from the children list
+    RemoveDoublyLinkedNode(pChildList, pDynamicNode);
+    // Remove the child from the priority quit list
+    RemoveDoublyLinkedNode(&pPriorityListQueue[STATUS_QUIT], pStaticNode);
+    // Clean up the child process
+    CleanUpPCB(pChild, pStaticNode);
+    // -----------------------------------
+    // Free the memory for dynamically created node for the parent to track its child
+    DestroyDoublyLinkedNode(pDynamicNode);
+}
+/**
+ * @brief Retrieve the next empty process slot from the proccess table
+ *
+ * @param fromProcessTablePtr Pointer to the process table
+ *
+ * @return The index into the process table or -1 if the table is full
+ */
 int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
 {
     int i;
@@ -105,7 +170,48 @@ int GetEmptyControlBlockIndex(Process *fromProcessTablePtr)
 
     return -1;
 }
+/**
+ * @brief Initializes the processes Table
+ *
+ * Takes an array of Processes and initializes all values to NULL
+ *
+ * @param usingTablePtr A pointer to the process table to initialize
+ * @param size The size of the process table
+ */
+void InitializeProcessTable(Process *usingTablePtr, int size)
+{
+    int i = 0;
+    // loop over the array of nodes and initialize each node to
+    // NULL values
+    for (i = 0; i < size; i++)
+    {
+        InitializeProcessToDefault(&usingTablePtr[i]);
+    }
+}
 
+/**
+ * @brief Clean up after a process with no parent or children
+ *
+ * Removes the process context and initializes the PCB to default values
+ *
+ * @param pProcessToClean Pointer to the process to clean up
+ * @param pStaticStorageNode Pointer to the static storage node
+ */
+void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
+{
+    context_stop(pProcessToClean->context);
+    InitializeProcessToDefault(pProcessToClean);
+    InitializeDoublyLinkedNode(pStaticStorageNode);
+}
+
+/**
+ * @brief Get the next ready process from the READY queue
+ *
+ * @param pRunningProcess Pointer to the currently running process
+ * @param pPriorityListQueue Pointer to the priority list queue
+ *
+ * @return Pointer to the next ready process or NULL if there are none
+ */
 Process *GetNextReadyProcess(Process *pRunningProcess,
                              DoublyLinkedList *pPriorityListQueue)
 {
@@ -151,50 +257,4 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
     }
 
     return NULL;
-}
-
-void CleanUpAfterChild(Process *pRunningProcess,
-                       DoublyLinkedList *pChildList,
-                       DoublyLinkedNode *pStaticStorage,
-                       DoublyLinkedList *pPriorityListQueue,
-                       int *pCode, int *pResult)
-{
-    Process *pChild = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticNode = NULL;
-
-    // get the first child in the children list
-    pDynamicNode = pChildList->pHead;
-    // get the pointer to the process from the linked list node
-    pChild = (Process *)pDynamicNode->pData;
-    // set the exit code
-    *pCode = pChild->exitCode;
-    // set the pid to the result
-    *pResult = pChild->pid;
-
-    // clean up after the child
-    pStaticNode = FindStaticStorageNode(pChild->pid, pStaticStorage);
-    // Remove the child from the children list
-    RemoveDoublyLinkedNode(pChildList, pDynamicNode);
-    // Remove the child from the priority quit list
-    RemoveDoublyLinkedNode(&pPriorityListQueue[STATUS_QUIT], pStaticNode);
-    // --- CAN BE MOVED TO A FUNCTION ----
-    // reset the context
-    // context_stop(pChild->context);
-    // // Reset the Process Control Block
-    // InitializeProcessToDefault(pChild);
-    // // Reset the static linked list node
-    // InitializeDoublyLinkedNode(pStaticNode);
-
-    CleanUpPCB(pChild, pStaticNode);
-    // -----------------------------------
-    // Free the memory for dynamically created node for the parent to track its child
-    DestroyDoublyLinkedNode(pDynamicNode);
-}
-
-void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
-{
-    context_stop(pProcessToClean->context);
-    InitializeProcessToDefault(pProcessToClean);
-    InitializeDoublyLinkedNode(pStaticStorageNode);
 }

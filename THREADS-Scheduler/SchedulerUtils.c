@@ -30,6 +30,39 @@ void TrimRight(char *pString)
 }
 
 /**
+ * @brief Displays a row in the process table
+ *
+ * @param pProcess Pointer to the process to display
+ */
+void PrintProcessRow(Process *pProcess)
+{
+    char *statusStr = NULL;
+    char statusBuffer[20] = {0};
+
+    // Grab the Status String
+    if (pProcess->status < NUM_PROCESS_STATES)
+    {
+        statusStr = STATUS_STRINGS[pProcess->status];
+    }
+    else
+    {
+        // Use the User Defined Number
+        snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
+        statusStr = statusBuffer;
+    }
+
+    // Print process information
+    console_output(0, PROCESS_TABLE_ROW_FORMAT,
+                   pProcess->pid,
+                   pProcess->pParent == NULL ? -1 : pProcess->pParent->pid,
+                   pProcess->priority,
+                   statusStr,
+                   pProcess->pChildren.count,
+                   pProcess->cpuTime,
+                   pProcess->name);
+}
+
+/**
  * @brief Copy a string from source to destination
  *
  * @param pSource Pointer to the source string
@@ -56,6 +89,62 @@ void CopyString(char *pSource, char *pDestination, size_t size)
     pDestination[i] = '\0';
 }
 
+/**
+ * @brief Print the process table
+ *
+ * @param usingTablePtr The process table to print
+ * @param size The size of the process table
+ * @param currentNumProcesses The current number of processes
+ */
+void PrintProcessTable(Process *usingTablePtr, int size, int currentNumProcesses)
+{
+    int i = 0;
+
+    // Print header
+    console_output(0, PROCESS_TABLE_HEADER_FORMAT,
+                   "PID",
+                   "Parent",
+                   "Priority",
+                   "Status",
+                   "# Kids",
+                   "CPUtime",
+                   "Name");
+
+    // if the table is full print the last process first
+    if (currentNumProcesses == MAXPROC)
+    {
+        PrintProcessRow(&usingTablePtr[MAXPROC - 1]);
+        // adjust the size to print the rest of the table
+        size--;
+    }
+
+    // Loop through process table
+    for (i; i < size; i++)
+    {
+        Process *pProcess = &usingTablePtr[i];
+        // Skip empty process slots
+        if (pProcess->context == NULL)
+        {
+            continue;
+        }
+
+        // Print process row
+        PrintProcessRow(pProcess);
+    }
+}
+
+/**
+ * @brief Validate the k_spawn parameters
+ *
+ * @param name The name of the process
+ * @param entryPoint The entry point of the process
+ * @param arg The arguments to pass to the process
+ * @param stacksize The size of the stack
+ * @param priority The priority of the process
+ * @param debugFlag The debug flag
+ *
+ * @return int The return value of the function
+ */
 int ValidateKSpawnParams(char *name, int (*entryPoint)(void *), void *arg, int stacksize,
                          int priority, int debugFlag)
 {
@@ -97,69 +186,4 @@ int ValidateKSpawnParams(char *name, int (*entryPoint)(void *), void *arg, int s
     }
 
     return 0;
-}
-
-void PrintProcessRow(Process *pProcess)
-{
-    char *statusStr = NULL;
-    char statusBuffer[20] = {0};
-
-    // Grab the Status String
-    if (pProcess->status < NUM_PROCESS_STATES)
-    {
-        statusStr = STATUS_STRINGS[pProcess->status];
-    }
-    else
-    {
-        // Use the User Defined Number
-        snprintf(statusBuffer, sizeof(statusBuffer), "%d", pProcess->status);
-        statusStr = statusBuffer;
-    }
-
-    // Print process information
-    console_output(0, PROCESS_TABLE_ROW_FORMAT,
-                   pProcess->pid,
-                   pProcess->pParent == NULL ? -1 : pProcess->pParent->pid,
-                   pProcess->priority,
-                   statusStr,
-                   pProcess->pChildren.count,
-                   pProcess->cpuTime,
-                   pProcess->name);
-}
-
-void PrintProcessTable(Process *usingTablePtr, int size, int currentNumProcesses)
-{
-    int i = 0;
-
-    // Print header
-    console_output(0, PROCESS_TABLE_HEADER_FORMAT,
-                   "PID",
-                   "Parent",
-                   "Priority",
-                   "Status",
-                   "# Kids",
-                   "CPUtime",
-                   "Name");
-
-    // if the table is full print the last process first
-    if (currentNumProcesses == MAXPROC)
-    {
-        PrintProcessRow(&usingTablePtr[MAXPROC - 1]);
-        // adjust the size to print the rest of the table
-        size--;
-    }
-
-    // Loop through process table
-    for (i; i < size; i++)
-    {
-        Process *pProcess = &usingTablePtr[i];
-        // Skip empty process slots
-        if (pProcess->context == NULL)
-        {
-            continue;
-        }
-
-        // Print process row
-        PrintProcessRow(pProcess);
-    }
 }
