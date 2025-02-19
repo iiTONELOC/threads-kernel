@@ -2,21 +2,128 @@
 
 // __________________________ Function Definitions __________________________
 
-void InitializeDoublyLinkedList(DoublyLinkedList *pList,
-                                int (*OrderFunction)(void *pNode1, void *pNode2))
+/**
+ * @brief Destroys a doubly linked list.
+ *
+ * This function destroys a doubly linked list.
+ *
+ * @param pList Pointer to the DoublyLinkedList structure.
+ */
+void DestroyDoublyLinkedList(DoublyLinkedList *pList)
 {
+    DoublyLinkedNode *current, *next;
+
+    // If the list is NULL, return
     if (pList == NULL)
     {
         return;
     }
 
-    pList->count = 0;
-    pList->pHead = NULL;
-    pList->pTail = NULL;
-    pList->dynamic = 0;
-    pList->OrderFunction = OrderFunction == NULL ? NULL : OrderFunction;
+    // If the list is dynamic, free the memory
+    if (pList->dynamic)
+    {
+        // loop through the list and free all nodes
+        current = pList->pHead;
+        while (current != NULL)
+        {
+            next = current->pNext;
+            DestroyDoublyLinkedNode(current);
+            current = next;
+        }
+        free(pList);
+    }
 }
 
+/**
+ * @brief Displays the contents of a doubly linked list.
+ *
+ * This function displays the contents of a doubly linked list.
+ *
+ * @param pList Pointer to the DoublyLinkedList structure.
+ */
+void DisplayDoublyLinkedList(DoublyLinkedList *pList)
+{
+    size_t i = 1;
+    // If the list is NULL or empty, return
+    if (pList == NULL || pList->count == 0)
+    {
+        return;
+    }
+
+    // Start at the head of the list
+    DoublyLinkedNode *current = pList->pHead;
+
+    // Traverse the list and display the contents of each node
+    while (current != NULL)
+    {
+        // Display the contents of the current node
+        printf("Node %zu: %p\n", i, current->pData);
+
+        // Move to the next node
+        current = current->pNext;
+        i++;
+    }
+}
+
+/**
+ * @brief Creates a new doubly linked list node.
+ *
+ * This function creates a new doubly linked list node.
+ *
+ * @param pData Pointer to the data to be attached to the node.
+ *
+ * @return Pointer to the newly created node or NULL if the memory allocation fails.
+ */
+DoublyLinkedNode *CreateDoublyLinkedNode(void *pData)
+{
+    // Allocate memory for the new node
+    DoublyLinkedNode *pNode = (DoublyLinkedNode *)malloc(sizeof(DoublyLinkedNode));
+
+    // If memory allocation fails, return NULL
+    if (pNode == NULL)
+    {
+        return NULL;
+    }
+
+    // Initialize the new node
+    InitializeDoublyLinkedNode(pNode);
+    pNode->pData = pData; // attach the data to the node
+    pNode->dynamic = 1;   // set the dynamic flag to 1
+
+    // Return a pointer to the new node
+    return pNode;
+}
+
+/**
+ * @brief Destroys a doubly linked list node.
+ *
+ * This function destroys a doubly linked list node.
+ *
+ * @param pNode Pointer to the node to be destroyed.
+ */
+void DestroyDoublyLinkedNode(DoublyLinkedNode *pNode)
+{
+    // If the node is NULL, return
+    if (pNode == NULL)
+    {
+        return;
+    }
+
+    // If the node is dynamic, free the memory
+    if (pNode->dynamic)
+    {
+        free(pNode);
+    }
+}
+
+/**
+ * @brief Initializes an array of doubly linked list nodes.
+ *
+ * This function initializes an array of doubly linked list nodes.
+ *
+ * @param pNode Pointer to the DoublyLinkedNode structure.
+ * @param size The size of the array.
+ */
 void InitializeDoublyLinkedNode(DoublyLinkedNode *pNode)
 {
     if (pNode == NULL)
@@ -29,6 +136,15 @@ void InitializeDoublyLinkedNode(DoublyLinkedNode *pNode)
     pNode->pData = NULL;
 }
 
+/**
+ * @brief Get the next empty linked node storage index.
+ *
+ * This function gets the next empty linked node storage index.
+ *
+ * @param fromNodeBucket The linked list node bucket to search.
+ *
+ * @return The index into the linked list node bucket or -1 if the bucket is full.
+ */
 void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, int size)
 {
     int i = 0;
@@ -38,24 +154,15 @@ void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNode, int size)
     }
 }
 
-int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode *fromNodeBucket, int size)
-{
-    int i;
-
-    for (i = 0; i < size; i++)
-    { // if a pid hasn't been assigned and the context is NULL
-        // we have a slot we can use - regardless of whatever else is in the slot
-        if (fromNodeBucket[i].pData == NULL)
-        {
-            // reset the next and previous pointers
-            fromNodeBucket[i].pNext = fromNodeBucket[i].pPrev = NULL;
-            return i;
-        }
-    }
-
-    return -1;
-}
-
+/**
+ * @brief Inserts a node into a doubly linked list.
+ *
+ * This function inserts a node into a doubly linked list in the correct position based on the
+ * ordering function provided during initialization.
+ *
+ * @param pList Pointer to the DoublyLinkedList structure.
+ * @param pNode Pointer to the node to be inserted.
+ */
 void InsertDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
 {
     // Check for invalid pointers
@@ -152,6 +259,14 @@ void InsertDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
     pList->count++; // Increment the count of nodes in the list
 }
 
+/**
+ * @brief Removes a node from a doubly linked list.
+ *
+ * This function removes a node from a doubly linked list.
+ *
+ * @param pList Pointer to the DoublyLinkedList structure.
+ * @param pNode Pointer to the node to be removed.
+ */
 void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
 {
     /**https://stackoverflow.com/questions/47045583/remove-method-for-a-doubly-linked-list */
@@ -229,41 +344,41 @@ void RemoveDoublyLinkedNode(DoublyLinkedList *pList, DoublyLinkedNode *pNode)
     }
 }
 
-DoublyLinkedNode *CreateDoublyLinkedNode(void *pData)
+/**
+ * @brief Initializes a doubly linked list node.
+ *
+ * This function initializes a doubly linked list node.
+ *
+ * @param pNode Pointer to the DoublyLinkedNode structure.
+ */
+int GetEmptyNodeArrayStorageIndex(DoublyLinkedNode *fromNodeBucket, int size)
 {
-    // Allocate memory for the new node
-    DoublyLinkedNode *pNode = (DoublyLinkedNode *)malloc(sizeof(DoublyLinkedNode));
+    int i;
 
-    // If memory allocation fails, return NULL
-    if (pNode == NULL)
-    {
-        return NULL;
+    for (i = 0; i < size; i++)
+    { // if a pid hasn't been assigned and the context is NULL
+        // we have a slot we can use - regardless of whatever else is in the slot
+        if (fromNodeBucket[i].pData == NULL)
+        {
+            // reset the next and previous pointers
+            fromNodeBucket[i].pNext = fromNodeBucket[i].pPrev = NULL;
+            return i;
+        }
     }
 
-    // Initialize the new node
-    InitializeDoublyLinkedNode(pNode);
-    pNode->pData = pData; // attach the data to the node
-    pNode->dynamic = 1;   // set the dynamic flag to 1
-
-    // Return a pointer to the new node
-    return pNode;
+    return -1;
 }
 
-void DestroyDoublyLinkedNode(DoublyLinkedNode *pNode)
-{
-    // If the node is NULL, return
-    if (pNode == NULL)
-    {
-        return;
-    }
-
-    // If the node is dynamic, free the memory
-    if (pNode->dynamic)
-    {
-        free(pNode);
-    }
-}
-
+/**
+ * @brief Finds a node in a doubly linked list by a specified value.
+ *
+ * This function finds a node in a doubly linked list by a specified value.
+ *
+ * @param pValue Pointer to the value to search for.
+ * @param pList Pointer to the DoublyLinkedList structure.
+ *
+ * @return Pointer to the node containing the value or NULL if the value is not found.
+ */
 DoublyLinkedNode *FindDoublyLinkedNode(void *pValue, DoublyLinkedList *pList)
 {
     // If the list is NULL or empty, return NULL
@@ -289,6 +404,15 @@ DoublyLinkedNode *FindDoublyLinkedNode(void *pValue, DoublyLinkedList *pList)
     return NULL;
 }
 
+/**
+ * @brief Creates a new doubly linked list.
+ *
+ * This function creates a new doubly linked list.
+ *
+ * @param OrderFunction Pointer to the function used to order the list.
+ *
+ * @return Pointer to the newly created doubly linked list or NULL if the memory allocation fails.
+ */
 DoublyLinkedList *CreateDoublyLinkedList(int (*OrderFunction)(void *pNode1, void *pNode2))
 {
     // Allocate memory for the new list
@@ -307,51 +431,25 @@ DoublyLinkedList *CreateDoublyLinkedList(int (*OrderFunction)(void *pNode1, void
     return pList;
 }
 
-void DestroyDoublyLinkedList(DoublyLinkedList *pList)
+/**
+ * @brief Initializes a doubly linked list.
+ *
+ * This function initializes a doubly linked list.
+ *
+ * @param pList Pointer to the DoublyLinkedList structure.
+ * @param OrderFunction Pointer to the function used to order the list.
+ */
+void InitializeDoublyLinkedList(DoublyLinkedList *pList,
+                                int (*OrderFunction)(void *pNode1, void *pNode2))
 {
-    DoublyLinkedNode *current, *next;
-
-    // If the list is NULL, return
     if (pList == NULL)
     {
         return;
     }
 
-    // If the list is dynamic, free the memory
-    if (pList->dynamic)
-    {
-        // loop through the list and free all nodes
-        current = pList->pHead;
-        while (current != NULL)
-        {
-            next = current->pNext;
-            DestroyDoublyLinkedNode(current);
-            current = next;
-        }
-        free(pList);
-    }
-}
-
-void DisplayDoublyLinkedList(DoublyLinkedList *pList)
-{
-    size_t i = 1;
-    // If the list is NULL or empty, return
-    if (pList == NULL || pList->count == 0)
-    {
-        return;
-    }
-
-    // Start at the head of the list
-    DoublyLinkedNode *current = pList->pHead;
-
-    // Traverse the list and display the contents of each node
-    while (current != NULL)
-    {
-        // Display the contents of the current node
-        printf("Node %zu: %p\n", i, current->pData);
-
-        // Move to the next node
-        current = current->pNext;
-        i++;
-    }
+    pList->count = 0;
+    pList->pHead = NULL;
+    pList->pTail = NULL;
+    pList->dynamic = 0;
+    pList->OrderFunction = OrderFunction == NULL ? NULL : OrderFunction;
 }

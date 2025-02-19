@@ -26,7 +26,6 @@ void enforceKernelMode();
 static int launch(void *);
 static int watchdog(void *);
 static void check_deadlock();
-
 static inline void enableInterrupts();
 static inline void disableInterrupts();
 static void DebugConsole(char *format, ...);
@@ -118,6 +117,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
 
     if (proc_slot < 0)
     {
+        enableInterrupts();
         return -4;
     }
 
@@ -144,6 +144,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         {
             console_output(debugFlag,
                            "spawn(): Error: Could not create a new linked list node for the child process.\n");
+            enableInterrupts();
             return -1;
         }
 
@@ -229,6 +230,7 @@ int k_wait(int *code)
     if (runningProcess != NULL && runningProcess->pChildren.count == 0)
     {
         // no processes to wait for
+        enableInterrupts();
         return -1;
     }
 
@@ -257,10 +259,9 @@ int k_wait(int *code)
     {
         console_output(debugFlag, "k_wait(): Exiting child not found in the exiting children list\n");
     }
-    if (runningProcess->signal)
-    {
-        return -5;
-    }
+
+    result = runningProcess->signal ? -5 : result;
+
     enableInterrupts();
 
     return result;
@@ -388,6 +389,7 @@ int k_kill(int pid, int signal)
     // check if the process is already signaled
     if (pProcess->signal)
     {
+        enableInterrupts();
         return 1;
     }
 
@@ -447,6 +449,7 @@ int k_join(int pid, int *pChildExitCode)
     {
         console_output(debugFlag,
                        "join(): Error: Could not create a new linked list node for the joining process.\n");
+        enableInterrupts();
         return -6;
     }
 
@@ -462,6 +465,7 @@ int k_join(int pid, int *pChildExitCode)
     // verify that our node made it the pJoiningProcesses list
     if (FindDoublyLinkedNode(runningProcess, &pProcess->pJoiningProcesses) == NULL)
     {
+        enableInterrupts();
         return -1;
     }
 
@@ -503,6 +507,7 @@ int unblock(int pid)
     // if invalid or process is not blocked, return -1
     if (pListNode == NULL || !isBlocked)
     {
+        enableInterrupts();
         return -1;
     }
 
@@ -514,6 +519,7 @@ int unblock(int pid)
 
 int block(int newStatus)
 {
+    int result = 0;
     enforceKernelMode();
     // function blocks the calling process and sets the status in the process table to the value specified by newStatus
 
@@ -531,13 +537,8 @@ int block(int newStatus)
                         newStatus);
 
     dispatcher();
-
-    if (runningProcess->signal)
-    {
-        return -5;
-    }
-
-    return 0;
+    result = runningProcess->signal ? -5 : result;
+    return result;
 }
 
 int signaled()
@@ -587,46 +588,42 @@ void dispatcher()
         return;
     }
 
-    // determine if the currently running process has exceeded its quantum
-    if (runningProcess != NULL &&
-        (runningProcess->elapsedTime >= runningProcess->quantum))
+    disableInterrupts();
+
+    // do bookkeeping for the running process
+    if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
     {
-        disableInterrupts();
         time_slice();
-        enableInterrupts();
+    }
+
+    // get the next ready process
+    pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
+
+    // if the next Ready process is null
+    if (pNextReadyProcess != NULL)
+    {
+        // if we get the same process back no need to context switch
+        if (runningProcess != NULL &&
+            pNextReadyProcess->pid == runningProcess->pid)
+        {
+            enableInterrupts();
+            return;
+        }
+        // set the running process to the next ready process
+        runningProcess = pNextReadyProcess;
+
+        // set the running process to the current process
+        // will re-enable interrupts
+        context_switch(runningProcess->context);
     }
     else
     {
-        disableInterrupts();
-        // get the next ready process
-        pNextReadyProcess = GetNextReadyProcess(runningProcess, priorityListQueue);
-
-        // if the next Ready process is null
-        if (pNextReadyProcess != NULL)
-        {
-            // if we get the same process back no need to context switch
-            if (runningProcess != NULL &&
-                pNextReadyProcess->pid == runningProcess->pid)
-            {
-                enableInterrupts();
-                return;
-            }
-
-            // set the running process to the next ready process
-            runningProcess = pNextReadyProcess;
-
-            // set the running process to the current process
-            // will re-enable interrupts
-            context_switch(runningProcess->context);
-        }
-        else
-        {
-            // if the next ready process is null, we have a deadlock
-            // GetNextReadyProcess should return the watchdog process
-            // So this should never be called from here unless there
-            // is a serious issue
-            watchdog(NULL);
-        }
+        // if the next ready process is null, we have a deadlock
+        // GetNextReadyProcess should return the watchdog process
+        // So this should never be called from here unless there
+        // is a serious issue
+        enableInterrupts();
+        watchdog(NULL);
     }
 }
 
@@ -645,13 +642,16 @@ static int watchdog(void *dummy)
     Process *pNextReadyProc = NULL;
     DoublyLinkedNode *pDynamicNode = NULL;
     DoublyLinkedNode *pStaticListNode = NULL;
-    DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
 
     if (isBooting)
     {
         // We are still booting up, so we need to wait for the system to be ready
         return 0;
     }
+
+    disableInterrupts();
+    DoublyLinkedNode *pNode = priorityListQueue[STATUS_READY].pHead;
+    enableInterrupts();
 
     if (pNode == NULL || pNode->pData == NULL)
     {
@@ -671,7 +671,6 @@ static void check_deadlock()
     Process *pCurrentProc = NULL;
     DoublyLinkedNode *pNextLNode = NULL;
 
-    disableInterrupts();
     // determine why the watchdog was called
     while (1)
     {
@@ -681,6 +680,7 @@ static void check_deadlock()
         // loop over the priority list queue
         for (i = 0; i < NUM_PROCESS_STATES; i++)
         {
+            disableInterrupts();
             // get the head of the list
             pNextLNode = priorityListQueue[i].pHead;
 
@@ -699,6 +699,7 @@ static void check_deadlock()
                 }
             }
         }
+        enableInterrupts();
         break;
     }
 
@@ -714,8 +715,6 @@ static void check_deadlock()
 static inline void disableInterrupts()
 {
     enforceKernelMode();
-
-    /* We ARE in kernel mode */
     set_psr(get_psr() & ~PSR_INTERRUPTS);
 }
 
@@ -725,7 +724,6 @@ static inline void disableInterrupts()
 static inline void enableInterrupts()
 {
     enforceKernelMode();
-
     set_psr(get_psr() | PSR_INTERRUPTS);
 }
 
@@ -762,7 +760,6 @@ int check_io_scheduler()
 
 void time_slice()
 {
-
     static int elapsed = 0;           // time elapsed since last context switch
     static int lastTime = 0;          // last time the clock interrupt was called
     int currentTime = system_clock(); // current time in μs but
@@ -794,8 +791,10 @@ void time_slice()
     // check if the elapsed time is greater than the quantum for the running process
     if (runningProcess != NULL && runningProcess->elapsedTime >= runningProcess->quantum)
     {
+
         elapsed = 0;
         runningProcess->elapsedTime = 0;
+
         dispatcher();
     }
     else
@@ -816,7 +815,6 @@ void time_slice()
  */
 void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
 {
-
     disableInterrupts();
     time_slice();
     enableInterrupts();
@@ -830,7 +828,6 @@ void clockInterruptHandler(void *device, uint8_t command, uint32_t status)
  */
 void enforceKernelMode()
 {
-
     if ((get_psr() & PSR_KERNEL_MODE) == 0)
     {
         console_output(debugFlag, "Kernel mode expected, but function called in user mode.\n");
