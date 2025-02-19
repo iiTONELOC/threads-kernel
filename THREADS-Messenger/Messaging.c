@@ -4,7 +4,7 @@
    The University of Arizona
    CYBV 489
 
-   Student Names:  <add your group members here>
+   Student Names: Anthony Tropeano, Connor Stackhouse
 
    ------------------------------------------------------------------------ */
 #include <Windows.h>
@@ -18,16 +18,17 @@
 #include "message.h"
 
 /* ------------------------- Prototypes ----------------------------------- */
-static void nullsys(system_call_arguments_t* args);
+static void nullsys(system_call_arguments_t *args);
 
-typedef void (*interrupt_handler_t) (char deviceId[32], uint8_t command, uint32_t status);
+typedef void (*interrupt_handler_t)(char deviceId[32], uint8_t command, uint32_t status);
 
 static void InitializeHandlers();
 static int check_io_messaging(void);
-extern int MessagingEntryPoint(void*);
-static void checkKernelMode(const char* functionName);
+extern int MessagingEntryPoint(void *);
+static void checkKernelMode(const char *functionName);
 
-struct psr_bits {
+struct psr_bits
+{
     unsigned int cur_int_enable : 1;
     unsigned int cur_mode : 1;
     unsigned int prev_int_enable : 1;
@@ -35,19 +36,19 @@ struct psr_bits {
     unsigned int unused : 28;
 };
 
-union psr_values {
+union psr_values
+{
     struct psr_bits bits;
     unsigned int integer_part;
 };
 
-
 /* -------------------------- Globals ------------------------------------- */
 
 /* Obtained from THREADS*/
-interrupt_handler_t* handlers;
+interrupt_handler_t *handlers;
 
 /* system call array of function pointers */
-void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t* args);
+void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args);
 
 /* the mail boxes */
 MailBox mailboxes[MAXMBOX];
@@ -55,7 +56,7 @@ MailSlot mailSlots[MAXSLOTS];
 
 typedef struct
 {
-    void* deviceHandle;
+    void *deviceHandle;
     int deviceMbox;
     int deviceType;
     char deviceName[16];
@@ -65,16 +66,17 @@ static DeviceManagementData devices[THREADS_MAX_DEVICES];
 static int nextMailboxId = 0;
 static int waitingOnDevice = 0;
 
-
 /* ------------------------------------------------------------------------
      Name - SchedulerEntryPoint
      Purpose - Initializes mailboxes and interrupt vector.
                Start the Messaging test process.
      Parameters - one, default arg passed by k_spawn that is not used here.
 ----------------------------------------------------------------------- */
-int SchedulerEntryPoint(void* arg)
+int SchedulerEntryPoint(void *arg)
 {
-    // TODO: check for kernel mode
+    int result = 0;
+    // check for kernel mode
+    checkKernelMode("SchedulerEntryPoint");
 
     /* Disable interrupts */
     disableInterrupts();
@@ -98,13 +100,22 @@ int SchedulerEntryPoint(void* arg)
 
     enableInterrupts();
 
-    /* TODO: Create a process for Messaging, then block on a wait until messaging exits.*/
+    /* Create a process for Messaging, then block on a wait until messaging exits.*/
+    result = k_spawn("MessagingEntryPoint", MessagingEntryPoint, NULL, 2 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
 
-    k_exit(0);
+    if (result < 0)
+    {
+        console_output(FALSE, "SchedulerEntryPoint(): spawn for MessagingEntryPoint returned an error (%d), stopping...\n", result);
+        stop(1);
+    }
+
+    /* wait for the MessagingEntryPoint to finish */
+    k_wait(&result);
+
+    k_exit(result);
 
     return 0;
 } /* SchedulerEntryPoint */
-
 
 /* ------------------------------------------------------------------------
    Name - mailbox_create
@@ -118,10 +129,8 @@ int mailbox_create(int slots, int slot_size)
 {
     int newId = -1;
 
-
     return newId;
 } /* mailbox_create */
-
 
 /* ------------------------------------------------------------------------
    Name - mailbox_send
@@ -131,7 +140,7 @@ int mailbox_create(int slots, int slot_size)
    Returns - zero if successful, -1 if invalid args.
    Side Effects - none.
    ----------------------------------------------------------------------- */
-int mailbox_send(int mboxId, void* pMsg, int msg_size, int wait)
+int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 {
     int result = -1;
 
@@ -146,7 +155,7 @@ int mailbox_send(int mboxId, void* pMsg, int msg_size, int wait)
    Returns - zero if successful, -1 if invalid args.
    Side Effects - none.
    ----------------------------------------------------------------------- */
-int mailbox_receive(int mboxId, void* pMsg, int msg_size, int wait)
+int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 {
     int result = -1;
 
@@ -163,7 +172,7 @@ int mailbox_free(int mboxId)
     return result;
 }
 
-int wait_device(char* deviceName, int* status)
+int wait_device(char *deviceName, int *status)
 {
     int result = 0;
     uint32_t deviceHandle = -1;
@@ -173,12 +182,12 @@ int wait_device(char* deviceName, int* status)
 
     if (strcmp(deviceName, "clock") == 0)
     {
-        deviceHandle = THREADS_CLOCK_DEVICE_ID;;
+        deviceHandle = THREADS_CLOCK_DEVICE_ID;
+        ;
     }
     else
     {
         deviceHandle = device_handle(deviceName);
-
     }
 
     if (deviceHandle >= 0 && deviceHandle < THREADS_MAX_DEVICES)
@@ -203,7 +212,6 @@ int wait_device(char* deviceName, int* status)
     return result;
 }
 
-
 int check_io_messaging(void)
 {
     if (waitingOnDevice)
@@ -216,16 +224,14 @@ int check_io_messaging(void)
 static void InitializeHandlers()
 {
     handlers = get_interrupt_handlers();
-
 }
 
 /* an error method to handle invalid syscalls */
-static void nullsys(system_call_arguments_t* args)
+static void nullsys(system_call_arguments_t *args)
 {
-    console_output(FALSE,"nullsys(): Invalid syscall %d. Halting...\n", args->call_id);
+    console_output(FALSE, "nullsys(): Invalid syscall %d. Halting...\n", args->call_id);
     stop(1);
 } /* nullsys */
-
 
 /*****************************************************************************
    Name - checkKernelMode
@@ -233,7 +239,7 @@ static void nullsys(system_call_arguments_t* args)
    Parameters -
    Returns -
 ****************************************************************************/
-static inline void checkKernelMode(const char* functionName)
+static inline void checkKernelMode(const char *functionName)
 {
     union psr_values psrValue;
 
