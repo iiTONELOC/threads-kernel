@@ -1,0 +1,3 @@
+[submodule "DoubleSea"]
+	path = DoubleSea
+	url = git@github.com:iiTONELOC/DoubleSea.git
