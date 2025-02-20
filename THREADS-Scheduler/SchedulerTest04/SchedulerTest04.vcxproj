@@ -129,7 +129,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)\Lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>THREADS.lib;THREADSMain.lib</AdditionalDependencies>
+      <AdditionalDependencies>THREADS.lib;THREADSMain.lib;$(SolutionDir)..\DoubleSea\x64\Debug\DoublyLinkedList.obj;$(SolutionDir)..\DoubleSea\x64\Debug\ListUtils.obj</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -158,6 +158,9 @@
     <ClCompile Include="SchedulerTest04.c" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\DoubleSea\LinkedList.vcxproj">
+      <Project>{a5afe66b-dab3-4c9d-94bd-2e32e2adcca0}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\Scheduler.vcxproj">
       <Project>{9c3a6259-d35e-453a-9a17-62b44c793a76}</Project>
     </ProjectReference>
