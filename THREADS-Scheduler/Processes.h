@@ -37,7 +37,7 @@ typedef struct _process
 
 /*_______________________Function Prototypes_______________________*/
 
-int OrderFunction(void *pNode1, void *pNode2);
+int orderFunction(void *pNode1, void *pNode2);
 void InitializeProcessToDefault(Process *usingProcessPtr);
 void InitializeNewProcess(Process *usingProcessPtr, char *name,
 						  int (*entryPoint)(void *), void *arg,
