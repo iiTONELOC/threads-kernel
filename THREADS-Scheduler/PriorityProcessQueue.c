@@ -71,6 +71,22 @@ DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBuck
 }
 
 /**
+ * @brief Initialize the static storage node array
+ *
+ * @param pNodeBucket The array of nodes to initialize
+ * @param numNodes The number of nodes to initialize
+ */
+void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNodeBucket, int numNodes)
+{
+    int i = 0;
+
+    for (i = 0; i < numNodes; i++)
+    {
+        InitializeDoublyLinkedNode(0, &pNodeBucket[i], NULL);
+    }
+}
+
+/**
  * @brief Initializes the priority process queue array
  *
  * @param usingArrayPtr The array of priority process queues
@@ -82,7 +98,7 @@ void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int nu
 
     for (i = 0; i < numStates; i++)
     {
-        InitializeDoublyLinkedList(&usingArrayPtr[i], OrderFunction);
+        InitializeDoublyLinkedList(0, DOUBLY_LINKED_NODE_OFFSET, &usingArrayPtr[i], orderFunction);
     }
 }
 
@@ -99,7 +115,7 @@ void AddNodeToPriorityProcessQueue(DoublyLinkedList *usingQueuePtr, DoublyLinked
         return;
     }
 
-    InsertDoublyLinkedNode(usingQueuePtr, pListNode);
+    InsertNode(pListNode, usingQueuePtr);
 }
 
 /**
@@ -115,7 +131,7 @@ void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLi
         return;
     }
 
-    RemoveDoublyLinkedNode(usingListPtr, pListNode);
+    RemoveNode(pListNode, usingListPtr);
 }
 
 /**
@@ -163,7 +179,7 @@ void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList
                           DoublyLinkedNode *pNode)
 {
     // remove the node from the from list
-    RemoveDoublyLinkedNode(pFromList, pNode);
+    RemoveNode((void *)pNode, pFromList);
     // insert the node into the to list
-    InsertDoublyLinkedNode(pToList, pNode);
+    InsertNode((void *)pNode, pToList);
 }

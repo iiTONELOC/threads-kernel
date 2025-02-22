@@ -6,7 +6,6 @@
 #include "Scheduler.h"
 #include "Processes.h"
 #include "SchedulerUtils.h"
-#include "DoublyLinkedList.h"
 #include "PriorityProcessQueue.h"
 
 int nextPid = 1;                                        // next process id
@@ -149,7 +148,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         }
 
         // add the child process to the parent's children list
-        InsertDoublyLinkedNode(&runningProcess->pChildren, pNewChildProcNode);
+        InsertNode(pNewChildProcNode, &runningProcess->pChildren);
 
         // add the parent process to the child process' pParent
         pNewProc->pParent = runningProcess;
@@ -235,8 +234,8 @@ int k_wait(int *code)
     }
 
     ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
+                        (DoublyLinkedNode *)FindDoublyLinkedNode(
+                            &priorityListQueue[STATUS_RUNNING], runningProcess),
                         STATUS_BLOCKED_WAIT);
     runningProcess = NULL;
 
@@ -298,7 +297,7 @@ void k_exit(int code)
     }
 
     // Grab the static linked list node for the process from static node storage
-    pStaticListNode = FindDoublyLinkedNode(runningProcess, &priorityListQueue[STATUS_RUNNING]);
+    pStaticListNode = (DoublyLinkedNode *)FindDoublyLinkedNode(&priorityListQueue[STATUS_RUNNING], (void *)runningProcess);
 
     // set the status of the quitting process to QUIT - requires a static node
     ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
@@ -311,14 +310,14 @@ void k_exit(int code)
         while (runningProcess->pJoiningProcesses.count > 0)
         {
             // get the dynamic linked list node for process
-            pDynamicNode = runningProcess->pJoiningProcesses.pHead;
-            RemoveDoublyLinkedNode(&runningProcess->pJoiningProcesses,
-                                   runningProcess->pJoiningProcesses.pHead);
+            pDynamicNode = (Process *)runningProcess->pJoiningProcesses.pHead;
+            RemoveNode(
+                runningProcess->pJoiningProcesses.pHead, &runningProcess->pJoiningProcesses);
             pProcessINeedToJoin = (Process *)pDynamicNode->pData;
             // set the status of the process to ready
             ChangeProcessStatus(priorityListQueue,
-                                FindDoublyLinkedNode(pProcessINeedToJoin,
-                                                     &priorityListQueue[STATUS_BLOCKED_JOIN]),
+                                (DoublyLinkedNode *)FindDoublyLinkedNode(
+                                    &priorityListQueue[STATUS_BLOCKED_JOIN], (void *)pProcessINeedToJoin),
                                 STATUS_READY);
             // free the linked list node
             DestroyDoublyLinkedNode(pDynamicNode);
@@ -330,7 +329,7 @@ void k_exit(int code)
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
-        pDynamicNode = FindDoublyLinkedNode(runningProcess, &runningProcess->pParent->pChildren);
+        pDynamicNode = (DoublyLinkedNode *)FindDoublyLinkedNode(&runningProcess->pParent->pChildren, (void *)runningProcess);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
         // with a higher priority than the parent process
@@ -338,21 +337,22 @@ void k_exit(int code)
         {
             // change the status of the parent to ready
             ChangeProcessStatus(priorityListQueue,
-                                FindDoublyLinkedNode(runningProcess->pParent,
-                                                     &priorityListQueue[STATUS_BLOCKED_WAIT]),
+                                (DoublyLinkedNode *)FindDoublyLinkedNode(
+                                    &priorityListQueue[STATUS_BLOCKED_WAIT],
+                                    (void *)runningProcess->pParent),
                                 STATUS_READY);
 
             // place the child into parent's exiting children list
             MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
                                  &runningProcess->pParent->pExitingChildren,
-                                 pDynamicNode);
+                                 (void *)pDynamicNode);
         }
         else
         {
             // place the child into parent's dead children list
             MoveDoublyLinkedNode(&runningProcess->pParent->pChildren,
                                  &runningProcess->pParent->pDeadChildren,
-                                 pDynamicNode);
+                                 (void *)pDynamicNode);
         }
     }
     else
@@ -454,16 +454,16 @@ int k_join(int pid, int *pChildExitCode)
     }
 
     // add the running process to the joining processes list of the process we are trying to join
-    InsertDoublyLinkedNode(&pProcess->pJoiningProcesses, pNewJoiningProcessNode);
+    InsertNode(pNewJoiningProcessNode, &pProcess->pJoiningProcesses);
 
     // set the status of the running process to blocked join
     ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
+                        (DoublyLinkedNode *)FindDoublyLinkedNode(
+                            &priorityListQueue[STATUS_RUNNING], runningProcess),
                         STATUS_BLOCKED_JOIN);
 
     // verify that our node made it the pJoiningProcesses list
-    if (FindDoublyLinkedNode(runningProcess, &pProcess->pJoiningProcesses) == NULL)
+    if (*FindDoublyLinkedNode(&pProcess->pJoiningProcesses, runningProcess) == NULL)
     {
         enableInterrupts();
         return -1;
@@ -532,8 +532,8 @@ int block(int newStatus)
 
     disableInterrupts();
     ChangeProcessStatus(priorityListQueue,
-                        FindDoublyLinkedNode(runningProcess,
-                                             &priorityListQueue[STATUS_RUNNING]),
+                        (DoublyLinkedNode *)FindDoublyLinkedNode(
+                            &priorityListQueue[STATUS_RUNNING], runningProcess),
                         newStatus);
 
     dispatcher();

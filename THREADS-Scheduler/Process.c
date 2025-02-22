@@ -13,7 +13,7 @@
  *
  * @return The difference between the two priorites.
  */
-int OrderFunction(void *pNode1, void *pNode2)
+int orderFunction(void *pNode1, void *pNode2)
 {
     if (pNode1 == NULL || pNode2 == NULL)
     {
@@ -60,10 +60,14 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     usingProcessPtr->entryPoint = NULL;
     usingProcessPtr->processTableIndex = -1;
     usingProcessPtr->quantum = MAX_PROC_QUANTUM;
-    InitializeDoublyLinkedList(&usingProcessPtr->pChildren, NULL);
-    InitializeDoublyLinkedList(&usingProcessPtr->pDeadChildren, NULL);
-    InitializeDoublyLinkedList(&usingProcessPtr->pExitingChildren, NULL);
-    InitializeDoublyLinkedList(&usingProcessPtr->pJoiningProcesses, NULL);
+    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
+                               &usingProcessPtr->pChildren, orderFunction);
+    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
+                               &usingProcessPtr->pDeadChildren, orderFunction);
+    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
+                               &usingProcessPtr->pExitingChildren, orderFunction);
+    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
+                               &usingProcessPtr->pJoiningProcesses, orderFunction);
 }
 
 /**
@@ -139,9 +143,9 @@ void CleanUpAfterChild(Process *pRunningProcess,
     // clean up after the child
     pStaticNode = FindStaticStorageNode(pChild->pid, pStaticStorage);
     // Remove the child from the children list
-    RemoveDoublyLinkedNode(pChildList, pDynamicNode);
+    RemoveNode(pDynamicNode, pChildList);
     // Remove the child from the priority quit list
-    RemoveDoublyLinkedNode(&pPriorityListQueue[STATUS_QUIT], pStaticNode);
+    RemoveNode(pStaticNode, &pPriorityListQueue[STATUS_QUIT]);
     // Clean up the child process
     CleanUpPCB(pChild, pStaticNode);
     // -----------------------------------
@@ -201,7 +205,7 @@ void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
 {
     context_stop(pProcessToClean->context);
     InitializeProcessToDefault(pProcessToClean);
-    InitializeDoublyLinkedNode(pStaticStorageNode);
+    InitializeDoublyLinkedNode(FALSE, pStaticStorageNode, NULL);
 }
 
 /**
@@ -245,8 +249,8 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
         {
 
             ChangeProcessStatus(pPriorityListQueue,
-                                FindDoublyLinkedNode(pRunningProcess,
-                                                     &pPriorityListQueue[STATUS_RUNNING]),
+                                (DoublyLinkedNode *)FindDoublyLinkedNode(
+                                    &pPriorityListQueue[STATUS_RUNNING], (void *)pRunningProcess),
                                 STATUS_READY);
         }
 
