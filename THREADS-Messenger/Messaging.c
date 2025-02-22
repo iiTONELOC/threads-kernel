@@ -77,7 +77,7 @@ int SchedulerEntryPoint(void *arg)
 {
     int result = 0;
     // check for kernel mode
-    checkKernelMode("SchedulerEntryPoint");
+    checkKernelMode(__func__);
 
     /* Disable interrupts */
     disableInterrupts();
