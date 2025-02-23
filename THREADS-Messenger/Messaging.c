@@ -52,8 +52,10 @@ interrupt_handler_t *handlers;
 void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args);
 
 /* the mail boxes */
-MailBox mailboxes[MAXMBOX];
-MailSlot mailSlots[MAXSLOTS];
+// MAIL_BOXES, MAILBOX_EMPTY_LIST, MAIL_BOX_EMPTY_STORAGE
+
+/* Messaging Process*/
+MessagingProcess mailProcesses[MAXPROC] = {0};
 
 typedef struct
 {
@@ -63,9 +65,9 @@ typedef struct
     char deviceName[16];
 } DeviceManagementData;
 
-static DeviceManagementData devices[THREADS_MAX_DEVICES];
 static int nextMailboxId = 0;
 static int waitingOnDevice = 0;
+static DeviceManagementData devices[THREADS_MAX_DEVICES];
 
 /* ------------------------------------------------------------------------
      Name - SchedulerEntryPoint
@@ -88,13 +90,13 @@ int SchedulerEntryPoint(void *arg)
     /* Initialize the mail box table, slots, & other data structures.
      * Initialize int_vec and sys_vec, allocate mailboxes for interrupt
      * handlers.  Etc... */
+    InitEmptyMailBoxList();
 
     /* Initialize the devices and their mailboxes. */
     /* Allocate mailboxes for use by the interrupt handlers */
     for (int i = 0; i < THREADS_MAX_DEVICES; ++i)
     {
-        // TODO: update this once mailbox_create is working
-        // devices[i].deviceMbox = mailbox_create(0, sizeof(int));
+        devices[i].deviceMbox = mailbox_create(0, sizeof(int));
     }
 
     InitializeHandlers();
@@ -102,7 +104,7 @@ int SchedulerEntryPoint(void *arg)
     enableInterrupts();
 
     /* Create a process for Messaging, then block on a wait until messaging exits.*/
-    result = k_spawn("MessagingEntryPoint", MessagingEntryPoint, NULL, 2 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
+    result = k_spawn("MessagingEntryPoint", MessagingEntryPoint, NULL, 4 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
 
     if (result < 0)
     {
@@ -128,9 +130,7 @@ int SchedulerEntryPoint(void *arg)
    ----------------------------------------------------------------------- */
 int mailbox_create(int slots, int slot_size)
 {
-    int newId = -1;
-
-    return newId;
+    return reuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
 } /* mailbox_create */
 
 /* ------------------------------------------------------------------------

@@ -13,9 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="MailBoxUtils">
+      <UniqueIdentifier>{55f42f81-25ad-4ad5-85ef-15a245032595}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Messaging.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MailBox.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MailSlot.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -24,6 +33,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Include\THREADSLib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MailBoxUtils.h">
+      <Filter>MailBoxUtils</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\MailBox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\MailSlot.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

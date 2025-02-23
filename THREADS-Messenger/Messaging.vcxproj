@@ -27,11 +27,16 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="MailBox.c" />
+    <ClCompile Include="MailSlot.c" />
     <ClCompile Include="Messaging.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Include\MailBox.h" />
+    <ClInclude Include="Include\MailSlot.h" />
     <ClInclude Include="Include\Messaging.h" />
     <ClInclude Include="Include\THREADSLib.h" />
+    <ClInclude Include="MailBoxUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DoubleSea\LinkedList.vcxproj">
