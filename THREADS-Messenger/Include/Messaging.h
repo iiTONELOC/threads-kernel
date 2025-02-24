@@ -1,4 +1,6 @@
 #pragma once
+#ifndef MESSAGING_H
+#define MESSAGING_H
 
 /*
  * Maximum line length. Used by terminal read and write.
@@ -32,10 +34,10 @@ typedef struct mqattr
 extern int mailbox_free(int mbox_id);
 
 /* returns 0 if successful, -1 if invalid args */
-extern int mailbox_send(int mbox_id, void *msg_ptr, int msg_size, BOOL block);
+extern int mailbox_send(int mbox_id, void *msg_ptr, int msg_size, int block);
 
 /* returns size of received msg if successful, -1 if invalid args */
-extern int mailbox_receive(int mbox_id, void *msg_ptr, int msg_max_size, BOOL block);
+extern int mailbox_receive(int mbox_id, void *msg_ptr, int msg_max_size, int block);
 
 /* type = interrupt device type, unit = # of device (when more than one),
  * status = where interrupt handler puts device's status register.
@@ -54,3 +56,4 @@ typedef struct sysargs
 } sysargs;
 
 extern void (*systemCallVector[])(system_call_arguments_t *args);
+#endif

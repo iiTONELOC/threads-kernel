@@ -11,12 +11,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <THREADSLib.h>
 #include <Scheduler.h>
 #include <Messaging.h>
-#include <stdint.h>
-#include "message.h"
-#include "DoublyLinkedList.h"
+#include <Messenger.h>
+#include <MailBox.h>
+#include <MailSlot.h>
+#include <MessagingProcess.h>
+#include <MailUtils.h>
 
 /* ------------------------- Prototypes ----------------------------------- */
 static void nullsys(system_call_arguments_t *args);
@@ -51,21 +55,7 @@ interrupt_handler_t *handlers;
 /* system call array of function pointers */
 void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args);
 
-/* the mail boxes */
-// MAIL_BOXES, MAILBOX_EMPTY_LIST, MAIL_BOX_EMPTY_STORAGE
-
-/* Messaging Process*/
-MessagingProcess mailProcesses[MAXPROC] = {0};
-
-typedef struct
-{
-    void *deviceHandle;
-    int deviceMbox;
-    int deviceType;
-    char deviceName[16];
-} DeviceManagementData;
-
-static int nextMailboxId = 0;
+static int inSetup = 1;
 static int waitingOnDevice = 0;
 static DeviceManagementData devices[THREADS_MAX_DEVICES];
 
@@ -90,21 +80,20 @@ int SchedulerEntryPoint(void *arg)
     /* Initialize the mail box table, slots, & other data structures.
      * Initialize int_vec and sys_vec, allocate mailboxes for interrupt
      * handlers.  Etc... */
-    InitEmptyMailBoxList();
+    InitMessagingTables();
 
     /* Initialize the devices and their mailboxes. */
     /* Allocate mailboxes for use by the interrupt handlers */
-    for (int i = 0; i < THREADS_MAX_DEVICES; ++i)
-    {
-        devices[i].deviceMbox = mailbox_create(0, sizeof(int));
-    }
+    InitDeviceMailBoxes(devices);
 
     InitializeHandlers();
 
+    inSetup = 0;
     enableInterrupts();
 
     /* Create a process for Messaging, then block on a wait until messaging exits.*/
-    result = k_spawn("MessagingEntryPoint", MessagingEntryPoint, NULL, 4 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
+    result = k_spawn("MessagingEntryPoint", MessagingEntryPoint,
+                     NULL, 4 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
 
     if (result < 0)
     {
@@ -130,7 +119,18 @@ int SchedulerEntryPoint(void *arg)
    ----------------------------------------------------------------------- */
 int mailbox_create(int slots, int slot_size)
 {
-    return reuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
+    checkKernelMode(__func__);
+    int result = -1;
+
+    if (!inSetup)
+        disableInterrupts();
+
+    result = ReuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
+
+    if (!inSetup)
+        enableInterrupts();
+
+    return result;
 } /* mailbox_create */
 
 /* ------------------------------------------------------------------------
@@ -143,7 +143,81 @@ int mailbox_create(int slots, int slot_size)
    ----------------------------------------------------------------------- */
 int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 {
+    checkKernelMode(__func__);
+    /* Producer */
     int result = -1;
+    MailSlot *pSlot;
+    MailBox *pMailBox;
+    int myPid = k_getpid();
+    MessagingProcess *pProcess;
+
+    /* Validate the input*/
+    if (mboxId < 0 || !pMsg || msg_size < 0 || myPid < 0)
+    {
+        /* Invalid args, return -1 */
+        return result;
+    }
+
+    /* Grab the mailbox and create a new messenger process for the current process */
+    disableInterrupts();
+    if ((pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL ||
+        (pProcess = GetNextEmptyMessagingProcess()) == NULL)
+    {
+        /* Invalid mailbox, return -1 */
+        enableInterrupts();
+        return result;
+    }
+
+    /* Try to acquire a slot if the mailbox has room */
+    if ((pMailBox->mailSlotsList.count + // check if the mailbox is full
+         pMailBox->deliveredMailList.count) >= pMailBox->slotCount)
+    {
+        /* We have to block, no slots are available */
+
+        /* Explicitly told not to block. Do not wait, return -2 */
+        if (!wait)
+        {
+            ResetMessagingProcess(pProcess);
+            enableInterrupts();
+            return -2;
+        }
+
+        /* Block the process */
+        result = BlockSendingProcess(pProcess, pMailBox);
+
+        /* AFTER UNBLOCK - ensure interrupts are disabled */
+        disableInterrupts();
+
+        /* Try to send the message again, a slot should have opened up */
+        return mailbox_send(mboxId, pMsg, msg_size, wait);
+    }
+
+    /* Slots are available for the mailbox */
+
+    /* Try to get a slot from the slot table */
+    if ((pSlot = GetNextEmptyMailSlot()) == NULL)
+    {
+        enableInterrupts();
+        return -1;
+    }
+
+    /* Associate the node with the mail box and add it to its slot list */
+    pSlot->mboxId = mboxId;
+    InsertNode((void *)pSlot, &pMailBox->mailSlotsList);
+
+    /* Send mail - disables interrupts and enables them before returning */
+    result = SendMail(pMailBox, pSlot, pMsg, msg_size, myPid);
+
+    /* See if any processes are waiting to be awoken*/
+    if (pMailBox->waitingProcsRecvList.count > 0)
+    {
+        /* Unblock the first process in the list */
+        UnblockReceivingProcess(
+            (MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList), pMailBox);
+    }
+
+    /* Reset the process - Disables and enables interrupts */
+    ResetMessagingProcess(pProcess);
 
     return result;
 }
@@ -158,7 +232,81 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
    ----------------------------------------------------------------------- */
 int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 {
+    checkKernelMode(__func__);
+    /*Consumer*/
     int result = -1;
+    MailSlot *pSlot;
+    MailBox *pMailBox;
+    int myPid = k_getpid();
+    MessagingProcess *pProcess;
+
+    /* Validate the input */
+    if (mboxId < 0 || !pMsg || msg_size < 0 || myPid < 0)
+    {
+        /* Invalid args, return -1 */
+        return result;
+    }
+
+    /* Grab the mailbox and create a new messenger process for the current process */
+    disableInterrupts();
+    if ((pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL ||
+        (pProcess = GetNextEmptyMessagingProcess()) == NULL)
+    {
+        /* Invalid mailbox, return -1 */
+        enableInterrupts();
+        return result;
+    }
+
+    /* Try to receive a message if there is a message to be received, if not we have to block*/
+    if (pMailBox->deliveredMailList.count == 0)
+    {
+        /* No mail has been delivered, we need to block the current process*/
+
+        if (!wait)
+        {
+            ResetMessagingProcess(pProcess);
+            enableInterrupts();
+            return -2;
+        }
+
+        /* Block the process */
+        result = BlockReceivingProcess(pProcess, pMailBox);
+
+        /* AFTER UNBLOCK - ensure interrupts are disabled */
+        disableInterrupts();
+
+        /* Try to receive the message again, a message should have been delivered */
+        return mailbox_receive(mboxId, pMsg, msg_size, wait);
+    }
+
+    /* There is a message to be received */
+
+    /* Get the first message in the delivered mail list */
+    pSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
+
+    /* Copy the message into the buffer */
+    memcpy_s(pMsg, msg_size, pSlot->message, pSlot->messageSize);
+
+    /* set the result to the message size if not signaled*/
+
+    if (signaled() && pProcess->hadToWait)
+    {
+        result = -5;
+    }
+    else
+    {
+        result = pSlot->messageSize;
+    }
+
+    /* Unblock the next proccess if needed */
+    if (pMailBox->waitingProcsSendList.count > 0)
+    {
+        UnblockSendingProcess(
+            (MessagingProcess *)Pop(&pMailBox->waitingProcsSendList), pMailBox);
+    }
+
+    /* Destroy the message process */
+    ResetMessagingProcess(pProcess);
 
     return result;
 }
@@ -168,6 +316,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
    ----------------------------------------------------------------------- */
 int mailbox_free(int mboxId)
 {
+    checkKernelMode(__func__);
     int result = -1;
 
     return result;
@@ -175,6 +324,7 @@ int mailbox_free(int mboxId)
 
 int wait_device(char *deviceName, int *status)
 {
+
     int result = 0;
     uint32_t deviceHandle = -1;
     checkKernelMode("waitdevice");
@@ -215,6 +365,7 @@ int wait_device(char *deviceName, int *status)
 
 int check_io_messaging(void)
 {
+    checkKernelMode(__func__);
     if (waitingOnDevice)
     {
         return 1;
@@ -224,6 +375,7 @@ int check_io_messaging(void)
 
 static void InitializeHandlers()
 {
+    checkKernelMode(__func__);
     handlers = get_interrupt_handlers();
 }
 

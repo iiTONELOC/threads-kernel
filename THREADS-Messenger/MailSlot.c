@@ -1,4 +1,3 @@
-#include "THREADSLib.h"
 #include "MailSlot.h"
 
 size_t NUM_M_SLOTS_IN_USE = 0;
@@ -10,15 +9,9 @@ DoublyLinkedList MAIL_SLOT_EMPTY_LIST = {0};
  */
 void InitEmptyMailSlotList()
 {
-    /* Init the MAIL_SLOT_EMPTY_LIST List */
-    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET, &MAIL_SLOT_EMPTY_LIST, NULL);
-
-    /* Add all of the empty mailslots into the linked list */
-    for (size_t i = 0; i < MAXSLOTS; i++)
-    {
-        /* Push the empty mailslot into the empty list */
-        InsertNode((void *)&MAIL_SLOTS[i], &MAIL_SLOT_EMPTY_LIST);
-    }
+    InitStaticLinkedList(OFFSETOF_MSLOT, MAXSLOTS, (void *)&MAIL_SLOTS,
+                         SIZEOF_MSLOT, OFFSETOF_MSLOT_TBL_IDX,
+                         &MAIL_SLOT_EMPTY_LIST, NULL);
 }
 
 /**
@@ -32,7 +25,6 @@ void InitEmptyMailSlotList()
 MailSlot *GetNextEmptyMailSlot()
 {
     MailSlot *pMailSlot;
-    DoublyLinkedNode *pNode;
 
     /* if the list is empty return NULL */
     if (MAIL_SLOT_EMPTY_LIST.count == 0 && NUM_M_SLOTS_IN_USE >= MAXSLOTS)
@@ -46,6 +38,13 @@ MailSlot *GetNextEmptyMailSlot()
     /* Remove the node from the head of the list */
     pMailSlot = (MailSlot *)Pop(&MAIL_SLOT_EMPTY_LIST);
 
+    /* if the mail slot is null stop(1)*/
+    if (!pMailSlot)
+    {
+        console_output(FALSE, "GetNextEmptyMailSlot: pMailSlot is NULL - System is out of empty mail slots!\n");
+        stop(1);
+    }
+
     /* return the pointer to the mailslot */
     return pMailSlot;
 }
@@ -57,11 +56,18 @@ MailSlot *GetNextEmptyMailSlot()
  *
  * @param pMailSlot A pointer to the mailslot to reset
  */
-void resetMailSlot(MailSlot *pMailSlot)
+void ResetMailSlot(MailSlot *pMailSlot)
 {
     /* Reset the mailslot */
-    memset(pMailSlot, 0, sizeof(MailSlot));
-
+    pMailSlot->toPid = 0;
+    pMailSlot->mboxId = 0;
+    pMailSlot->fromPid = 0;
+    pMailSlot->dynamic = 0;
+    pMailSlot->pNext = NULL;
+    pMailSlot->pPrev = NULL;
+    pMailSlot->messageSize = 0;
+    pMailSlot->status = MS_STATUS_EMPTY;
+    memset(pMailSlot->message, 0, MAX_MESSAGE);
     /* Decrease the number of slots in use*/
     NUM_M_SLOTS_IN_USE--;
 
@@ -80,7 +86,7 @@ void resetMailSlot(MailSlot *pMailSlot)
  * @param mboxId The mailbox id
  * @return 0 if successful, -1 if invalid args
  */
-int reuseMailSlot(MailSlot *pMailSlot, int slotSize, int mboxId)
+int ReuseMailSlot(MailSlot *pMailSlot, int slotSize, int mboxId)
 {
     /* Check for invalid arguments */
     if (pMailSlot == NULL || slotSize < 0 || slotSize > MAX_MESSAGE || mboxId < 0)
