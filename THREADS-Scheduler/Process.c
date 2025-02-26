@@ -249,7 +249,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
         {
 
             ChangeProcessStatus(pPriorityListQueue,
-                                (DoublyLinkedNode *)FindDoublyLinkedNode(
+                                (DoublyLinkedNode *)*FindDoublyLinkedNode(
                                     &pPriorityListQueue[STATUS_RUNNING], (void *)pRunningProcess),
                                 STATUS_READY);
         }

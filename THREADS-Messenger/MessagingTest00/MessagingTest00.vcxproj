@@ -161,7 +161,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)Lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>THREADS.lib;THREADSMain.lib;Scheduler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>THREADS.lib;THREADSMain.lib;Scheduler.lib;$(SolutionDir)..\DoubleSea\x64\Debug\DoublyLinkedList.obj;$(SolutionDir)..\DoubleSea\x64\Debug\ListUtils.obj;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
