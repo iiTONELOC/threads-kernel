@@ -7,12 +7,14 @@
 #pragma once
 #ifndef MESSENGER_H
 #define MESSENGER_H
+#define MESSAGING_QUANTUM 100000 // 100ms
 
 typedef enum MAIL_SLOT_STATUS
 {
     MS_STATUS_EMPTY,
     MS_STATUS_INUSE,
-    MS_STATUS_DELIVERED,
+    MS_STATUS_DELIVERED_TO_MBOX,
+    MS_STATUS_DELIVERED_TO_PROC,
     MS_STATUS_RELEASED,
     MS_STATUS_MAX // This is the number of mailslot statuses
 } MAIL_SLOT_STATUS;
@@ -30,9 +32,10 @@ typedef enum MESSAGING_PROCESS_STATUS
 {
     MP_STATUS_EMPTY = 0,
     MP_READY = 1,
+    MP_RUNNING = 2,
     // Has to be larger than 10 for use with the block function
-    MP_BLOCKED_SEND = 15,
-    MP_BLOCKED_RECEIVE = 16,
+    MP_BLOCKED_SEND = 11,
+    MP_BLOCKED_RECEIVE = 12,
     // -----------------------------------------------------------
     MP_STATUS_MAX = 5 // This is the number of messaging process statuses
 } MESSAGING_PROCESS_STATUS;
@@ -55,15 +58,13 @@ typedef struct mailbox
     int tableIndex;
     int maxMessageSize;
     MAILBOX_STATUS status;
-    DoublyLinkedList mailSlotsList;
     DoublyLinkedList deliveredMailList;
-    DoublyLinkedList waitingProcsSendList;
     DoublyLinkedList waitingProcsRecvList;
+    DoublyLinkedList waitingProcsSendList;
 } MailBox;
 
 typedef struct mailSlot
 {
-    int toPid;
     int mboxId;
     int fromPid;
     int dynamic;
@@ -85,7 +86,11 @@ typedef struct messagingProcess
     int hadToWait;
     int tableIndex;
     MailSlot *pSlot;
-    MailBox *pMailBox;
+    // MailBox *pMailBox;
+    unsigned int quantum;       /* Time slice */
+    unsigned int startTime;     /* Process start time */
+    unsigned int elapsedTime;   /* Process elapsed time */
+    unsigned long long cpuTime; /* Process CPU time */
     enum MESSAGING_PROCESS_STATUS status;
 } MessagingProcess;
 
@@ -103,14 +108,11 @@ typedef struct mailSlot *SlotPtr;
 #define OFFSETOF_MSG_PROC offsetof(MessagingProcess, pNext)
 #define OFFSETOF_MSG_PROC_TBL_IDX offsetof(MessagingProcess, tableIndex)
 // ___________________________ Global Variables ___________________________
-
+extern MessagingProcess *runningMessengerProcess;           // The current running process
 extern MailBox MAIL_BOXES[MAXMBOX];                         // Array of mailboxes
 extern DoublyLinkedList MBOX_EMPTY_LIST;                    // List of empty mailboxes
 extern size_t NUM_M_SLOTS_IN_USE;                           // Number of mailslots in use
 extern MailSlot MAIL_SLOTS[MAXSLOTS];                       // Array of mailslots
 extern DoublyLinkedList MAIL_SLOT_EMPTY_LIST;               // List of empty mailslots
-extern size_t NUM_MESSAGING_PROCESSES_IN_USE;               // Number of messaging processes in use
-extern DoublyLinkedList MESSAGING_PROCESS_EMPTY_LIST;       // List of empty messaging processes
 extern MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES]; // Array of messaging processes
-
 #endif

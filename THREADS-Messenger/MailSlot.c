@@ -59,7 +59,6 @@ MailSlot *GetNextEmptyMailSlot()
 void ResetMailSlot(MailSlot *pMailSlot)
 {
     /* Reset the mailslot */
-    pMailSlot->toPid = 0;
     pMailSlot->mboxId = 0;
     pMailSlot->fromPid = 0;
     pMailSlot->dynamic = 0;

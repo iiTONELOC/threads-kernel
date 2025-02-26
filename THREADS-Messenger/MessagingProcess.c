@@ -1,8 +1,5 @@
-
 #include "MessagingProcess.h"
 
-size_t NUM_MESSAGING_PROCESSES_IN_USE = 0;
-DoublyLinkedList MESSAGING_PROCESS_EMPTY_LIST = {0};
 MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = {0};
 
 // _________________________________ Function Definitions _________________________________
@@ -10,12 +7,18 @@ MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = {0};
 /**
  * @brief Initialize a Linked List to Track Empty Messaging Processes
  */
-void InitEmptyMessagingProcessList()
+void InitEmptyMessagingProcessArray()
 {
-    InitStaticLinkedList(OFFSETOF_MSG_PROC, MAX_PROCESSES,
-                         (void *)&MESSAGING_PROCESSES[0],
-                         SIZEOF_MSG_PROC, OFFSETOF_MSG_PROC_TBL_IDX,
-                         &MESSAGING_PROCESS_EMPTY_LIST, NULL);
+    // loop over the array of messaging processes, ensuring they are all empty
+    // but set the pid to the appropriate value, index + 1
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+
+        ResetMessagingProcess(&MESSAGING_PROCESSES[i]);
+        MESSAGING_PROCESSES[i].pid = i + 1;
+        MESSAGING_PROCESSES[i].tableIndex = i;
+        MESSAGING_PROCESSES[i].quantum = MESSAGING_QUANTUM; // 100ms
+    }
 }
 
 /**
@@ -27,44 +30,27 @@ void InitEmptyMessagingProcessList()
  *
  * @return A pointer to the process if found, NULL otherwise
  */
-MessagingProcess *FindProcessInTable(int byPid)
+MessagingProcess *FindProcessInTable(int byPid, bool setTimes)
 {
-    /* Loop through the table to find the process */
-    for (int i = 0; i < MAX_PROCESSES; i++)
+    if (setTimes)
     {
-        if (MESSAGING_PROCESSES[i].pid == byPid)
+        MessagingProcess *pProcess = &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
+        if (pProcess && pProcess->startTime == 0)
         {
-            return &MESSAGING_PROCESSES[i];
+            pProcess->startTime = system_clock();
         }
+
+        pProcess->status = MP_RUNNING;
+
+        /* ensure the runningProcess is updated accordingly */
+        runningMessengerProcess = runningMessengerProcess == pProcess ? runningMessengerProcess : pProcess;
+
+        return pProcess;
     }
-
-    return NULL;
-}
-
-/**
- * @brief Get the next empty messaging process
- *
- * This function gets the next empty messaging process from the list of empty processes
- *
- * @return A pointer to the next empty messaging process
- */
-MessagingProcess *GetNextEmptyMessagingProcess()
-{
-    MessagingProcess *pMessagingProcess;
-
-    /* Pop the next process off the list*/
-    pMessagingProcess = (MessagingProcess *)Pop(&MESSAGING_PROCESS_EMPTY_LIST);
-
-    if (!pMessagingProcess)
+    else
     {
-        return NULL;
+        return &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
     }
-
-    /* Increment the number of messaging processes in use */
-    NUM_MESSAGING_PROCESSES_IN_USE++;
-
-    /* Return the new message process*/
-    return pMessagingProcess;
 }
 
 /**
@@ -73,54 +59,8 @@ MessagingProcess *GetNextEmptyMessagingProcess()
  * This function resets a messaging process
  *
  * @param pMessagingProcess A pointer to the messaging process to reset
- *
- * @note This function disables and enables interrupts before returning
  */
 void ResetMessagingProcess(MessagingProcess *pMessagingProcess)
 {
-    disableInterrupts();
-
-    /* Reset the messaging process - this leaves the table index - this won't change*/
-    pMessagingProcess->pid = 0;
-    pMessagingProcess->dynamic = 0;
-    pMessagingProcess->pNext = NULL;
-    pMessagingProcess->pPrev = NULL;
-    pMessagingProcess->pSlot = NULL;
-    pMessagingProcess->hadToWait = 0;
-    pMessagingProcess->pMailBox = NULL;
-    pMessagingProcess->status = MP_STATUS_EMPTY;
-
-    /* Decrease number of processes */
-    NUM_MESSAGING_PROCESSES_IN_USE--;
-
-    /* Add it back to the empty list */
-    InsertNode((void *)pMessagingProcess, &MESSAGING_PROCESS_EMPTY_LIST);
-
-    enableInterrupts();
-}
-
-/**
- * @brief Reuse a messaging process
- *
- * This function reuses a messaging process
- *
- * @param pMessagingProcess A pointer to the messaging process to reuse
- * @param pid The pid of the process
- *
- * @return 0 if successful, -1 if invalid args
- */
-int ReuseMessagingProcess(MessagingProcess *pMessagingProcess, int pid)
-{
-    /* Check for invalid args */
-    if (!pMessagingProcess || pid < 0)
-    {
-        return -1;
-    }
-
-    /* Set pid */
-    pMessagingProcess->pid;
-    /* Set status to ready*/
-    pMessagingProcess->status = MP_READY;
-
-    return 0;
+    memset(pMessagingProcess, 0, SIZEOF_MSG_PROC);
 }

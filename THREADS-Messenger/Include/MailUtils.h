@@ -10,16 +10,15 @@
 
 // _________________________________ Function Prototypes _________________________________
 
-// int UnblockSendingProcess(int mboxId);
-// int UnblockReceivingProcess(int mboxId);
 void InitMessagingTables();
 
 void InitDeviceMailBoxes(DeviceManagementData *pDevices);
 
-int BlockSendingProcess(MessagingProcess *pProcess, MailBox *pMailBox);
-int BlockReceivingProcess(MessagingProcess *pProcess, MailBox *pMailBox);
-int UnblockSendingProcess(MessagingProcess *pProcess, MailBox *pMailBox);
-int UnblockReceivingProcess(MessagingProcess *pProcess, MailBox *pMailBox);
-int SendMail(MailBox *pMailBox, MailSlot *pSlot, void *pMsg, int msg_size, int myPid);
+int BlockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS status);
+int UnblockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS status);
+int HandleSendMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+int HandleSendMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+int HandleReceiveMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+int HandleReceiveMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
 
 #endif
