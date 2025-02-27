@@ -3,7 +3,7 @@
 #include "Scheduler.h"
 #include "Messaging.h"
 
-int ReceiveTerminal(char *strArgs);
+int ReceiveTerminal(char* strArgs);
 char inputChar;
 
 /*********************************************************************************
@@ -12,9 +12,9 @@ char inputChar;
  *
  *
  *********************************************************************************/
-int MessagingEntryPoint(void *pArgs)
+int MessagingEntryPoint(void* pArgs)
 {
-	char *testName = "MessagingTest14";
+	char* testName = "MessagingTest14";
 	int status = -1;
 	int kidpid = -1;
 	char nameBuffer[512];
@@ -31,9 +31,9 @@ int MessagingEntryPoint(void *pArgs)
 
 	/* Use the -Child naming convention for the child process name. */
 	snprintf(nameBuffer, sizeof(nameBuffer), "%s-Child1", testName);
-	/*kidpid = k_spawn(nameBuffer, ReceiveTerminal, nameBuffer, THREADS_MIN_STACK_SIZE, 3);
+	kidpid = k_spawn(nameBuffer, ReceiveTerminal, nameBuffer, THREADS_MIN_STACK_SIZE, 3);
 
-	kidpid = k_wait(&status);*/
+	kidpid = k_wait(&status);
 	console_output(FALSE, "%s: exit status for child %d is %d\n", testName, kidpid, status);
 
 	k_exit(0);
@@ -41,7 +41,7 @@ int MessagingEntryPoint(void *pArgs)
 	return 0;
 }
 
-int ReceiveTerminal(char *strArgs)
+int ReceiveTerminal(char* strArgs)
 {
 	int result;
 	int status = 0;

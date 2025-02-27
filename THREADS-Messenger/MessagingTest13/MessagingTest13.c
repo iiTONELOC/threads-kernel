@@ -34,15 +34,15 @@ int MessagingEntryPoint(void* pArgs)
 } /* MessagingEntryPoint */
 
 int WaitForClockThenExit(char* strArgs)
-{/*
+{
 	int i, result;
-	char buffer[20];*/
+	char buffer[20];
 	int status = -1;
 
 	console_output(FALSE, "%s: started\n", strArgs);
 
 	/* wait for the device to respond. */
-	//wait_device("clock", &status);
+	wait_device("clock", &status);
 
 	console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.\n", strArgs, status);
 

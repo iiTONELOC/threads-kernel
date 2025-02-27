@@ -15,13 +15,29 @@
 void InitMessagingTables();
 
 /**
+ * @brief Trims the right side of a string
+ *
+ * @param pString Pointer to the string to trim
+ */
+void TrimRight(char *pString);
+
+/**
  * @brief Initialize the device mailboxes
  *
  * This function initializes the device mailboxes
  *
  * @param pDevices A pointer to the devices to add mailboxes to
  */
-void InitDeviceMailBoxes(DeviceManagementData* pDevices);
+void InitializeDevices(DeviceManagementData *pDevices);
+
+/**
+ * @brief Copy a string from source to destination
+ *
+ * @param pSource Pointer to the source string
+ * @param pDestination Pointer to the destination string
+ * @param size The size of the destination string
+ */
+void CopyString(char *pSource, char *pDestination, size_t size);
 
 /**
  * @brief Block a messaging process
@@ -59,7 +75,7 @@ int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status);
  * @param wait Whether or not to wait
  * @return 0 if successful, -1 if invalid args
  */
-int HandleSendMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait);
+int HandleSendMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
 /**
  * @brief Handle sending a message with slots
  *
@@ -72,8 +88,8 @@ int HandleSendMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess, void*
  * @param wait Whether or not to wait
  * @return 0 if successful, -1 if invalid args
  */
-int HandleSendMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait);
-int HandleReceiveMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait);
-int HandleReceiveMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait);
+int HandleSendMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+int HandleReceiveMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+int HandleReceiveMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
 
 #endif

@@ -28,16 +28,16 @@ int MessagingEntryPoint(void* pArgs)
 
 	console_output(FALSE, "\n%s: started\n", testName);
 
-	// controlBlock.command = TERMINAL_WRITE_CHAR;
-	// controlBlock.output_data = (void *)'A';
+	controlBlock.command = TERMINAL_WRITE_CHAR;
+	controlBlock.output_data = (void*)'A';
 
-	// /* send a character to the terminal. */
-	// device_control("term0", controlBlock);
+	/* send a character to the terminal. */
+	device_control("term0", controlBlock);
 
-	// /* wait for the device to respond. */
-	// wait_device("term0", &status);
+	/* wait for the device to respond. */
+	wait_device("term0", &status);
 
-	// console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.\n", testName, status);
+	console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.\n", testName, status);
 
 	mailboxId = mailbox_create(10, 50);
 	console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);

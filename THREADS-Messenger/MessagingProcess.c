@@ -43,7 +43,7 @@ MessagingProcess* FindProcessInTable(int byPid, bool setTimes)
 			pProcess->startTime = system_clock();
 		}
 		pProcess->pid = byPid;
-		pProcess->status = MP_RUNNING;
+
 
 		/* ensure the runningProcess is updated accordingly */
 		runningMessengerProcess = runningMessengerProcess == pProcess ? runningMessengerProcess : pProcess;

@@ -20,19 +20,19 @@
 
 #include <Windows.h>
 
-   /* ------------------------- Prototypes ----------------------------------- */
-static void nullsys(system_call_arguments_t* args);
+/* ------------------------- Prototypes ----------------------------------- */
+static void nullsys(system_call_arguments_t *args);
 
 typedef void (*interrupt_handler_t)(char deviceId[32], uint8_t command, uint32_t status);
 
 static int check_io_messaging(void);
 static void InitializeHandlers(void);
-extern int MessagingEntryPoint(void*);
-MessagingProcess* runningMessengerProcess = NULL;
-static void checkKernelMode(const char* functionName);
-void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status);
+extern int MessagingEntryPoint(void *);
+MessagingProcess *runningMessengerProcess = NULL;
+static void checkKernelMode(const char *functionName);
+static void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status);
 void TimerInterruptHandler(char deviceId[32], uint8_t command, uint32_t status);
-void SysCallInterruptHandler(char deviceId[32], uint8_t command, uint32_t status);
+void SystemCallInterruptHandler(char deviceId[32], uint8_t command, uint32_t status);
 
 struct psr_bits
 {
@@ -52,10 +52,10 @@ union psr_values
 /* -------------------------- Globals ------------------------------------- */
 
 /* Obtained from THREADS*/
-interrupt_handler_t* handlers;
+interrupt_handler_t *handlers;
 
 /* system call array of function pointers */
-void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t* args);
+void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args);
 
 static int waitingOnDevice = 0;
 static DeviceManagementData devices[THREADS_MAX_DEVICES];
@@ -66,39 +66,32 @@ static DeviceManagementData devices[THREADS_MAX_DEVICES];
 			   Start the Messaging test process.
 	 Parameters - one, default arg passed by k_spawn that is not used here.
 ----------------------------------------------------------------------- */
-int SchedulerEntryPoint(void* arg)
+int SchedulerEntryPoint(void *arg)
 {
 	int result = 0;
 	// check for kernel mode
 	checkKernelMode(__func__);
-
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
 	/* Disable interrupts */
 	disableInterrupts();
 
 	/* set this to the real check_io function. */
 	check_io = check_io_messaging;
 
-	/* Initialize the mail box table, slots, & other data structures.
-	 * Initialize int_vec and sys_vec, allocate mailboxes for interrupt
-	 * handlers.  Etc... */
 	InitMessagingTables();
-
-	/* Initialize the devices and their mailboxes. */
-	/* Allocate mailboxes for use by the interrupt handlers */
-	InitDeviceMailBoxes(devices);
-
+	InitializeDevices(devices);
 	InitializeHandlers();
 
 	enableInterrupts();
 
 	/* Create a process for Messaging, then block on a wait until messaging exits.*/
 	result = k_spawn("MessagingEntryPoint", MessagingEntryPoint,
-		NULL, 4 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
+					 NULL, 4 * THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
 
 	if (result < 0)
 	{
 		console_output(FALSE,
-			"SchedulerEntryPoint(): spawn for MessagingEntryPoint returned an error (%d), stopping...\n", result);
+					   "SchedulerEntryPoint(): spawn for MessagingEntryPoint returned an error (%d), stopping...\n", result);
 		stop(1);
 	}
 
@@ -121,6 +114,8 @@ int SchedulerEntryPoint(void* arg)
 int mailbox_create(int slots, int slot_size)
 {
 	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+
 	int result = -1;
 
 	result = ReuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
@@ -136,15 +131,17 @@ int mailbox_create(int slots, int slot_size)
    Returns - zero if successful, -1 if invalid args.
    Side Effects - none.
    ----------------------------------------------------------------------- */
-int mailbox_send(int mboxId, void* pMsg, int msg_size, int wait)
+int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 {
 	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+
 	enableInterrupts();
 	/* Producer */
 	int result = -1;
-	MailBox* pMailBox;
+	MailBox *pMailBox;
 	int myPid = k_getpid();
-	MessagingProcess* pProcess;
+	MessagingProcess *pProcess;
 
 	/* Validate the input*/
 	if (mboxId < 0 || !pMsg || msg_size < 0 || myPid < 0)
@@ -180,7 +177,7 @@ int mailbox_send(int mboxId, void* pMsg, int msg_size, int wait)
 	/* Unblock any processes waiting to receive a message */
 	if (pMailBox->waitingProcsRecvList.count > 0)
 	{
-		UnblockMessagingProcess(((MessagingProcess*)Pop(&pMailBox->waitingProcsRecvList))->pid, MP_READY);
+		UnblockMessagingProcess(((MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList))->pid, MP_READY);
 	}
 	enableInterrupts();
 
@@ -195,15 +192,17 @@ int mailbox_send(int mboxId, void* pMsg, int msg_size, int wait)
    Returns - zero if successful, -1 if invalid args.
    Side Effects - none.
    ----------------------------------------------------------------------- */
-int mailbox_receive(int mboxId, void* pMsg, int msg_size, int wait)
+int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 {
 	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+
 	enableInterrupts();
 	/*Consumer*/
 	int result = -1;
-	MailBox* pMailBox;
+	MailBox *pMailBox;
 	int myPid = k_getpid();
-	MessagingProcess* pProcess;
+	MessagingProcess *pProcess;
 
 	/* Validate the input */
 	if (mboxId < 0 || !pMsg || msg_size < 0 || myPid < 0)
@@ -238,7 +237,7 @@ int mailbox_receive(int mboxId, void* pMsg, int msg_size, int wait)
 
 	if (pMailBox->waitingProcsSendList.count > 0)
 	{
-		UnblockMessagingProcess(((MessagingProcess*)Pop(&pMailBox->waitingProcsSendList))->pid, MP_READY);
+		UnblockMessagingProcess(((MessagingProcess *)Pop(&pMailBox->waitingProcsSendList))->pid, MP_READY);
 	}
 
 	return result;
@@ -250,9 +249,11 @@ int mailbox_receive(int mboxId, void* pMsg, int msg_size, int wait)
 int mailbox_free(int mboxId)
 {
 	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+
 	int result = -1;
-	MailBox* pBox;
-	MessagingProcess* pProc;
+	MailBox *pBox;
+	MessagingProcess *pProc;
 
 	/*Closes a previously created mailbox*/
 
@@ -265,32 +266,40 @@ int mailbox_free(int mboxId)
 	pBox->status = MB_STATUS_RELEASED;
 
 	/* Check for blockers, and wake them them up*/
-	DoublyLinkedList* pBlockedProcessLists[2] = { &pBox->waitingProcsRecvList, &pBox->waitingProcsSendList };
+	DoublyLinkedList *pBlockedProcessLists[2] = {&pBox->waitingProcsRecvList, &pBox->waitingProcsSendList};
 
 	/* Unblock any processes waiting to receive or send a message */
 	for (int i = 0; i < 2; i++)
 	{
 		while (pBlockedProcessLists[i]->count > 0)
 		{
-			/*Signal the Process with k_kill*/
-			pProc = (MessagingProcess*)Pop(pBlockedProcessLists[i]);
-			k_kill(pProc->pid, SIG_TERM);
+
+			pProc = (MessagingProcess *)Pop(pBlockedProcessLists[i]);
+			/*
+			  Using k_kill causes the return values to be -5 in k_wait,
+			  This is not what we want according to the provided output
+			  So we have to signal the process some other way
+			*/
+			// k_kill(pProc->pid, SIG_TERM);
 			UnblockMessagingProcess(pProc->pid, MP_BOX_DESTROYED);
 		}
 	}
 
 	ResetMailbox(pBox);
 
-	return signaled() ? -5 : 0;
+	if (signaled())
+	{
+		enableInterrupts();
+		return -5;
+	}
 }
 
-int wait_device(char* deviceName, int* status)
+int wait_device(char *deviceName, int *status)
 {
-
 	int result = 0;
 	uint32_t deviceHandle = -1;
-	checkKernelMode("waitdevice");
-
+	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
 	enableInterrupts();
 
 	if (strcmp(deviceName, "clock") == 0)
@@ -327,6 +336,7 @@ int wait_device(char* deviceName, int* status)
 int check_io_messaging(void)
 {
 	checkKernelMode(__func__);
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
 	if (waitingOnDevice)
 	{
 		return 1;
@@ -335,7 +345,7 @@ int check_io_messaging(void)
 }
 
 /* an error method to handle invalid syscalls */
-static void nullsys(system_call_arguments_t* args)
+static void nullsys(system_call_arguments_t *args)
 {
 	console_output(FALSE, "nullsys(): Invalid syscall %d. Halting...\n", args->call_id);
 	stop(1);
@@ -347,7 +357,7 @@ static void nullsys(system_call_arguments_t* args)
    Parameters -
    Returns -
 ****************************************************************************/
-static inline void checkKernelMode(const char* functionName)
+static inline void checkKernelMode(const char *functionName)
 {
 	union psr_values psrValue;
 
@@ -369,9 +379,9 @@ static inline void checkKernelMode(const char* functionName)
 static void InitializeHandlers(void)
 {
 	handlers = get_interrupt_handlers();
-	// handlers[THREADS_TIMER_INTERRUPT] = TimerInterruptHandler;
-	// handlers[THREADS_IO_INTERRUPT] = IOInterruptHandler;
-	// handlers[THREADS_SYS_CALL_INTERRUPT] = SysCallInterruptHandler;
+	handlers[THREADS_TIMER_INTERRUPT] = TimerInterruptHandler;
+	handlers[THREADS_IO_INTERRUPT] = IOInterruptHandler;
+	handlers[THREADS_SYS_CALL_INTERRUPT] = SystemCallInterruptHandler;
 
 	/* init the system call vector */
 	for (int i = 0; i < THREADS_MAX_SYSCALLS; i++)
@@ -387,8 +397,30 @@ static void InitializeHandlers(void)
    Returns -
 ****************************************************************************/
 
-void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
+static void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 {
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+
+	LARGE_INTEGER unit;
+	int result;
+	int id;
+
+	unit.QuadPart = (LONGLONG)deviceId;
+	id = (int)unit.LowPart;
+
+	if (deviceId >= THREADS_MAX_DEVICES)
+	{
+		console_output(FALSE, "IOInterruptHandler(): Device ID is out of range %d\n", deviceId);
+		return;
+	}
+
+	result = mailbox_send(devices[id].deviceMbox, &status, sizeof(int), FALSE);
+	if (result == -3 || result == -1)
+	{
+		console_output(FALSE, "IOInterruptHandler(): mailbox_send returned %d, pid = %d\n", result, k_getpid());
+		stop(1);
+	}
+
 	return;
 }
 
@@ -400,15 +432,7 @@ void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 ****************************************************************************/
 void TimerInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 {
-	/* Copied from Scheduler - Not sure what to do here yet */
-	console_output(FALSE, "Timer Interrupt, pid: %d\n", k_getpid());
-
-	int pid = k_getpid();
-
-	if (!runningMessengerProcess && pid > 0)
-	{
-		runningMessengerProcess = FindProcessInTable(pid, TRUE);
-	}
+	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
 
 	static int elapsed = 0;			  // time elapsed since last context switch
 	static int lastTime = 0;		  // last time the clock interrupt was called
@@ -439,20 +463,48 @@ void TimerInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 	}
 
 	// check if the elapsed time is greater than the quantum for the running process
-	if (runningMessengerProcess != NULL && runningMessengerProcess->elapsedTime >= runningMessengerProcess->quantum)
+	if (runningMessengerProcess != NULL &&
+		runningMessengerProcess->elapsedTime >= 100000)
 	{
 		elapsed = 0;
 		runningMessengerProcess->elapsedTime = 0;
+		// Check for messages
+		if (check_io_messaging())
+		{ /* get the mailbox for the clock */
+			MailBox *pMailBox = &MAIL_BOXES[GetMailboxIdx(THREADS_CLOCK_DEVICE_ID)];
 
-		time_slice();
+			/* Send the clock's status */
+			mailbox_send(pMailBox->mboxId, &status, sizeof(int), FALSE);
+			if (pMailBox->waitingProcsRecvList.count > 0)
+			{ /* unblock the process */
+				UnblockMessagingProcess(((MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList))->pid, MP_READY);
+			}
+		}
 	}
 	else
 	{
 		elapsed = 0;
 	}
+
+	time_slice();
 }
 
-void SysCallInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
+/*****************************************************************************
+   Name - SystemCallInterruptHandler
+   Purpose - Handles System Call interrupts
+   Parameters -
+   Returns -
+****************************************************************************/
+
+void SystemCallInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 {
-	return;
+	system_call_arguments_t *args = (system_call_arguments_t *)deviceId;
+
+	if (args->call_id < 0 || args->call_id >= THREADS_MAX_SYSCALLS)
+	{
+		console_output(FALSE, "SystemCallInterruptHandler(): Invalid syscall %d\n", args->call_id);
+		stop(1);
+	}
+
+	systemCallVector[args->call_id](args);
 }
