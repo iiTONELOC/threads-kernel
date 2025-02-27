@@ -140,7 +140,7 @@ int HandleSendMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess,
 	disableInterrupts();
 	MailSlot* pSlot;
 
-	if (pSlot = GetNextEmptyMailSlot() == NULL)
+	if ((pSlot = GetNextEmptyMailSlot()) == NULL)
 	{
 		enableInterrupts();
 		return result;
@@ -173,6 +173,12 @@ int HandleSendMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess,
 
 			/* After Awoken */
 			pProcess = FindProcessInTable(pProcess->pid, TRUE);
+			if (signaled())
+			{
+				enableInterrupts();
+				return -5;
+			}
+
 			result = HandleSendMailZeroSlots(pMailBox, pProcess, pMsg, msg_size, wait);
 		}
 		else
@@ -229,6 +235,13 @@ int HandleSendMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess,
 
 			/* After Awoken */
 			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
+
+			/*check if signaled*/
+			if (signaled())
+			{
+				enableInterrupts();
+				return -5;
+			}
 		}
 		/* Cannot wait, return -2 */
 		else
@@ -267,6 +280,14 @@ int HandleReceiveMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess, vo
 
 			/* After Awoken - Try to receive again */
 			/* update the pProcess data */
+
+			/*check if signaled*/
+			if (signaled())
+			{
+				enableInterrupts();
+				return -5;
+			}
+
 			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
 			return HandleReceiveMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
 		}
@@ -335,6 +356,12 @@ int HandleReceiveMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess, vo
 			/* After Awoken - Try to receive again */
 			/* update the pProcess data */
 			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
+			if (signaled())
+			{
+				enableInterrupts();
+				return -5;
+			}
+
 			return HandleReceiveMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
 		}
 		/* Not allowed to block; return immediately with a -2 */

@@ -7,6 +7,7 @@
    Student Names: Anthony Tropeano, Connor Stackhouse
 
    ------------------------------------------------------------------------ */
+#include <THREADSLib.h>
 #include <DoublyLinkedList.h>
 #include <MailBox.h>
 #include <MailUtils.h>
@@ -16,7 +17,7 @@
 #include <Scheduler.h>
 #include <stdint.h>
 #include <string.h>
-#include <THREADSLib.h>
+
 #include <Windows.h>
 
    /* ------------------------- Prototypes ----------------------------------- */
@@ -250,8 +251,37 @@ int mailbox_free(int mboxId)
 {
 	checkKernelMode(__func__);
 	int result = -1;
+	MailBox* pBox;
+	MessagingProcess* pProc;
 
-	return result;
+	/*Closes a previously created mailbox*/
+
+	/* Get the mailbox in the mailbox table*/
+	if ((pBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL)
+	{
+		return result;
+	}
+
+	pBox->status = MB_STATUS_RELEASED;
+
+	/* Check for blockers, and wake them them up*/
+	DoublyLinkedList* pBlockedProcessLists[2] = { &pBox->waitingProcsRecvList, &pBox->waitingProcsSendList };
+
+	/* Unblock any processes waiting to receive or send a message */
+	for (int i = 0; i < 2; i++)
+	{
+		while (pBlockedProcessLists[i]->count > 0)
+		{
+			/*Signal the Process with k_kill*/
+			pProc = (MessagingProcess*)Pop(pBlockedProcessLists[i]);
+			k_kill(pProc->pid, SIG_TERM);
+			UnblockMessagingProcess(pProc->pid, MP_BOX_DESTROYED);
+		}
+	}
+
+	ResetMailbox(pBox);
+
+	return signaled() ? -5 : 0;
 }
 
 int wait_device(char* deviceName, int* status)

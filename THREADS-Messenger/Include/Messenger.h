@@ -37,6 +37,7 @@ typedef enum MESSAGING_PROCESS_STATUS
     // Has to be larger than 10 for use with the block function
     MP_BLOCKED_SEND = 11,
     MP_BLOCKED_RECEIVE = 12,
+    MP_BOX_DESTROYED = 13,
     // -----------------------------------------------------------
     MP_STATUS_MAX = 5 // This is the number of messaging process statuses
 } MESSAGING_PROCESS_STATUS;
