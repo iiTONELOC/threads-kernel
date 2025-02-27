@@ -1,6 +1,9 @@
 #include "MessagingProcess.h"
+#include <stdbool.h>
+#include "Messenger.h"
+#include "THREADSLib.h"
 
-MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = {0};
+MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = { 0 };
 
 // _________________________________ Function Definitions _________________________________
 
@@ -9,16 +12,16 @@ MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = {0};
  */
 void InitEmptyMessagingProcessArray()
 {
-    // loop over the array of messaging processes, ensuring they are all empty
-    // but set the pid to the appropriate value, index + 1
-    for (int i = 0; i < MAX_PROCESSES; i++)
-    {
+	// loop over the array of messaging processes, ensuring they are all empty
+	// but set the pid to the appropriate value, index + 1
+	for (int i = 0; i < MAX_PROCESSES; i++)
+	{
 
-        ResetMessagingProcess(&MESSAGING_PROCESSES[i]);
-        MESSAGING_PROCESSES[i].pid = i + 1;
-        MESSAGING_PROCESSES[i].tableIndex = i;
-        MESSAGING_PROCESSES[i].quantum = MESSAGING_QUANTUM; // 100ms
-    }
+		ResetMessagingProcess(&MESSAGING_PROCESSES[i]);
+		MESSAGING_PROCESSES[i].pid = i + 1;
+		MESSAGING_PROCESSES[i].tableIndex = i;
+		MESSAGING_PROCESSES[i].quantum = MESSAGING_QUANTUM; // 100ms
+	}
 }
 
 /**
@@ -30,27 +33,27 @@ void InitEmptyMessagingProcessArray()
  *
  * @return A pointer to the process if found, NULL otherwise
  */
-MessagingProcess *FindProcessInTable(int byPid, bool setTimes)
+MessagingProcess* FindProcessInTable(int byPid, bool setTimes)
 {
-    if (setTimes)
-    {
-        MessagingProcess *pProcess = &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
-        if (pProcess && pProcess->startTime == 0)
-        {
-            pProcess->startTime = system_clock();
-        }
+	if (setTimes)
+	{
+		MessagingProcess* pProcess = &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
+		if (pProcess && pProcess->startTime == 0)
+		{
+			pProcess->startTime = system_clock();
+		}
+		pProcess->pid = byPid;
+		pProcess->status = MP_RUNNING;
 
-        pProcess->status = MP_RUNNING;
+		/* ensure the runningProcess is updated accordingly */
+		runningMessengerProcess = runningMessengerProcess == pProcess ? runningMessengerProcess : pProcess;
 
-        /* ensure the runningProcess is updated accordingly */
-        runningMessengerProcess = runningMessengerProcess == pProcess ? runningMessengerProcess : pProcess;
-
-        return pProcess;
-    }
-    else
-    {
-        return &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
-    }
+		return pProcess;
+	}
+	else
+	{
+		return &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
+	}
 }
 
 /**
@@ -60,7 +63,18 @@ MessagingProcess *FindProcessInTable(int byPid, bool setTimes)
  *
  * @param pMessagingProcess A pointer to the messaging process to reset
  */
-void ResetMessagingProcess(MessagingProcess *pMessagingProcess)
+void ResetMessagingProcess(MessagingProcess* pMessagingProcess)
 {
-    memset(pMessagingProcess, 0, SIZEOF_MSG_PROC);
+	pMessagingProcess->dynamic = 0;
+	pMessagingProcess->pNext = NULL;
+	pMessagingProcess->pPrev = NULL;
+	pMessagingProcess->hadToWait = 0;
+	pMessagingProcess->tableIndex = 0;
+	pMessagingProcess->pSlot = NULL;
+	pMessagingProcess->quantum = 0;
+	pMessagingProcess->startTime = 0;
+	pMessagingProcess->elapsedTime = 0;
+	pMessagingProcess->cpuTime = 0;
+	pMessagingProcess->status = MP_STATUS_EMPTY;
+	pMessagingProcess->pSlot = NULL;
 }

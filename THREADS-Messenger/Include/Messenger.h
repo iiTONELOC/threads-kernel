@@ -3,6 +3,7 @@
 #include "Scheduler.h"
 #include "Messaging.h"
 #include "DoublyLinkedList.h"
+#include <stddef.h>
 
 #pragma once
 #ifndef MESSENGER_H

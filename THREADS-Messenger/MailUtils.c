@@ -1,8 +1,19 @@
 #include "MailUtils.h"
+#include <Windows.h>
+#include <DoublyLinkedList.h>
+#include "MailBox.h"
+#include "MailSlot.h"
+#include "Messaging.h"
+#include "MessagingProcess.h"
+#include "Messenger.h"
+#include "Scheduler.h"
+#include "THREADSLib.h"
+#include <memory.h>
+#include <string.h>
 
 // _________________________________ Function Prototypes _________________________________
 
-void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status);
+void CopyMessageToSlot(MailSlot* pSlot, void* pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status);
 // _________________________________ Function Definitions _________________________________
 
 /**
@@ -12,9 +23,9 @@ void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int m
  */
 void InitMessagingTables()
 {
-    InitEmptyMailSlotList();
-    InitEmptyMailBoxList();
-    InitEmptyMessagingProcessArray();
+	InitEmptyMailSlotList();
+	InitEmptyMailBoxList();
+	InitEmptyMessagingProcessArray();
 }
 
 /**
@@ -24,12 +35,12 @@ void InitMessagingTables()
  *
  * @param pDevices A pointer to the devices to add mailboxes to
  */
-void InitDeviceMailBoxes(DeviceManagementData *pDevices)
+void InitDeviceMailBoxes(DeviceManagementData* pDevices)
 {
-    for (int i = 0; i < THREADS_MAX_DEVICES; ++i)
-    {
-        pDevices[i].deviceMbox = mailbox_create(0, sizeof(int));
-    }
+	for (int i = 0; i < THREADS_MAX_DEVICES; ++i)
+	{
+		pDevices[i].deviceMbox = mailbox_create(0, sizeof(int));
+	}
 }
 
 /**
@@ -37,59 +48,40 @@ void InitDeviceMailBoxes(DeviceManagementData *pDevices)
  *
  * This function blocks a messaging process with a given status
  *
- * @param mboxId The mailbox id
  * @param pid The process id
  * @param status The status to block the process with
  *
  * @return 0 if successful, -1 if invalid args
  */
-int BlockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS status)
+int BlockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 {
-    int result = -1;
-    MailBox *pMailBox;
-    MessagingProcess *pProcess;
+	int result = -1;
 
-    /* Validate the input */
-    if (mboxId < 0 || pid < 0 || status < 0)
-    {
-        return result;
-    }
+	MessagingProcess* pProcess;
 
-    /* Get the mailbox */
-    pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)];
+	/* Validate the input */
+	if (pid < 0 || status < 0)
+	{
+		return result;
+	}
 
-    /* Get the process */
-    pProcess = FindProcessInTable(pid, FALSE);
+	/* validate  the process */
+	pProcess = FindProcessInTable(pid, TRUE);
 
-    /* If the process is null there is a problem */
-    if (!pProcess)
-    {
-        return result;
-    }
+	/* If the process is null there is a problem */
+	if (!pProcess)
+	{
+		return result;
+	}
 
-    /* Set the process' mailbox id to the mailbox id */
-    // pProcess->pMailBox = pMailBox;
-    /*Set its status to the status*/
-    pProcess->status = status;
-    /* set had to wait */
-    pProcess->hadToWait = 1;
+	/*Set its status to the status*/
+	pProcess->status = status;
+	/* set had to wait */
+	pProcess->hadToWait = 1;
 
-    /* Add the Waiting Process to the List on the Mailbox*/
-    if (status == MP_BLOCKED_SEND)
-    {
-        InsertNode((void *)pProcess, &pMailBox->waitingProcsSendList);
-    }
-    else if (status == MP_BLOCKED_RECEIVE)
-    {
-        InsertNode((void *)pProcess, &pMailBox->waitingProcsRecvList);
-    }
+	/* Block the current process*/
 
-    /* Block the current process*/
-    runningMessengerProcess = NULL;
-    enableInterrupts();
-    result = block(pProcess->status);
-    disableInterrupts();
-    return result;
+	return block(status);
 }
 
 /**
@@ -97,52 +89,36 @@ int BlockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS sta
  *
  * This function unblocks a messaging process with a given status
  *
- * @param mboxId The mailbox id
  * @param pid The process id
  * @param status The status to unblock the process with
  *
  * @return 0 if successful, -1 if invalid args
  */
-int UnblockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS status)
+int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 {
-    MailBox *pMailBox;
-    MessagingProcess *pProcess;
+	MessagingProcess* pProcess;
 
-    /* Validate the input */
-    if (mboxId < 0 || pid < 0 || status < 0)
-    {
-        return -1;
-    }
+	/* Validate the input */
+	if (pid < 0 || status < 0)
+	{
+		return -1;
+	}
 
-    /* Get the mailbox */
-    pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)];
+	/* validate the process */
+	pProcess = FindProcessInTable(pid, TRUE);
 
-    /* Get the process */
-    pProcess = FindProcessInTable(pid, FALSE);
+	/* If the process is null there is a problem */
+	if (!pProcess)
+	{
+		return -1;
+	}
 
-    /* If the process is null there is a problem */
-    if (!pProcess)
-    {
-        return -1;
-    }
+	/* Set the process status to ready */
+	pProcess->status = MP_READY;
 
-    /* Remove the process from the waiting list */
-    if (status == MP_BLOCKED_SEND)
-    {
-        RemoveNode((void *)pProcess, &pMailBox->waitingProcsSendList);
-    }
-    else if (status == MP_BLOCKED_RECEIVE)
-    {
-        RemoveNode((void *)pProcess, &pMailBox->waitingProcsRecvList);
-    }
-    /* Set the process status to ready */
-    pProcess->status = MP_READY;
-
-    /* Unblock the process */
-    enableInterrupts();
-    unblock(pProcess->pid);
-    disableInterrupts();
-    return 0;
+	/* Unblock the process */
+	unblock(pid);
+	return 0;
 }
 
 /**
@@ -157,67 +133,57 @@ int UnblockMessagingProcess(int mboxId, int pid, enum MESSAGING_PROCESS_STATUS s
  * @param wait Whether or not to wait
  * @return 0 if successful, -1 if invalid args
  */
-int HandleSendMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait)
+int HandleSendMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess,
+	void* pMsg, int msg_size, int wait)
 {
-    /*
-    a. If the mailbox has no slots
-             - Look for a process waiting to receive a message
-                 - Copy the message into the process's slot
-                 - Unblock the process
-             - If no process is waiting, block the sending process
-  */
-    int result = -1;
-    disableInterrupts();
-    MailSlot *pSlot = GetNextEmptyMailSlot();
-    if (!pSlot)
-    {
-        enableInterrupts();
-        return result;
-    }
+	int result = -1;
+	disableInterrupts();
+	MailSlot* pSlot;
 
-    /* Copy the message into the slot */
-    CopyMessageToSlot(pSlot, pMsg, msg_size, pProcess->pid, pMailBox->mboxId, MS_STATUS_INUSE);
+	if (pSlot = GetNextEmptyMailSlot() == NULL)
+	{
+		enableInterrupts();
+		return result;
+	}
 
-    /* Look for a process to unblock */
-    MessagingProcess *pProc = (MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList);
+	/* Copy the message into the slot */
+	CopyMessageToSlot(pSlot, pMsg, msg_size, pProcess->pid, pMailBox->mboxId, MS_STATUS_INUSE);
 
-    /* A process was found */
-    if (pProc)
-    {
-        /* Copy the message into the process's slot */
-        pSlot->status = MS_STATUS_DELIVERED_TO_PROC;
-        pProc->pSlot = pSlot;
+	/* Look for a process to unblock */
+	MessagingProcess* pProc = (MessagingProcess*)Pop(&pMailBox->waitingProcsRecvList);
 
-        /* Unblock the process */
-        UnblockMessagingProcess(pMailBox->mboxId, pProc->pid, MP_READY);
-        result = msg_size;
-    }
-    else
-    {
+	/* A process was found */
+	if (pProc)
+	{
+		/* Copy the message into the process's slot */
+		pSlot->status = MS_STATUS_DELIVERED_TO_PROC;
+		pProc->pSlot = pSlot;
 
-        if (wait)
-        {
-            /* Add the sending process to the waiting list */
-            pProcess->status = MP_BLOCKED_SEND;
-            InsertNode((void *)pProcess, &pMailBox->waitingProcsSendList);
+		/* Unblock the process */
+		UnblockMessagingProcess(pProc->pid, MP_READY);
+		result = msg_size;
+	}
+	else
+	{
+		if (wait)
+		{
+			InsertNode((void*)pProcess, &pMailBox->waitingProcsSendList);
+			runningMessengerProcess = NULL;
+			BlockMessagingProcess(pProcess->pid, MP_BLOCKED_SEND);
 
-            /* Block the sending process */
-            runningMessengerProcess = NULL;
-            result = block(pProcess->status);
-
-            /* After Awoken */
-
-            result = HandleSendMailZeroSlots(pMailBox, pProcess, pMsg, msg_size, wait);
-        }
-        else
-        {
-            /* Do not wait return immediately with a -2 */
-            enableInterrupts();
-            return -2;
-        }
-    }
-    enableInterrupts();
-    return msg_size;
+			/* After Awoken */
+			pProcess = FindProcessInTable(pProcess->pid, TRUE);
+			result = HandleSendMailZeroSlots(pMailBox, pProcess, pMsg, msg_size, wait);
+		}
+		else
+		{
+			/* Do not wait return immediately with a -2 */
+			enableInterrupts();
+			return -2;
+		}
+	}
+	enableInterrupts();
+	return msg_size;
 }
 
 /**
@@ -232,139 +198,182 @@ int HandleSendMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void 
  * @param wait Whether or not to wait
  * @return 0 if successful, -1 if invalid args
  */
-int HandleSendMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait)
+int HandleSendMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess,
+	void* pMsg, int msg_size, int wait)
 {
-    /*
-     b. If the mailbox has slots
-                - Look to see if the slot can be delivered to the mailbox
-                - If the slot can be delivered, deliver the message to the mailbox
-                    - Unblock any processes waiting to receive a message
-                - If the slot cannot be delivered
-                    - Add the sending process to the waiting list
-                    - Block the sending process
-    */
-    int result = -1;
-    disableInterrupts();
-    MailSlot *pSlot = GetNextEmptyMailSlot();
-    if (!pSlot)
-    {
-        enableInterrupts();
-        return result;
-    }
+	int result = -1;
+	disableInterrupts();
+	MailSlot* pSlot = GetNextEmptyMailSlot();
 
-    /* Copy the message into the slot */
-    CopyMessageToSlot(pSlot, pMsg, msg_size, pProcess->pid, pMailBox->mboxId, MS_STATUS_INUSE);
+	if (!pSlot)
+	{
+		enableInterrupts();
+		return result;
+	}
 
-    /* Look to see if the Mailbox is full*/
-    if (pMailBox->deliveredMailList.count == pMailBox->slotCount)
-    {
-        if (wait)
-        {
-            /* Add the sending process to the waiting list */
-            pProcess->status = MP_BLOCKED_SEND;
-            InsertNode((void *)pProcess, &pMailBox->waitingProcsSendList);
-            /* Block the sending process */
-            runningMessengerProcess = NULL;
-            block(pProcess->status);
+	/* Copy the message into the slot */
+	CopyMessageToSlot(pSlot, pMsg, msg_size, pProcess->tableIndex + 1,
+		pMailBox->mboxId, MS_STATUS_INUSE);
 
-            /* After Awoken */
+	/* If the mailbox is full - we cannot deliver */
+	if (pMailBox->deliveredMailList.count == pMailBox->slotCount)
+	{
+		/* If we can wait */
+		if (wait)
+		{
+			/* place ourselves into the mailbox's waiting to send list */
+			InsertNode((void*)pProcess, &pMailBox->waitingProcsSendList);
+			/* block ourselves */
+			runningMessengerProcess = NULL;
+			BlockMessagingProcess(pProcess->tableIndex + 1, MP_BLOCKED_SEND);
 
-            result = HandleSendMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
-        }
-        else
-        {
-            result = -2;
-        }
-    }
-    else
-    {
-        /* Deliver the message to the mailbox */
-        pSlot->status = MS_STATUS_DELIVERED_TO_MBOX;
-        InsertNode((void *)pSlot, &pMailBox->deliveredMailList);
+			/* After Awoken */
+			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
+		}
+		/* Cannot wait, return -2 */
+		else
+		{
+			enableInterrupts();
+			return -2;
+		}
+	}
 
-        /* Unblock any processes waiting to receive a message */
-        MessagingProcess *pProc = (MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList);
-        if (pProc)
-        {
-            pProc->pSlot = pSlot;
-            result = UnblockMessagingProcess(pMailBox->mboxId, pProc->pid, MP_READY);
-        }
+	/* Deliver the message to the mailbox */
+	pSlot->status = MS_STATUS_DELIVERED_TO_MBOX;
+	InsertNode((void*)pSlot, &pMailBox->deliveredMailList);
+	result = 0;
 
-        result = 0;
-    }
-    enableInterrupts();
-
-    return result;
+	enableInterrupts();
+	return result;
 }
 
-int HandleReceiveMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait)
+int HandleReceiveMailZeroSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait)
 {
-    return -1;
+	int result = -1;
+	disableInterrupts();
+
+	/* If there is no mail we cannot receive anything */
+	if (!pProcess->pSlot || (pProcess->pSlot && pProcess->pSlot->status != MS_STATUS_DELIVERED_TO_PROC))
+	{
+		/* If we can wait */
+		if (wait)
+		{
+			/* place ourselves in the mailbox's waiting to receive list */
+			InsertNode((void*)pProcess, &pMailBox->waitingProcsRecvList);
+
+			/* block ourselves */
+			runningMessengerProcess = NULL;
+			BlockMessagingProcess(pProcess->pid, MP_BLOCKED_RECEIVE);
+
+			/* After Awoken - Try to receive again */
+			/* update the pProcess data */
+			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
+			return HandleReceiveMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
+		}
+		/* Not allowed to block; return immediately with a -2 */
+		else
+		{
+			enableInterrupts();
+			return -2;
+		}
+	}
+
+	/* Look for a message in the delivered list*/
+	MailSlot* pSlot = pProcess->pSlot;
+
+	/* Ensure the destination can hold the message before copying */
+	if (msg_size < pSlot->messageSize)
+	{
+		enableInterrupts();
+		return -1;
+	}
+
+	/* Copy the message into the pMsg buffer */
+	memcpy_s(pMsg, msg_size, pSlot->message, pSlot->messageSize);
+
+	/* Set result to num bytes copied */
+	result = pSlot->messageSize;
+
+	pProcess->pSlot = NULL;
+
+	/* free the slot*/
+	ResetMailSlot(pSlot);
+
+	enableInterrupts();
+	return result;
 }
 
-int HandleReceiveMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait)
+/**
+ * @brief Handle receiving a message from a mailbox with slots
+ *
+ *
+ * @param pMailBox A pointer to the mailbox
+ * @param pProcess A pointer to the process
+ * @param pMsg A pointer to the dest buffer
+ * @param msg_size The size of the message
+ * @param wait Whether or not to block
+ * @return 0 if successful, -1 if invalid args
+ */
+int HandleReceiveMailWithSlots(MailBox* pMailBox, MessagingProcess* pProcess, void* pMsg, int msg_size, int wait)
 {
-    int result = -1;
-    disableInterrupts();
-    /* If the mailbox has slots*/
-    /*
-        1. Look in the mailbox for a message
-        2. If there is a message, copy it to the pMsg pointer
-            3. Unblock any processes waiting to send a message
-        4. If there is no message, block the receiving process
-    */
+	int result = -1;
+	disableInterrupts();
 
-    /* Look for a message in the delivered list*/
-    MailSlot *pSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
+	/* If there is no mail we cannot receive anything */
+	if (pMailBox->deliveredMailList.count == 0)
+	{
+		/* If we can wait */
+		if (wait)
+		{
+			/* place ourselves in the mailbox's waiting to receive list */
+			InsertNode((void*)pProcess, &pMailBox->waitingProcsRecvList);
 
-    if (pSlot)
-    {
-        /* Copy the message into the pMsg buffer */
-        memcpy_s(pMsg, msg_size, pSlot->message, pSlot->messageSize);
-        result = pSlot->messageSize;
+			/* block ourselves */
+			runningMessengerProcess = NULL;
+			BlockMessagingProcess(pProcess->pid, MP_BLOCKED_RECEIVE);
 
-        /* free the slot*/
-        ResetMailSlot(pSlot);
+			/* After Awoken - Try to receive again */
+			/* update the pProcess data */
+			pProcess = FindProcessInTable(pProcess->tableIndex + 1, TRUE);
+			return HandleReceiveMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
+		}
+		/* Not allowed to block; return immediately with a -2 */
+		else
+		{
+			enableInterrupts();
+			return -2;
+		}
+	}
 
-        /* Unblock any processes waiting to sent*/
-        MessagingProcess *pProc = (MessagingProcess *)Pop(&pMailBox->waitingProcsSendList);
+	/* Look for a message in the delivered list*/
+	MailSlot* pSlot = (MailSlot*)Pop(&pMailBox->deliveredMailList);
 
-        if (pProc)
-        {
-            UnblockMessagingProcess(pMailBox->mboxId, pProc->pid, MP_READY);
-        }
-    }
-    else
-    {
-        /* No messages in the delivered list*/
-        if (wait)
-        {
-            /* block the current process*/
-            pProcess->status = MP_BLOCKED_RECEIVE;
-            InsertNode((void *)pProcess, &pMailBox->waitingProcsRecvList);
-            runningMessengerProcess = NULL;
-            block(pProcess->status);
+	/* Ensure the destination can hold the message before copying */
+	if (msg_size < pSlot->messageSize)
+	{
+		enableInterrupts();
+		return -1;
+	}
 
-            /* After Awoken */
-            result = HandleReceiveMailWithSlots(pMailBox, pProcess, pMsg, msg_size, wait);
-        }
-        else
-        {
-            enableInterrupts();
-            return -2;
-        }
-    }
+	/* Copy the message into the pMsg buffer */
+	memcpy_s(pMsg, msg_size, pSlot->message, pSlot->messageSize);
 
-    enableInterrupts();
-    return result;
+	/* Set result to num bytes copied */
+	result = pSlot->messageSize;
+
+	/* free the slot*/
+	ResetMailSlot(pSlot);
+
+	enableInterrupts();
+	return result;
 }
 
-void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status)
+void CopyMessageToSlot(MailSlot* pSlot, void* pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status)
 {
-    /* Copy the message into the slot */
-    memcpy(pSlot->message, pMsg, msg_size);
-    pSlot->messageSize = msg_size;
-    pSlot->fromPid = pid;
-    pSlot->mboxId = mboxId;
-    pSlot->status = status;
+	/* Copy the message into the slot */
+	memcpy(pSlot->message, pMsg, msg_size);
+	pSlot->messageSize = msg_size;
+	pSlot->fromPid = pid;
+	pSlot->mboxId = mboxId;
+	pSlot->status = status;
 }
