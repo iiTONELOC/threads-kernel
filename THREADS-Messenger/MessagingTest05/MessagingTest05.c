@@ -26,7 +26,7 @@ int MessagingEntryPoint(void* pArgs)
 	device_control_block_t controlBlock;
 	memset(childNames, 0, sizeof(childNames));
 
-	console_output(FALSE, "\n%s: started\n", testName);
+	console_output(FALSE, "\n%s: started", testName);
 
 	controlBlock.command = TERMINAL_WRITE_CHAR;
 	controlBlock.output_data = (void*)'A';
@@ -37,7 +37,7 @@ int MessagingEntryPoint(void* pArgs)
 	/* wait for the device to respond. */
 	wait_device("term0", &status);
 
-	console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.\n", testName, status);
+	console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.", testName, status);
 
 	mailboxId = mailbox_create(10, 50);
 	console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);

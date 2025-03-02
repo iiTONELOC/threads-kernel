@@ -23,7 +23,7 @@ int MessagingEntryPoint(void* pArgs)
 
 	memset(buffer, 0, sizeof(buffer));
 	console_output(FALSE, "\n%s: started\n", testName);
-	
+
 	mailboxId = mailbox_create(10, 50);
 	printf("%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
@@ -38,6 +38,6 @@ int MessagingEntryPoint(void* pArgs)
 
 	k_exit(0);
 
-	return 0; 
+	return 0;
 }
 

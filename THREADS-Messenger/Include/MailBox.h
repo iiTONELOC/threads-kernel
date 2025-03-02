@@ -1,6 +1,4 @@
 #include "Messenger.h"
-#include "MessagingProcess.h"
-#include "MailSlot.h"
 
 #pragma once
 #ifndef MAIL_BOX_H
@@ -10,9 +8,9 @@
 
 void InitEmptyMailBoxList();
 int GetMailboxIdx(int mboxId);
-MailBox *GetNextEmptyMailbox();
-void ResetMailbox(MailBox *pMailbox);
-void ResetMailBoxSlots(MailBox *pMailBox);
-void ResetMailBoxMsgProcs(MailBox *pMailBox);
-int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize);
+MailBox* GetNextEmptyMailbox();
+void ResetMailbox(MailBox* pMailbox);
+void ResetMailBoxSlots(MailBox* pMailBox);
+void ResetMailBoxMsgProcs(MailBox* pMailBox);
+int ReuseMailbox(MailBox* pMailbox, int slotCount, int slotSize);
 #endif

@@ -12,91 +12,91 @@
 
 typedef enum MAIL_SLOT_STATUS
 {
-    MS_STATUS_EMPTY,
-    MS_STATUS_INUSE,
-    MS_STATUS_DELIVERED_TO_MBOX,
-    MS_STATUS_DELIVERED_TO_PROC,
-    MS_STATUS_RELEASED,
-    MS_STATUS_MAX // This is the number of mailslot statuses
+	MS_STATUS_EMPTY,
+	MS_STATUS_INUSE,
+	MS_STATUS_DELIVERED_TO_MBOX,
+	MS_STATUS_DELIVERED_TO_PROC,
+	MS_STATUS_RELEASED,
+	MS_STATUS_MAX // This is the number of mailslot statuses
 } MAIL_SLOT_STATUS;
 
 typedef enum MAILBOX_STATUS
 {
-    MB_STATUS_EMPTY,
-    MB_STATUS_READY,
-    MB_STATUS_INUSE,
-    MB_STATUS_RELEASED,
-    MB_STATUS_MAX // This is the number of mailbox statuses
+	MB_STATUS_EMPTY,
+	MB_STATUS_READY,
+	MB_STATUS_INUSE,
+	MB_STATUS_RELEASED,
+	MB_STATUS_MAX // This is the number of mailbox statuses
 } MAILBOX_STATUS;
 
 typedef enum MESSAGING_PROCESS_STATUS
 {
-    MP_STATUS_EMPTY = 0,
-    MP_READY = 1,
-    MP_RUNNING = 2,
-    // Has to be larger than 10 for use with the block function
-    MP_BLOCKED_SEND = 11,
-    MP_BLOCKED_RECEIVE = 12,
-    MP_BOX_DESTROYED = 13,
-    // -----------------------------------------------------------
-    MP_STATUS_MAX = 5 // This is the number of messaging process statuses
+	MP_STATUS_EMPTY = 0,
+	MP_READY = 1,
+	MP_RUNNING = 2,
+	// Has to be larger than 10 for use with the block function
+	MP_BLOCKED_SEND = 11,
+	MP_BLOCKED_RECEIVE = 12,
+	MP_BOX_DESTROYED = 13,
+	// -----------------------------------------------------------
+	MP_STATUS_MAX = 5 // This is the number of messaging process statuses
 } MESSAGING_PROCESS_STATUS;
 
 typedef struct
 {
-    void *deviceHandle;
-    int deviceMbox;
-    int deviceType;
-    char deviceName[16];
+	void* deviceHandle;
+	int deviceMbox;
+	int deviceType;
+	char deviceName[16];
 } DeviceManagementData;
-
-typedef struct mailbox
-{
-    int mboxId;
-    int dynamic;
-    void *pNext;
-    void *pPrev;
-    int slotCount;
-    int tableIndex;
-    int maxMessageSize;
-    MAILBOX_STATUS status;
-    DoublyLinkedList deliveredMailList;
-    DoublyLinkedList waitingProcsRecvList;
-    DoublyLinkedList waitingProcsSendList;
-} MailBox;
 
 typedef struct mailSlot
 {
-    int mboxId;
-    int fromPid;
-    int dynamic;
-    void *pNext;
-    void *pPrev;
-    int tableIndex;
-    int messageSize;
-    enum MAIL_SLOT_STATUS status;
-    unsigned char message[MAX_MESSAGE];
-    /* other items as needed... */
+	int mboxId;
+	int fromPid;
+	int dynamic;
+	void* pNext;
+	void* pPrev;
+	int tableIndex;
+	int messageSize;
+	enum MAIL_SLOT_STATUS status;
+	unsigned char message[MAX_MESSAGE];
+	/* other items as needed... */
 } MailSlot;
 
 typedef struct messagingProcess
 {
-    int pid;
-    int dynamic;
-    void *pNext;
-    void *pPrev;
-    int hadToWait;
-    int tableIndex;
-    MailSlot *pSlot;
-    // MailBox *pMailBox;
-    unsigned int quantum;       /* Time slice */
-    unsigned int startTime;     /* Process start time */
-    unsigned int elapsedTime;   /* Process elapsed time */
-    unsigned long long cpuTime; /* Process CPU time */
-    enum MESSAGING_PROCESS_STATUS status;
+	int pid;
+	int dynamic;
+	void* pNext;
+	void* pPrev;
+	int hadToWait;
+	int tableIndex;
+	MailSlot* pSlot;
+	unsigned int quantum;       /* Time slice */
+	unsigned int startTime;     /* Process start time */
+	unsigned int elapsedTime;   /* Process elapsed time */
+	unsigned long long cpuTime; /* Process CPU time */
+	enum MESSAGING_PROCESS_STATUS status;
 } MessagingProcess;
 
-typedef struct mailSlot *SlotPtr;
+
+typedef struct mailbox
+{
+	int mboxId;
+	int dynamic;
+	void* pNext;
+	void* pPrev;
+	int slotCount;
+	int tableIndex;
+	int maxMessageSize;
+	MAILBOX_STATUS status;
+	DoublyLinkedList deliveredMailList;
+	DoublyLinkedList waitingProcsRecvList;
+	DoublyLinkedList waitingProcsSendList;
+} MailBox;
+
+typedef struct mailSlot* SlotPtr;
 
 #define SIZEOF_MBOX sizeof(MailBox)
 #define OFFSETOF_MBOX offsetof(MailBox, pNext)
@@ -110,7 +110,7 @@ typedef struct mailSlot *SlotPtr;
 #define OFFSETOF_MSG_PROC offsetof(MessagingProcess, pNext)
 #define OFFSETOF_MSG_PROC_TBL_IDX offsetof(MessagingProcess, tableIndex)
 // ___________________________ Global Variables ___________________________
-extern MessagingProcess *runningMessengerProcess;           // The current running process
+extern MessagingProcess* runningMessengerProcess;           // The current running process
 extern MailBox MAIL_BOXES[MAXMBOX];                         // Array of mailboxes
 extern DoublyLinkedList MBOX_EMPTY_LIST;                    // List of empty mailboxes
 extern size_t NUM_M_SLOTS_IN_USE;                           // Number of mailslots in use

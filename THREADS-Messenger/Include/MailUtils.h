@@ -21,6 +21,8 @@ void InitMessagingTables();
  */
 void TrimRight(char *pString);
 
+int GetSignals(MessagingProcess *pProcess);
+
 /**
  * @brief Initialize the device mailboxes
  *
@@ -63,33 +65,8 @@ int BlockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status);
  */
 int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status);
 
-/**
- * @brief Handle sending a message with zero slots
- *
- * This function handles sending a message with zero slots
- *
- * @param pMailBox A pointer to the mailbox
- * @param pProcess A pointer to the process
- * @param pMsg A pointer to the message
- * @param msg_size The size of the message
- * @param wait Whether or not to wait
- * @return 0 if successful, -1 if invalid args
- */
-int HandleSendMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
-/**
- * @brief Handle sending a message with slots
- *
- * This function handles sending a message with slots
- *
- * @param pMailBox A pointer to the mailbox
- * @param pProcess A pointer to the process
- * @param pMsg A pointer to the message
- * @param msg_size The size of the message
- * @param wait Whether or not to wait
- * @return 0 if successful, -1 if invalid args
- */
-int HandleSendMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
-int HandleReceiveMailZeroSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
-int HandleReceiveMailWithSlots(MailBox *pMailBox, MessagingProcess *pProcess, void *pMsg, int msg_size, int wait);
+
+
+void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status);
 
 #endif
