@@ -87,37 +87,38 @@ All processes completed.
 | 08               | <p style="color: green"> PASSED </p>   |
 | 09               | <p style="color: red">   FAILED </p>   |
 | 10               | <p style="color: green"> PASSED </p>   |
-| 11               | <p style="color: red">   FAILED </p>   |
-| 12               | <p style="color: red">   FAILED </p>   |
+| 11               | <p style="color: green"> PASSED </p>   |
+| 12               | <p style="color: green"> PASSED </p>   |
 | 13               | <p style="color: green"> PASSED </p>   |
-| 14               | <p style="color: red">   FAILED </p>   |
+| 14               | <p style="color: green"> PASSED* </p>  |
 | 15               | <p style="color: green"> PASSED </p>   |
 | 16               | <p style="color: green"> PASSED </p>   |
 | 17               | <p style="color: red">   FAILED </p>   |
 | 18               | <p style="color: red">   FAILED </p>   |
 | 19               | <p style="color: red">   FAILED </p>   |
 | 20               | <p style="color: red">   FAILED </p>   |
-| 21               | <p style="color: red">   FAILED </p>   |
+| 21               | <p style="color: green"> PASSED </p>   |
 | 22               | <p style="color: green"> PASSED </p>   |
 | 23               | <p style="color: green"> PASSED </p>   |
 | 24               | <p style="color: green"> PASSED </p>   |
-| 25               | <p style="color: red">   FAILED </p>   |
+| 25               | <p style="color: green"> PASSED* </p>  |
 | 26               | <p style="color: red">   FAILED </p>   |
 | 27               | <p style="color: red">   FAILED </p>   |
 | 28               | <p style="color: green"> PASSED </p>   |
 | 29               | <p style="color: green"> PASSED </p>   |
-| 30               | <p style="color: red">   FAILED </p>   |
+| 30               | <p style="color: green"> PASSED </p>   |
 | 31               | <p style="color: green"> PASSED </p>   |
 | 32               | <p style="color: green"> PASSED </p>   |
 | 33               | <p style="color: green"> PASSED </p>   |
 | 34               | <p style="color: green"> PASSED </p>   |
 | 35               | <p style="color: green"> PASSED </p>   |
-| 36               | <p style="color: red">   FAILED </p>   |
+| 36               | <p style="color: green"> PASSED </p>   |
 | 37               | <p style="color: green"> PASSED </p>   |
 
 ### Test Case Output
 
 ```bash
+
 
 MessagingTest00: started
 All processes completed.
@@ -266,7 +267,7 @@ MessagingTest09-Child3: Message delivery failed: result = -3
 MessagingTest09: Exit status for child MessagingTest09-Child3 is -3
 MessagingTest09-Child4: Message delivery failed: result = -3
 MessagingTest09: Exit status for child MessagingTest09-Child4 is -3
-MessagingTest09: Exit status for child └└∩ñy is -3
+MessagingTest09: Exit status for child ≡╝ ╠* is -3
 All processes completed.
 
 MessagingTest10: started
@@ -328,9 +329,35 @@ MessagingTest11-Child2: Receiving message 3 from mailbox 8
 MessagingTest11-Child2: Received message 3, result = 14, message = Hello There 3
 MessagingTest11-Child2: Receiving message 4 from mailbox 8
 MessagingTest11-Child2: Received message 4, result = 14, message = Hello There 4
+MessagingTest11-Child1: Sending message 8 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned 0 - Message 'Hello There 8' DELIVERED
+MessagingTest11-Child1: Sending message 9 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned 0 - Message 'Hello There 9' DELIVERED
+MessagingTest11-Child1: Sending message 10 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned 0 - Message 'Hello There 10' DELIVERED
+MessagingTest11-Child1: Sending message 11 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned 0 - Message 'Hello There 11' DELIVERED
+MessagingTest11-Child1: Sending message 12 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned 0 - Message 'Hello There 12' DELIVERED
+MessagingTest11-Child1: Sending message 13 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned -2
+MessagingTest11-Child1: Sending message 14 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned -2
+MessagingTest11-Child1: Sending message 15 to mailbox 8
+MessagingTest11-Child1: mailbox_send Returned -2
+MessagingTest11: Exit status for child MessagingTest11-Child1 is -3
 MessagingTest11-Child2: Receiving message 0 from mailbox 8
-check_deadlock: numProc is 5
-check_deadlock: processes still present, halting...
+MessagingTest11-Child2: Received message 0, result = 14, message = Hello There 8
+MessagingTest11-Child2: Receiving message 1 from mailbox 8
+MessagingTest11-Child2: Received message 1, result = 14, message = Hello There 9
+MessagingTest11-Child2: Receiving message 2 from mailbox 8
+MessagingTest11-Child2: Received message 2, result = 15, message = Hello There 10
+MessagingTest11-Child2: Receiving message 3 from mailbox 8
+MessagingTest11-Child2: Received message 3, result = 15, message = Hello There 11
+MessagingTest11-Child2: Receiving message 4 from mailbox 8
+MessagingTest11-Child2: Received message 4, result = 15, message = Hello There 12
+MessagingTest11: Exit status for child MessagingTest11-Child2 is -3
+All processes completed.
 
 MessagingTest12: started
 MessagingTest12: mailbox_create returned id = 8
@@ -359,10 +386,31 @@ MessagingTest12-Child2: Received message in non-blocking mode, result = 14, mess
 MessagingTest12-Child2: Received message in non-blocking mode, result = 14, message = Hello There 3
 MessagingTest12-Child2: Received message in non-blocking mode, result = 14, message = Hello There 4
 MessagingTest12-Child2: Received 5 hello messages from mailbox 8
-MessagingTest12-Child2: Received 0 hello messages from mailbox 8
+MessagingTest12-Child1: Sending message 8 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned 0 - Message 'Hello There 8' DELIVERED
+MessagingTest12-Child1: Sending message 9 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned 0 - Message 'Hello There 9' DELIVERED
+MessagingTest12-Child1: Sending message 10 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned 0 - Message 'Hello There 10' DELIVERED
+MessagingTest12-Child1: Sending message 11 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned 0 - Message 'Hello There 11' DELIVERED
+MessagingTest12-Child1: Sending message 12 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned 0 - Message 'Hello There 12' DELIVERED
+MessagingTest12-Child1: Sending message 13 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned -2
+MessagingTest12-Child1: Sending message 14 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned -2
+MessagingTest12-Child1: Sending message 15 to mailbox 8
+MessagingTest12-Child1: mailbox_send Returned -2
+MessagingTest12: Exit status for child MessagingTest12-Child1 is -3
+MessagingTest12-Child2: Received message in non-blocking mode, result = 14, message = Hello There 8
+MessagingTest12-Child2: Received message in non-blocking mode, result = 14, message = Hello There 9
+MessagingTest12-Child2: Received message in non-blocking mode, result = 15, message = Hello There 10
+MessagingTest12-Child2: Received message in non-blocking mode, result = 15, message = Hello There 11
+MessagingTest12-Child2: Received message in non-blocking mode, result = 15, message = Hello There 12
+MessagingTest12-Child2: Received 5 hello messages from mailbox 8
 MessagingTest12: Exit status for child MessagingTest12-Child2 is -3
-check_deadlock: numProc is 4
-check_deadlock: processes still present, halting...
+All processes completed.
 
 MessagingTest13: started
 MessagingTest13-Child1: started
@@ -371,11 +419,10 @@ MessagingTest13-Child1: Returned from waitdevice, status: 0x00000000.
 MessagingTest13: Exit status for child MessagingTest13-Child1 is -3
 All processes completed.
 
-MessagingTest14: started
-MessagingTest14-Child1: started
-
-MessagingTest14-Child1: Returned from waitdevice, result: 0, status: 0x00000100.
-MessagingTest14: exit status for child 4 is -3
+MessagingTest05: started
+MessagingTest05-Child1: started
+MessagingTest05-Child1: Returned from waitdevice, result: 0, status: 0x00000100.
+MessagingTest05: exit status for child 4 is -3
 All processes completed.
 
 MessagingTest15: started
@@ -476,10 +523,15 @@ MessagingTest21-Child1: started
 MessagingTest21-Child1: Sending message 0 to mailbox 8
 MessagingTest21-Child2: started
 MessagingTest21-Child2: Receiving message 0 from mailbox 8
-MessagingTest21-Child2: Received message 0, result = -1, message = Hello There, 0
+MessagingTest21-Child1: Delivered message - result = 0, message = Hello There, 0
+MessagingTest21-Child1: Sending message 1 to mailbox 8
+MessagingTest21-Child2: Received message 0, result = 15, message = Hello There, 0
 MessagingTest21-Child2: Receiving message 1 from mailbox 8
-check_deadlock: numProc is 5
-check_deadlock: processes still present, halting...
+MessagingTest21-Child1: Delivered message - result = 0, message = Hello There, 1
+MessagingTest21: Exit status for child MessagingTest21-Child1 is -3
+MessagingTest21-Child2: Received message 1, result = 15, message = Hello There, 1
+MessagingTest21: Exit status for child MessagingTest21-Child2 is -3
+All processes completed.
 
 MessagingTest22: started
 
@@ -566,13 +618,9 @@ All processes completed.
 MessagingTest25: started
 
 MessagingTest25: trying to create too many mailboxes
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_close returned 0
 
 MessagingTest25: mailbox_close returned 0
@@ -594,31 +642,18 @@ MessagingTest25: mailbox_close returned 0
 MessagingTest25: mailbox_close returned 0
 
 MessagingTest25: mailbox_create returned id = 2000
-
 MessagingTest25: mailbox_create returned id = 2001
-
 MessagingTest25: mailbox_create returned id = 2002
-
 MessagingTest25: mailbox_create returned id = 2003
-
 MessagingTest25: mailbox_create returned id = 2004
-
 MessagingTest25: mailbox_create returned id = 2005
-
 MessagingTest25: mailbox_create returned id = 2006
-
 MessagingTest25: mailbox_create returned id = 2007
-
 MessagingTest25: mailbox_create returned id = 2008
-
 MessagingTest25: mailbox_create returned id = 2009
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
-
 MessagingTest25: mailbox_create returned id less than zero, id = -1
 All processes completed.
 
@@ -688,7 +723,6 @@ MessagingTest27: Exit status for child MessagingTest27-Child6 is -3
 All processes completed.
 
 MessagingTest28: started
-
 MessagingTest28: mailbox_create returned id = 8
 MessagingTest28-Child1: started
 MessagingTest28-Child2: started
@@ -706,7 +740,6 @@ MessagingTest28: mailbox_receive returned -1: SUCCESS
 All processes completed.
 
 MessagingTest29: started
-
 MessagingTest29: mailbox_create returned id = 8
 MessagingTest29-Child1: started
 MessagingTest29-Child2: started
@@ -724,9 +757,8 @@ MessagingTest29: mailbox_send returned -1: SUCCESS
 All processes completed.
 
 MessagingTest30: started
-
 MessagingTest30: mailbox_create returned id = 8
-MessagingTest30: Message delivery failed: result = -1
+MessagingTest30: Delivered message: First message
 MessagingTest30-Child3: started
 MessagingTest30-Child3: Message delivery failed: result = -1
 MessagingTest30: Exit status for child MessagingTest30-Child3 is -3
@@ -792,10 +824,8 @@ All processes completed.
 MessagingTest35: started
 MessagingTest35: mailbox_create returned id = -1
 MessagingTest35: mailbox_create border case test 1: PASSED
-
 MessagingTest35: mailbox_create returned id = -1
 MessagingTest35: mailbox_create border case test 2: PASSED
-
 MessagingTest35: mailbox_create returned id = -1
 MessagingTest35: mailbox_create border case test 3: PASSED
 All processes completed.
@@ -805,6 +835,9 @@ MessagingTest36: mailbox_create returned id = 8
 
 MessagingTest36: Receiving message with a buffer that is too small
 MessagingTest36-Child1: started
+MessagingTest36: Message receive failed: result = -1
+MessagingTest36-Child1: Delivered message: Message Number 0
+All processes completed.
 
 MessagingTest37: started
 MessagingTest37: mailbox_create returned id = 8

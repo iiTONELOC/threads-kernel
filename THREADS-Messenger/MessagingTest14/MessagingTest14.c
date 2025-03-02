@@ -14,7 +14,7 @@ char inputChar;
  *********************************************************************************/
 int MessagingEntryPoint(void* pArgs)
 {
-	char* testName = "MessagingTest14";
+	char* testName = "MessagingTest05";
 	int status = -1;
 	int kidpid = -1;
 	char nameBuffer[512];
@@ -48,7 +48,7 @@ int ReceiveTerminal(char* strArgs)
 
 	if (strArgs != NULL)
 	{
-		console_output(FALSE, "%s: started\n", strArgs);
+		console_output(FALSE, "%s: started", strArgs);
 
 		/* wait for the device to respond. */
 		result = wait_device("term0", &status);

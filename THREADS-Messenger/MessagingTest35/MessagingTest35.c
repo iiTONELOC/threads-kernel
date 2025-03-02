@@ -28,7 +28,7 @@ int MessagingEntryPoint(void* pArgs)
 	console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
 	if (mailboxId == -1)
 	{
-		console_output(FALSE, "%s: mailbox_create border case test 1: PASSED\n", testName);
+		console_output(FALSE, "%s: mailbox_create border case test 1: PASSED", testName);
 	}
 	else
 	{
@@ -40,7 +40,7 @@ int MessagingEntryPoint(void* pArgs)
 	console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
 	if (mailboxId == -1)
 	{
-		console_output(FALSE, "%s: mailbox_create border case test 2: PASSED\n", testName);
+		console_output(FALSE, "%s: mailbox_create border case test 2: PASSED", testName);
 	}
 	else
 	{

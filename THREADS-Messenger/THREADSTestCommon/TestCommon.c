@@ -17,7 +17,8 @@ int SignalAndJoinTwoLower(char* strArgs);
 static testNameBuffer[512];
 
 
-char* CreateMessageTestArgs(char* buffer, int bufferSize, char* prefix, int childId, int mailbox, int sendCount, int receiveCount, int options)
+char* CreateMessageTestArgs(char* buffer, int bufferSize, char* prefix,
+	int childId, int mailbox, int sendCount, int receiveCount, int options)
 {
 	char* separator;
 
