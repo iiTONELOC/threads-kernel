@@ -65,8 +65,23 @@ int BlockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status);
  */
 int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status);
 
+/**
+ * @brief Copy the message from a slot to a buffer
+ *
+ * @param pSlot A pointer to the slot to copy the message from
+ * @param pBuffer A pointer to the buffer to copy the message to
+ *
+ * @return The number of bytes copied or -1 if an error occurs
+ */
+int CopyMessageFromSlot(MailSlot *pSlot, void *pBuffer, int buffSize);
 
-
+/**
+ * @brief Copy the message from a buffer to a slot
+ *
+ * @param pSlot A pointer to the slot to copy the message to
+ * @param pBuffer A pointer to the buffer to copy the message from
+ * @param buffSize The size of the buffer
+ */
 void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status);
 
 #endif

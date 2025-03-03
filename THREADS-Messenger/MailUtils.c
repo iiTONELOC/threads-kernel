@@ -142,7 +142,7 @@ int BlockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 	}
 
 	/* validate  the process */
-	pProcess = FindProcessInTable(pid, TRUE);
+	pProcess = FindProcessInTable(pid);
 
 	/* If the process is null there is a problem */
 	if (!pProcess)
@@ -152,13 +152,11 @@ int BlockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 
 	/*Set its status to the status*/
 	pProcess->status = status;
-	/* set had to wait */
-	pProcess->hadToWait = 1;
 
 	/* Block the current process*/
 	result = block(status);
 	disableInterrupts();
-	runningMessengerProcess = FindProcessInTable(pid, TRUE);
+	runningMessengerProcess = FindProcessInTable(pid);
 	return result;
 }
 
@@ -183,7 +181,7 @@ int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 	}
 
 	/* validate the process */
-	pProcess = FindProcessInTable(pid, TRUE);
+	pProcess = FindProcessInTable(pid);
 
 	/* If the process is null there is a problem */
 	if (!pProcess)
@@ -197,12 +195,41 @@ int UnblockMessagingProcess(int pid, enum MESSAGING_PROCESS_STATUS status)
 	/* Unblock the process */
 	unblock(pid);
 	disableInterrupts();
-	runningMessengerProcess = FindProcessInTable(pid, TRUE);
+	runningMessengerProcess = FindProcessInTable(pid);
 	return 0;
 }
 
+/**
+ * @brief Copy the message from a slot to a buffer
+ *
+ * @param pSlot A pointer to the slot to copy the message from
+ * @param pBuffer A pointer to the buffer to copy the message to
+ *
+ * @return The number of bytes copied or -1 if an error occurs
+ */
+int CopyMessageFromSlot(MailSlot *pSlot, void *pBuffer, int buffSize)
+{
+	if (!pSlot || !pBuffer || buffSize < 0 || buffSize < pSlot->messageSize)
+	{
+		return -1;
+	}
+
+	/* Copy the message into the buffer */
+	memcpy_s(pBuffer, buffSize, pSlot->message, pSlot->messageSize);
+
+	return pSlot->messageSize;
+}
+
+/**
+ * @brief Copy the message from a buffer to a slot
+ *
+ * @param pSlot A pointer to the slot to copy the message to
+ * @param pBuffer A pointer to the buffer to copy the message from
+ * @param buffSize The size of the buffer
+ */
 void CopyMessageToSlot(MailSlot *pSlot, void *pMsg, int msg_size, int pid, int mboxId, enum MAIL_SLOT_STATUS status)
 {
+
 	/* Copy the message into the slot */
 	memcpy_s(pSlot->message, sizeof(pSlot->message), pMsg, msg_size);
 	pSlot->messageSize = msg_size;

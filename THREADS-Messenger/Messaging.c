@@ -67,7 +67,7 @@ int SchedulerEntryPoint(void *arg)
 	int result = 0;
 	// check for kernel mode
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 	/* Disable interrupts */
 	disableInterrupts();
 
@@ -110,12 +110,13 @@ int SchedulerEntryPoint(void *arg)
 int mailbox_create(int slots, int slot_size)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	disableInterrupts();
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 
 	int result = -1;
 
 	result = ReuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
-
+	enableInterrupts();
 	return result;
 } /* mailbox_create */
 
@@ -130,7 +131,7 @@ int mailbox_create(int slots, int slot_size)
 int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 
 	enableInterrupts();
 	/* Producer */
@@ -148,8 +149,6 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 	}
 
 	disableInterrupts();
-
-	// pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)];
 
 	/* Ensure the mailbox exists */
 	if (((pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL) ||
@@ -180,20 +179,10 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 		if (pMailBox->waitingProcsRecvList.count > 0)
 		{
 			pWaitingToRecvProcess = (MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList);
-
-			if (pWaitingToRecvProcess->pid == runningMessengerProcess->pid)
-			{
-				result = mailbox_receive(mboxId, pMsg, msg_size, wait);
-				result = msg_size == result ? 0 : -1;
-			}
-			else
-			{
-				pWaitingToRecvProcess->pSlot = pMailSlot;
-				pWaitingToRecvProcess->pSlot->status = MS_STATUS_DELIVERED_TO_PROC;
-
-				UnblockMessagingProcess(pWaitingToRecvProcess->pid, MP_READY);
-				result = 0;
-			}
+			pWaitingToRecvProcess->pSlot = pMailSlot;
+			pWaitingToRecvProcess->pSlot->status = MS_STATUS_DELIVERED_TO_PROC;
+			UnblockMessagingProcess(pWaitingToRecvProcess->pid, MP_READY);
+			result = 0;
 		}
 		else
 		{
@@ -212,7 +201,7 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 
 				/* After Awoken - Try to send again */
 				disableInterrupts();
-				runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+				runningMessengerProcess = FindProcessInTable(k_getpid());
 				result = GetSignals(runningMessengerProcess);
 
 				if (result != -5 && result != -3 && runningMessengerProcess->pSlot == NULL)
@@ -224,6 +213,7 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 				{
 					ResetMailSlot(runningMessengerProcess->pSlot);
 					runningMessengerProcess->pSlot == NULL;
+					enableInterrupts();
 					return result;
 				}
 			}
@@ -252,10 +242,8 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 
-	enableInterrupts();
-	/*Consumer*/
 	int result = -1;
 	int signals = 0;
 	MailBox *pMailBox;
@@ -285,36 +273,18 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 	if (pMailBox->waitingProcsSendList.count > 0)
 	{
 		pWaitingToSendProcess = (MessagingProcess *)Pop(&pMailBox->waitingProcsSendList);
-		pMailSlot = pWaitingToSendProcess && pWaitingToSendProcess->pSlot ? pWaitingToSendProcess->pSlot : pMailSlot;
-
-		/*Zero slot*/
+		pMailSlot = pWaitingToSendProcess->pSlot;
+		/*Zero slot mailbox*/
 		if (pMailBox->slotCount == 0)
 		{
-			/* We have zero slots - take the message*/
+			result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 
-			/* Ensure the destination can hold the message before copying */
-			if (msg_size < pMailSlot->messageSize)
+			UnblockMessagingProcess(pWaitingToSendProcess->pid, MP_READY);
+
+			if ((signals = GetSignals(runningMessengerProcess)) == -3 || signals == -5)
 			{
 				enableInterrupts();
-				return -1;
-			}
-
-			/* Copy the message into the pMsg buffer */
-			memcpy_s(pMsg, msg_size, pMailSlot->message, pMailSlot->messageSize);
-
-			result = pMailSlot->messageSize;
-
-			/* Wake up the pWaiter if the pWaiter exists*/
-			if (pWaitingToSendProcess)
-			{
-				UnblockMessagingProcess(pWaitingToSendProcess->pid, MP_READY);
-
-				if (signals = GetSignals(runningMessengerProcess) == -3 || signals == -5)
-				{
-
-					enableInterrupts();
-					return runningMessengerProcess->pSlot == NULL ? signals : -1;
-				}
+				return runningMessengerProcess->pSlot == NULL ? signals : -1;
 			}
 		}
 		/* The mailbox has slots */
@@ -322,7 +292,8 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		{
 			/* Check to see if we can attach the message to the current process */
 			if (runningMessengerProcess->pSlot == NULL ||
-				runningMessengerProcess->pSlot != NULL && runningMessengerProcess->pSlot->status == MS_STATUS_EMPTY)
+				(runningMessengerProcess->pSlot != NULL &&
+				 runningMessengerProcess->pSlot->status == MS_STATUS_EMPTY))
 			{
 				/* The mailbox is full - but the current receiving process has an empty slot*/
 				runningMessengerProcess->pSlot = pMailSlot;
@@ -335,16 +306,15 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 					return -1;
 				}
 				pWaitingToSendProcess->pSlot = NULL;
+
 				/* Unblock the sender */
 				UnblockMessagingProcess(pWaitingToSendProcess->pid, MP_READY);
 
 				/* After unblock */
+				runningMessengerProcess = FindProcessInTable(k_getpid());
 
-				runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
-
-				if (signals = GetSignals(runningMessengerProcess) == -3 || signals == -5)
+				if ((signals = GetSignals(runningMessengerProcess)) == -3 || signals == -5)
 				{
-
 					enableInterrupts();
 					return runningMessengerProcess->pSlot == NULL ? signals : -1;
 				}
@@ -355,12 +325,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 
 				/* Now we need to send back the next item in the delivery list*/
 				pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
-
-				/* Copy the message into the pMsg buffer */
-				memcpy_s(pMsg, msg_size, pMailSlot->message, pMailSlot->messageSize);
-
-				/* Set result to num bytes copied*/
-				result = pMailSlot->messageSize;
+				result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 
 				/* free the slot*/
 				ResetMailSlot(pMailSlot);
@@ -371,19 +336,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 
 				/* Now we need to send back the next item in the delivery list*/
 				pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
-
-				/* Ensure the message can fit */
-				if (msg_size < pMailSlot->messageSize)
-				{
-					enableInterrupts();
-					return -1;
-				}
-
-				/* Copy the message into the pMsg buffer */
-				memcpy_s(pMsg, msg_size, pMailSlot->message, pMailSlot->messageSize);
-
-				/* Set result to num bytes copied*/
-				result = pMailSlot->messageSize;
+				result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 
 				/* free the slot*/
 				ResetMailSlot(pMailSlot);
@@ -391,9 +344,8 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 				/* Unblock the sender */
 				UnblockMessagingProcess(pWaitingToSendProcess->pid, MP_READY);
 
-				if (signals = GetSignals(runningMessengerProcess) == -3 || signals == -5)
+				if ((signals = GetSignals(runningMessengerProcess)) == -3 || signals == -5)
 				{
-
 					enableInterrupts();
 					return signals == -3 ? -1 : signals;
 				}
@@ -408,19 +360,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		if (pMailBox->deliveredMailList.count > 0)
 		{
 			pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
-			/* Ensure the destination can hold the message before copying */
-			if (msg_size < pMailSlot->messageSize)
-			{
-				enableInterrupts();
-				return -1;
-			}
-
-			/* Copy the message into the pMsg buffer */
-			memcpy_s(pMsg, msg_size, pMailSlot->message, pMailSlot->messageSize);
-
-			/* Set result to num bytes copied */
-			result = pMailSlot->messageSize;
-
+			result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 			runningMessengerProcess->pSlot = NULL;
 
 			/* free the slot*/
@@ -428,13 +368,12 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		}
 		else if (wait)
 		{
-
 			InsertNode((void *)runningMessengerProcess, &pMailBox->waitingProcsRecvList);
 			BlockMessagingProcess(myPid, MP_BLOCKED_RECEIVE);
 
 			/* After Awoken - CHECK TO SEE IF WE HAD A DIRECT DERIVERY */
 			disableInterrupts();
-			runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+			runningMessengerProcess = FindProcessInTable(k_getpid());
 			result = GetSignals(runningMessengerProcess);
 
 			if (result == -5 || result == -3)
@@ -443,17 +382,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 				return runningMessengerProcess->pSlot == NULL ? result : -1;
 			}
 
-			if (msg_size < runningMessengerProcess->pSlot->messageSize)
-			{
-				enableInterrupts();
-				return -1;
-			}
-
-			/* Copy the message into the pMsg buffer */
-			memcpy_s(pMsg, msg_size, runningMessengerProcess->pSlot->message, runningMessengerProcess->pSlot->messageSize);
-
-			/* Set result to num bytes copied */
-			result = runningMessengerProcess->pSlot->messageSize;
+			result = CopyMessageFromSlot(runningMessengerProcess->pSlot, pMsg, msg_size);
 
 			/* free the slot*/
 			ResetMailSlot(runningMessengerProcess->pSlot);
@@ -472,7 +401,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 int mailbox_free(int mboxId)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 	enableInterrupts();
 
 	MailBox *pBox;
@@ -484,6 +413,7 @@ int mailbox_free(int mboxId)
 	/* Get the mailbox in the mailbox table*/
 	if ((pBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL)
 	{
+		enableInterrupts();
 		return result;
 	}
 
@@ -491,8 +421,9 @@ int mailbox_free(int mboxId)
 
 	/* Check for blockers, and wake them up*/
 	DoublyLinkedList *pBlockedProcessLists[2] = {
-		&pBox->waitingProcsRecvList,
 		&pBox->waitingProcsSendList,
+		&pBox->waitingProcsRecvList,
+
 	};
 
 	/* Mark all the processes as MP_BOX_DESTROYED */
@@ -528,13 +459,7 @@ int mailbox_free(int mboxId)
 	ResetMailbox(pBox);
 	enableInterrupts();
 
-	if (signaled())
-	{
-		enableInterrupts();
-		return -5;
-	}
-
-	return 0;
+	return signaled() ? -5 : 0;
 }
 
 int wait_device(char *deviceName, int *status)
@@ -542,7 +467,7 @@ int wait_device(char *deviceName, int *status)
 	int result = 0;
 	uint32_t deviceHandle = -1;
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 	enableInterrupts();
 
 	if (strcmp(deviceName, "clock") == 0)
@@ -568,23 +493,14 @@ int wait_device(char *deviceName, int *status)
 	}
 
 	/* spec says return -1 if zapped. */
-	if (signaled())
-	{
-		result = -5;
-	}
-
-	return result;
+	return signaled() ? -1 : result;
 }
 
 int check_io_messaging(void)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
-	if (waitingOnDevice)
-	{
-		return 1;
-	}
-	return 0;
+	disableInterrupts();
+	return waitingOnDevice ? 1 : 0;
 }
 
 /* an error method to handle invalid syscalls */
@@ -642,7 +558,7 @@ static void InitializeHandlers(void)
 
 static void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 {
-	runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 
 	LARGE_INTEGER unit;
 	int result;
@@ -675,8 +591,6 @@ static void IOInterruptHandler(char deviceId[32], uint8_t command, uint32_t stat
 ****************************************************************************/
 void TimerInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 {
-	// runningMessengerProcess = FindProcessInTable(k_getpid(), TRUE);
-
 	static int count = 0;
 
 	/* every 5th interrupt check for a message */

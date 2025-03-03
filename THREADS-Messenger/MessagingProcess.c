@@ -1,9 +1,7 @@
 #include "MessagingProcess.h"
-#include <stdbool.h>
 #include "Messenger.h"
-#include "THREADSLib.h"
 
-MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = { 0 };
+MessagingProcess MESSAGING_PROCESSES[MAX_PROCESSES] = {0};
 
 // _________________________________ Function Definitions _________________________________
 
@@ -16,11 +14,9 @@ void InitEmptyMessagingProcessArray()
 	// but set the pid to the appropriate value, index + 1
 	for (int i = 0; i < MAX_PROCESSES; i++)
 	{
-
 		ResetMessagingProcess(&MESSAGING_PROCESSES[i]);
 		MESSAGING_PROCESSES[i].pid = i + 1;
 		MESSAGING_PROCESSES[i].tableIndex = i;
-		MESSAGING_PROCESSES[i].quantum = MESSAGING_QUANTUM; // 100ms
 	}
 }
 
@@ -33,27 +29,15 @@ void InitEmptyMessagingProcessArray()
  *
  * @return A pointer to the process if found, NULL otherwise
  */
-MessagingProcess* FindProcessInTable(int byPid, bool setTimes)
+MessagingProcess *FindProcessInTable(int byPid)
 {
-	if (setTimes)
-	{
-		MessagingProcess* pProcess = &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
-		if (pProcess && pProcess->startTime == 0)
-		{
-			pProcess->startTime = system_clock();
-		}
-		pProcess->pid = byPid;
 
+	MessagingProcess *pProcess = &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
 
-		/* ensure the runningProcess is updated accordingly */
-		runningMessengerProcess = runningMessengerProcess == pProcess ? runningMessengerProcess : pProcess;
+	pProcess->pid = byPid;
+	runningMessengerProcess = pProcess;
 
-		return pProcess;
-	}
-	else
-	{
-		return &MESSAGING_PROCESSES[(byPid % MAX_PROCESSES) - 1];
-	}
+	return pProcess;
 }
 
 /**
@@ -63,18 +47,12 @@ MessagingProcess* FindProcessInTable(int byPid, bool setTimes)
  *
  * @param pMessagingProcess A pointer to the messaging process to reset
  */
-void ResetMessagingProcess(MessagingProcess* pMessagingProcess)
+void ResetMessagingProcess(MessagingProcess *pMessagingProcess)
 {
-	pMessagingProcess->dynamic = 0;
 	pMessagingProcess->pNext = NULL;
 	pMessagingProcess->pPrev = NULL;
-	pMessagingProcess->hadToWait = 0;
+	pMessagingProcess->pSlot = NULL;
+	pMessagingProcess->pSlot = NULL;
 	pMessagingProcess->tableIndex = 0;
-	pMessagingProcess->pSlot = NULL;
-	pMessagingProcess->quantum = 0;
-	pMessagingProcess->startTime = 0;
-	pMessagingProcess->elapsedTime = 0;
-	pMessagingProcess->cpuTime = 0;
 	pMessagingProcess->status = MP_STATUS_EMPTY;
-	pMessagingProcess->pSlot = NULL;
 }
