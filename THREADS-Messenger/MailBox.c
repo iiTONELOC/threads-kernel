@@ -8,8 +8,8 @@
 #include <Windows.h>
 
 size_t mailBoxId = 0;
-MailBox MAIL_BOXES[MAXMBOX] = { 0 };
-DoublyLinkedList MBOX_EMPTY_LIST = { 0 };
+MailBox MAIL_BOXES[MAXMBOX] = {0};
+DoublyLinkedList MBOX_EMPTY_LIST = {0};
 
 // __________________________ Function Prototypes __________________________
 
@@ -32,9 +32,9 @@ void InitEmptyMailBoxList()
 	}
 
 	/* Init the Linked List Structure */
-	InitStaticLinkedList(OFFSETOF_MBOX, MAXMBOX, (void*)&MAIL_BOXES,
-		SIZEOF_MBOX, OFFSETOF_MBOX_TBL_IDX,
-		&MBOX_EMPTY_LIST, NULL);
+	InitStaticLinkedList(OFFSETOF_MBOX, MAXMBOX, (void *)&MAIL_BOXES,
+						 SIZEOF_MBOX, OFFSETOF_MBOX_TBL_IDX,
+						 &MBOX_EMPTY_LIST, NULL);
 }
 
 /**
@@ -73,12 +73,12 @@ int GetMailboxIdx(int mboxId)
  *
  * @return A pointer to the next empty mailbox
  */
-MailBox* GetNextEmptyMailbox()
+MailBox *GetNextEmptyMailbox()
 {
-	MailBox* pMailBox;
+	MailBox *pMailBox;
 
 	/* Remove the node from the head of the list */
-	pMailBox = (MailBox*)Pop(&MBOX_EMPTY_LIST);
+	pMailBox = (MailBox *)Pop(&MBOX_EMPTY_LIST);
 
 	if (!pMailBox)
 		return NULL;
@@ -88,6 +88,8 @@ MailBox* GetNextEmptyMailbox()
 
 	/* Increment the mailbox id */
 	_IncrementMailBoxId();
+
+	pMailBox->status = MB_STATUS_READY;
 
 	/* return the pointer to the mailbox */
 	return pMailBox;
@@ -100,7 +102,7 @@ MailBox* GetNextEmptyMailbox()
  *
  * @param pMailbox A pointer to the mailbox to rest
  */
-void ResetMailbox(MailBox* pMailbox)
+void ResetMailbox(MailBox *pMailbox)
 {
 	/* Reset the mailbox's slots*/
 	ResetMailBoxSlots(pMailbox);
@@ -121,7 +123,7 @@ void ResetMailbox(MailBox* pMailbox)
 	InitializeDoublyLinkedList(0, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsSendList, NULL);
 
 	/* Add the mailbox to the empty list */
-	InsertNode((void*)pMailbox, &MBOX_EMPTY_LIST);
+	InsertNode((void *)pMailbox, &MBOX_EMPTY_LIST);
 }
 
 /**
@@ -133,19 +135,19 @@ void ResetMailbox(MailBox* pMailbox)
  *
  * @param pMailBox A pointer to the mailbox
  */
-void ResetMailBoxSlots(MailBox* pMailBox)
+void ResetMailBoxSlots(MailBox *pMailBox)
 {
 	/* List of our slots */
-	DoublyLinkedList slotLists[] = {/*pMailBox->mailSlotsList,*/ pMailBox->deliveredMailList };
+	DoublyLinkedList slotLists[] = {/*pMailBox->mailSlotsList,*/ pMailBox->deliveredMailList};
 
 	/* Reset any mailslots, they could be anywhere in the lists*/
 	for (int i = 0; i < sizeof(slotLists) / sizeof(slotLists[0]); i++)
 	{
-		MailSlot* pSlot = (MailSlot*)Pop(&slotLists[i]);
+		MailSlot *pSlot = (MailSlot *)Pop(&slotLists[i]);
 		while (pSlot)
 		{
 			ResetMailSlot(pSlot);
-			pSlot = (MailSlot*)Pop(&slotLists[i]);
+			pSlot = (MailSlot *)Pop(&slotLists[i]);
 		}
 	}
 }
@@ -159,19 +161,19 @@ void ResetMailBoxSlots(MailBox* pMailBox)
  *
  * @param pMailBox A pointer to the mailbox
  */
-void ResetMailBoxMsgProcs(MailBox* pMailBox)
+void ResetMailBoxMsgProcs(MailBox *pMailBox)
 {
 	/* List of messaging processes */
-	DoublyLinkedList listsToCheck[] = { pMailBox->waitingProcsSendList, pMailBox->waitingProcsRecvList };
+	DoublyLinkedList listsToCheck[] = {pMailBox->waitingProcsSendList, pMailBox->waitingProcsRecvList};
 
 	/*Reset any messaging processes, they could be anywhere in the waiting lists*/
 	for (int i = 0; i < sizeof(listsToCheck) / sizeof(listsToCheck[0]); i++)
 	{
-		MessagingProcess* pMsgProc = (MessagingProcess*)Pop(&listsToCheck[i]);
+		MessagingProcess *pMsgProc = (MessagingProcess *)Pop(&listsToCheck[i]);
 		while (pMsgProc)
 		{
 			ResetMessagingProcess(pMsgProc);
-			pMsgProc = (MessagingProcess*)Pop(&listsToCheck[i]);
+			pMsgProc = (MessagingProcess *)Pop(&listsToCheck[i]);
 		}
 	}
 }
@@ -187,7 +189,7 @@ void ResetMailBoxMsgProcs(MailBox* pMailBox)
  *
  * @return >= 0 Success, -1 if an error occurs
  */
-int ReuseMailbox(MailBox* pMailbox, int slotCount, int slotSize)
+int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize)
 {
 	int validSlots = slotCount >= 0 && slotCount <= MAXSLOTS;
 	int validSize = slotSize >= 0 && slotSize <= MAX_MESSAGE;
