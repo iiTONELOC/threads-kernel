@@ -6,29 +6,27 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-
-
 /*********************************************************************************
-*
-* MessagingTest31
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest31
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     int status, kidpid;
     char childNames[MAXPROC][256];
     char nameBuffer[512];
     int childId = 0;
     int mailboxId;
-    char* optionSeparator;
+    char *optionSeparator;
 
     memset(childNames, 0, sizeof(childNames));
 
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(1, 13);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     optionSeparator = CreateMessageTestArgs(nameBuffer, sizeof(nameBuffer), testName, ++childId, mailboxId, 0, 1, OPTION_NONE);
     kidpid = k_spawn(nameBuffer, SendAndReceive, nameBuffer, THREADS_MIN_STACK_SIZE, 2);
@@ -51,7 +49,6 @@ int MessagingEntryPoint(void* pArgs)
     optionSeparator[0] = '\0';
     strncpy(childNames[kidpid], nameBuffer, 256);
 
-
     char message[32];
     strcpy(message, "First message");
     int result = mailbox_receive(mailboxId, NULL, 0, TRUE);
@@ -64,7 +61,6 @@ int MessagingEntryPoint(void* pArgs)
         console_output(FALSE, "%s: Message receive failed: result = %d\n", testName, result);
     }
 
-
     kidpid = k_wait(&status);
     console_output(FALSE, "%s: Exit status for child %s is %d\n", testName, childNames[kidpid], status);
 
@@ -76,12 +72,8 @@ int MessagingEntryPoint(void* pArgs)
 
     kidpid = k_wait(&status);
     console_output(FALSE, "%s: Exit status for child %s is %d\n", testName, childNames[kidpid], status);
-
 
     k_exit(0);
 
-
-
     return 0;
 } /* MessagingEntryPoint */
-

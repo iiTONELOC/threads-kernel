@@ -6,39 +6,38 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-
 /*********************************************************************************
-*
-* MessagingTest15
-*
-* Send a message that is too large
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest15
+ *
+ * Send a message that is too large
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
 	int mailboxId;
-	char* testName = GetTestName(__FILE__);
+	char *testName = GetTestName(__FILE__);
 	int result;
 	char message[80];
 
 	console_output(FALSE, "\n%s: started\n", testName);
 
 	mailboxId = mailbox_create(10, 5);
-	console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+	console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
 	sprintf(message, "Hello There");
 
 	console_output(FALSE, "%s: Sending large message to mailbox %d\n", testName, mailboxId);
 	result = mailbox_send(mailboxId, message, (int)strlen(message) + 1, TRUE);
 
-	if (result != 0) {
+	if (result != 0)
+	{
 		console_output(FALSE, "%s: mailbox_send failed\n", testName);
 		k_exit(0);
 		return 0;
 	}
 
 	console_output(FALSE, "%s: mailbox_send returned %d for message = %s\n", testName, result, message);
-
 
 	memset(message, 0, sizeof(message));
 
@@ -57,4 +56,3 @@ int MessagingEntryPoint(void* pArgs)
 
 	return 0;
 }
-

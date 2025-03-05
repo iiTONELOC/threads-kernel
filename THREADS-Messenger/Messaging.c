@@ -67,7 +67,6 @@ int SchedulerEntryPoint(void *arg)
 	int result = 0;
 	// check for kernel mode
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid());
 	/* Disable interrupts */
 	disableInterrupts();
 
@@ -111,8 +110,6 @@ int mailbox_create(int slots, int slot_size)
 {
 	checkKernelMode(__func__);
 	disableInterrupts();
-	runningMessengerProcess = FindProcessInTable(k_getpid());
-
 	int result = -1;
 
 	result = ReuseMailbox(GetNextEmptyMailbox(), slots, slot_size);
@@ -131,9 +128,7 @@ int mailbox_create(int slots, int slot_size)
 int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid());
 
-	enableInterrupts();
 	/* Producer */
 	int result = -1;
 	MailBox *pMailBox;
@@ -149,7 +144,7 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 	}
 
 	disableInterrupts();
-
+	runningMessengerProcess = FindProcessInTable(k_getpid());
 	/* Ensure the mailbox exists */
 	if (((pMailBox = &MAIL_BOXES[GetMailboxIdx(mboxId)]) == NULL) ||
 		pMailBox->status == MB_STATUS_EMPTY ||
@@ -173,6 +168,7 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 			enableInterrupts();
 			return -1;
 		}
+
 		CopyMessageToSlot(pMailSlot, pMsg, msg_size, myPid, mboxId, MS_STATUS_INUSE);
 
 		/* If there is a process waiting to recv then deliver the message directly to them and wake them up */
@@ -202,7 +198,13 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 				/* After Awoken - Try to send again */
 				disableInterrupts();
 				runningMessengerProcess = FindProcessInTable(k_getpid());
-				result = GetSignals(runningMessengerProcess);
+
+				/* Handle a closing mailbox */
+				result = HandleMailBoxClose(pMailBox);
+				disableInterrupts();
+				runningMessengerProcess = FindProcessInTable(k_getpid());
+				/* If the process wasn't signaled and the mailbox wasn't closed, ensure the slot on the
+				running process was reset */
 
 				if (result != -5 && result != -3 && runningMessengerProcess->pSlot == NULL)
 				{
@@ -310,13 +312,18 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 				/* Unblock the sender */
 				UnblockMessagingProcess(pWaitingToSendProcess->pid, MP_READY);
 
-				/* After unblock */
-				runningMessengerProcess = FindProcessInTable(k_getpid());
+				/* Handle a closing mailbox */
 
-				if ((signals = GetSignals(runningMessengerProcess)) == -3 || signals == -5)
+				disableInterrupts();
+				result = GetSignals(runningMessengerProcess);
+				runningMessengerProcess = FindProcessInTable(k_getpid());
+				/* If the process wasn't signaled and the mailbox wasn't closed, ensure the slot on the
+				running process was reset */
+
+				if (result == -3 || result == -5)
 				{
 					enableInterrupts();
-					return runningMessengerProcess->pSlot == NULL ? signals : -1;
+					return runningMessengerProcess->pSlot == NULL ? result : -1;
 				}
 
 				/* Add the process stored to the delivered list */
@@ -373,10 +380,14 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 
 			/* After Awoken - CHECK TO SEE IF WE HAD A DIRECT DERIVERY */
 			disableInterrupts();
+			/* Handle a closing mailbox */
+			result = HandleMailBoxClose(pMailBox);
+			disableInterrupts();
 			runningMessengerProcess = FindProcessInTable(k_getpid());
-			result = GetSignals(runningMessengerProcess);
 
-			if (result == -5 || result == -3)
+			/* If the process wasn't signaled and the mailbox wasn't closed, ensure the slot on the
+			running process was reset */
+			if (result == -3 || result == -5)
 			{
 				enableInterrupts();
 				return runningMessengerProcess->pSlot == NULL ? result : -1;
@@ -386,7 +397,6 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 
 			/* free the slot*/
 			ResetMailSlot(runningMessengerProcess->pSlot);
-
 			runningMessengerProcess->pSlot = NULL;
 		}
 	}
@@ -401,12 +411,12 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 int mailbox_free(int mboxId)
 {
 	checkKernelMode(__func__);
-	runningMessengerProcess = FindProcessInTable(k_getpid());
 	enableInterrupts();
 
 	MailBox *pBox;
 	int result = -1;
 	MessagingProcess *pProc;
+	int waitingToCloseCount = 0;
 
 	disableInterrupts();
 
@@ -416,8 +426,6 @@ int mailbox_free(int mboxId)
 		enableInterrupts();
 		return result;
 	}
-
-	pBox->status = MB_STATUS_RELEASED;
 
 	/* Check for blockers, and wake them up*/
 	DoublyLinkedList *pBlockedProcessLists[2] = {
@@ -436,23 +444,36 @@ int mailbox_free(int mboxId)
 			pProc = (MessagingProcess *)pCurrent;
 			pProc->status = MP_BOX_DESTROYED;
 			pCurrent = pCurrent->pNext;
+			waitingToCloseCount++;
 		}
 	}
-	/* Unblock any remaining processes */
+
+	pBox->closerPid = k_getpid();
+	pBox->status = MB_STATUS_RELEASED;
+	pBox->waitingToClose = waitingToCloseCount;
+
+	/* Kill and Unblock any processes blocked on the mailbox */
 	for (int i = 0; i < 2; i++)
 	{
 		while (pBlockedProcessLists[i]->count > 0)
 		{
 			pProc = (MessagingProcess *)Pop(pBlockedProcessLists[i]);
-			/*
-			  Using k_kill causes the return values to be -5 in k_wait,
-			  This is not what we want according to the provided output
-			  So we have to signal the process some other way
-			*/
-			disableInterrupts();
+			k_kill(pProc->pid, SIG_TERM);
 			UnblockMessagingProcess(pProc->pid, MP_BOX_DESTROYED);
-			enableInterrupts();
 		}
+	}
+
+	if (pBox->waitingToClose > 0)
+	{
+		/* If this list has any waiters,
+		block and wait for the last one and then join it*/
+		BlockMessagingProcess(k_getpid(), MP_BOX_DESTROYED);
+		/* Unblock in case higher priority */
+		UnblockMessagingProcess(pBox->closerPid, MP_BOX_DESTROYED);
+		/* Try to join if lower */
+		k_join(pBox->closerPid, &result);
+		disableInterrupts();
+		pBox->closerPid = k_getpid(); // reset the closer in case we are not the last list
 	}
 
 	disableInterrupts();
@@ -604,11 +625,6 @@ void TimerInterruptHandler(char deviceId[32], uint8_t command, uint32_t status)
 
 			/* Send the clock's status */
 			mailbox_send(pMailBox->mboxId, &status, sizeof(int), FALSE);
-			/* wake up any one waiting */
-			if (pMailBox->waitingProcsRecvList.count > 0)
-			{
-				UnblockMessagingProcess(((MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList))->pid, MP_READY);
-			}
 		}
 	}
 

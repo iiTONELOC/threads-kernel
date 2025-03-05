@@ -6,29 +6,27 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-
-
 /*********************************************************************************
-*
-* MessagingTest26
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest26
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     int status, kidpid;
     char childNames[MAXPROC][256];
     char nameBuffer[512];
     int childId = 0;
     int mailboxId;
-    char* optionSeparator;
+    char *optionSeparator;
 
     memset(childNames, 0, sizeof(childNames));
 
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(5, MAX_MESSAGE);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     optionSeparator = CreateMessageTestArgs(nameBuffer, sizeof(nameBuffer), testName, ++childId, mailboxId, 5, 5, OPTION_RECEIVE_FIRST);
     kidpid = k_spawn(nameBuffer, SendAndReceive, nameBuffer, THREADS_MIN_STACK_SIZE, 4);
@@ -79,7 +77,5 @@ int MessagingEntryPoint(void* pArgs)
 
     console_output(FALSE, "\n%s: started\n", testName);
 
-
     return 0;
 } /* MessagingEntryPoint */
-

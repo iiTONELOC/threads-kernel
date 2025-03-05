@@ -5,20 +5,19 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-int SendTwoAndExit(char* arg);
-int ReceiveTwoAndExit(char* arg);
+int SendTwoAndExit(char *arg);
+int ReceiveTwoAndExit(char *arg);
 int mailboxId;
 char childNames[MAXPROC][256];
 
-
 /*********************************************************************************
-*
-* MessagingTest22
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest22
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     int status, kidpid;
 
     char nameBuffer[512];
@@ -26,7 +25,7 @@ int MessagingEntryPoint(void* pArgs)
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(0, 50);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     /* Use the -Child naming convention for the child process name. */
     snprintf(nameBuffer, sizeof(nameBuffer), "%s-Child1", testName);
@@ -49,18 +48,17 @@ int MessagingEntryPoint(void* pArgs)
 
     console_output(FALSE, "\n%s: started\n", testName);
 
-
     return 0;
 } /* MessagingEntryPoint */
 
-
-int SendTwoAndExit(char* strArgs)
+int SendTwoAndExit(char *strArgs)
 {
     int i, result;
     char buffer[20];
 
     console_output(FALSE, "%s: started\n", strArgs);
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < 2; i++)
+    {
 
         console_output(FALSE, "%s: Sending message %d to mailbox %d\n", strArgs, i, mailboxId);
         sprintf(buffer, "Hello There, %d", i);
@@ -73,8 +71,7 @@ int SendTwoAndExit(char* strArgs)
     return 0;
 }
 
-
-int ReceiveTwoAndExit(char* strArgs)
+int ReceiveTwoAndExit(char *strArgs)
 {
     int i, result;
     char message[100];
@@ -83,7 +80,8 @@ int ReceiveTwoAndExit(char* strArgs)
     {
         console_output(FALSE, "%s: started\n", strArgs);
 
-        for (i = 0; i < 2; i++) {
+        for (i = 0; i < 2; i++)
+        {
             console_output(FALSE, "%s: Receiving message %d from mailbox %d\n", strArgs, i, mailboxId);
             result = mailbox_receive(mailboxId, message, sizeof(message), TRUE);
             console_output(FALSE, "%s: Received message %d, result = %d, message = %s\n", strArgs, i, result, message);

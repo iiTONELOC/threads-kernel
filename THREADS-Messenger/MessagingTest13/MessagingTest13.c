@@ -44,7 +44,7 @@ int WaitForClockThenExit(char* strArgs)
 	/* wait for the device to respond. */
 	wait_device("clock", &status);
 
-	console_output(FALSE, "\n%s: Returned from waitdevice, status: 0x%08x.\n", strArgs, status);
+	console_output(FALSE, "%s: Returned from waitdevice, status: 0x%08x.\n", strArgs, status);
 
 	k_exit(-3);
 

@@ -6,6 +6,7 @@
 #include "THREADSLib.h"
 #include <DoublyLinkedList.h>
 #include <Windows.h>
+#include "MailUtils.h"
 
 size_t mailBoxId = 0;
 MailBox MAIL_BOXES[MAXMBOX] = {0};
@@ -116,6 +117,8 @@ void ResetMailbox(MailBox *pMailbox)
 	pMailbox->pNext = NULL;
 	pMailbox->pPrev = NULL;
 	pMailbox->slotCount = 0;
+	pMailbox->closerPid = 0;
+	pMailbox->waitingToClose = 0;
 	pMailbox->maxMessageSize = 0;
 	pMailbox->status = MB_STATUS_EMPTY;
 	InitializeDoublyLinkedList(0, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
@@ -150,6 +153,35 @@ void ResetMailBoxSlots(MailBox *pMailBox)
 			pSlot = (MailSlot *)Pop(&slotLists[i]);
 		}
 	}
+}
+
+/**
+ * @brief Handle a mailbox closure
+ *
+ * This function handles the closing of a mailbox if it has been released.
+ *
+ * @param pMailBox A pointer to the mailbox
+ *
+ * @return -3 if the mailbox is released, -5 if the process is signaled, 0 otherwise
+ *
+ */
+int HandleMailBoxClose(MailBox *pMailBox)
+{
+	if (pMailBox->status == MB_STATUS_RELEASED || pMailBox->status == MB_STATUS_EMPTY)
+	{
+		/* We are the last one  */
+		if (pMailBox->waitingToClose == 1)
+		{
+			/* wake up the closer so it can join */
+			int closer = pMailBox->closerPid;
+			pMailBox->closerPid = k_getpid();
+			UnblockMessagingProcess(closer, MP_BOX_DESTROYED);
+			/*	BlockMessagingProcess(k_getpid(), MP_BOX_DESTROYED);*/
+		}
+
+		pMailBox->waitingToClose--;
+	}
+	return GetSignals(FindProcessInTable(k_getpid()));
 }
 
 /**
@@ -220,7 +252,7 @@ int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize)
 void _IncrementMailBoxId()
 {
 	/* If we have rolled over*/
-	if ((mailBoxId > MAXMBOX) && ((mailBoxId % MAXMBOX) == 0))
+	if (mailBoxId > 0 && (mailBoxId % MAXMBOX) == 0)
 	{
 		/* Ensure that we account for the device's mailboxes */
 		mailBoxId = mailBoxId + THREADS_MAX_DEVICES;

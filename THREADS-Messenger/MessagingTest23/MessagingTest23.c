@@ -5,18 +5,17 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-int LowPriorityParent(char* strArgs);
+int LowPriorityParent(char *strArgs);
 int mailboxId;
 
-
 /*********************************************************************************
-*
-* MessagingTest23
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest23
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     int status, kidpid;
     char childNames[MAXPROC][256];
     char nameBuffer[512];
@@ -26,7 +25,7 @@ int MessagingEntryPoint(void* pArgs)
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(5, MAX_MESSAGE);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     /* Use the -Child naming convention for the child process name. */
     snprintf(nameBuffer, sizeof(nameBuffer), "%s-Child1", testName);
@@ -40,18 +39,17 @@ int MessagingEntryPoint(void* pArgs)
 
     console_output(FALSE, "\n%s: started\n", testName);
 
-
     return 0;
 } /* MessagingEntryPoint */
 
-
-int SendThreeAndExit(char* strArgs)
+int SendThreeAndExit(char *strArgs)
 {
     int i, result;
     char buffer[20];
 
     console_output(FALSE, "%s: started\n", strArgs);
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++)
+    {
 
         console_output(FALSE, "%s: Sending message %d to mailbox %d\n", strArgs, i, mailboxId);
         sprintf(buffer, "Message Number %d", i);
@@ -64,7 +62,7 @@ int SendThreeAndExit(char* strArgs)
     return 0;
 }
 
-int ReceiveAndExit(char* strArgs)
+int ReceiveAndExit(char *strArgs)
 {
     int result;
     char message[100];
@@ -82,7 +80,7 @@ int ReceiveAndExit(char* strArgs)
     return 0;
 }
 
-int LowPriorityParent(char* strArgs)
+int LowPriorityParent(char *strArgs)
 {
     int i, status, kidpid;
     char nameBuffer[512];

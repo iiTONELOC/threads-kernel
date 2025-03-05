@@ -6,31 +6,28 @@
 #include "Messaging.h"
 #include "TestCommon.h"
 
-int SendOneAndExit(char* strArgs);
-int CloseMailbox(char* strArgs);
+int SendOneAndExit(char *strArgs);
+int CloseMailbox(char *strArgs);
 int mailboxId;
 
 char childNames[MAXPROC][256];
 
-
-
 /*********************************************************************************
-*
-* MessagingTest17
-**
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest17
+ **
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
     int status, kidpid, pausepid, result;
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     char nameBuffer[512];
     char message[32];
-
 
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(0, 50);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     /* Use the -Child naming convention for the child process name. */
     snprintf(nameBuffer, sizeof(nameBuffer), "%s-Child1", testName);
@@ -89,10 +86,7 @@ int MessagingEntryPoint(void* pArgs)
     return 0;
 } /* MessagingEntryPoint */
 
-
-
-
-int SendOneAndExit(char* strArgs)
+int SendOneAndExit(char *strArgs)
 {
     int result;
     char buffer[32];
@@ -111,7 +105,7 @@ int SendOneAndExit(char* strArgs)
     return 0;
 } /* SendSixAndExit */
 
-int CloseMailbox(char* strArgs)
+int CloseMailbox(char *strArgs)
 {
     int result;
 
@@ -122,7 +116,6 @@ int CloseMailbox(char* strArgs)
         result = mailbox_free(mailboxId);
 
         console_output(FALSE, "%s: mailbox_close returned %d\n", strArgs, result);
-
     }
 
     k_exit(-3);

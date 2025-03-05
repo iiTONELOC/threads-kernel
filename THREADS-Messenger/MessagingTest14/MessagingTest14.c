@@ -3,7 +3,7 @@
 #include "Scheduler.h"
 #include "Messaging.h"
 
-int ReceiveTerminal(char* strArgs);
+int ReceiveTerminal(char *strArgs);
 char inputChar;
 
 /*********************************************************************************
@@ -12,9 +12,9 @@ char inputChar;
  *
  *
  *********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+int MessagingEntryPoint(void *pArgs)
 {
-	char* testName = "MessagingTest05";
+	char *testName = "MessagingTest14";
 	int status = -1;
 	int kidpid = -1;
 	char nameBuffer[512];
@@ -41,7 +41,7 @@ int MessagingEntryPoint(void* pArgs)
 	return 0;
 }
 
-int ReceiveTerminal(char* strArgs)
+int ReceiveTerminal(char *strArgs)
 {
 	int result;
 	int status = 0;

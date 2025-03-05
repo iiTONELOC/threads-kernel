@@ -6,18 +6,18 @@
 #include "TestCommon.h"
 
 int mailboxId;
-int SendFiveSpawnFour(char* strArgs);
-int SendOneAndExit(char* strArgs);
-int ReceiveEightAndExit(char* strArgs);
+int SendFiveSpawnFour(char *strArgs);
+int SendOneAndExit(char *strArgs);
+int ReceiveEightAndExit(char *strArgs);
 
 /*********************************************************************************
-*
-* MessagingTest24
-*
-*********************************************************************************/
-int MessagingEntryPoint(void* pArgs)
+ *
+ * MessagingTest24
+ *
+ *********************************************************************************/
+int MessagingEntryPoint(void *pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+    char *testName = GetTestName(__FILE__);
     int status, kidpid;
     char childNames[MAXPROC][256];
     char nameBuffer[512];
@@ -27,7 +27,7 @@ int MessagingEntryPoint(void* pArgs)
     console_output(FALSE, "\n%s: started\n", testName);
 
     mailboxId = mailbox_create(5, MAX_MESSAGE);
-    console_output(FALSE, "\n%s: mailbox_create returned id = %d\n", testName, mailboxId);
+    console_output(FALSE, "%s: mailbox_create returned id = %d\n", testName, mailboxId);
 
     /* Use the -Child naming convention for the child process name. */
     snprintf(nameBuffer, sizeof(nameBuffer), "%s-Child1", testName);
@@ -41,12 +41,10 @@ int MessagingEntryPoint(void* pArgs)
 
     console_output(FALSE, "\n%s: started\n", testName);
 
-
     return 0;
 } /* MessagingEntryPoint */
 
-
-int SendFiveSpawnFour(char* strArgs)
+int SendFiveSpawnFour(char *strArgs)
 {
     int i, result, kidpid, status;
     char buffer[20];
@@ -55,9 +53,10 @@ int SendFiveSpawnFour(char* strArgs)
     memset(childNames, 0, sizeof(childNames));
 
     console_output(FALSE, "%s: started\n", strArgs);
-    for (i = 0; i < 5; i++) {
+    for (i = 0; i < 5; i++)
+    {
 
-            sprintf(buffer, "Message Number %d", i);
+        sprintf(buffer, "Message Number %d", i);
         result = mailbox_send(mailboxId, buffer, (int)strlen(buffer) + 1, TRUE);
         console_output(FALSE, "%s: Delivered message: %s\n", strArgs, buffer);
     }
@@ -93,7 +92,7 @@ int SendFiveSpawnFour(char* strArgs)
     return 0;
 }
 
-int SendOneAndExit(char* strArgs)
+int SendOneAndExit(char *strArgs)
 {
     int result;
     char message[100];
@@ -114,7 +113,7 @@ int SendOneAndExit(char* strArgs)
     return 0;
 }
 
-int ReceiveEightAndExit(char* strArgs)
+int ReceiveEightAndExit(char *strArgs)
 {
     int result;
     char message[100];
@@ -127,7 +126,6 @@ int ReceiveEightAndExit(char* strArgs)
             result = mailbox_receive(mailboxId, message, sizeof(message), TRUE);
             console_output(FALSE, "%s: message received: %s\n", strArgs, message);
         }
-
     }
 
     k_exit(-3);

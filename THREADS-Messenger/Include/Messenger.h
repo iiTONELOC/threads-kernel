@@ -80,8 +80,10 @@ typedef struct mailbox
 	int dynamic;
 	void *pNext;
 	void *pPrev;
+	int closerPid;
 	int slotCount;
 	int tableIndex;
+	int waitingToClose;
 	int maxMessageSize;
 	MAILBOX_STATUS status;
 	DoublyLinkedList deliveredMailList;
