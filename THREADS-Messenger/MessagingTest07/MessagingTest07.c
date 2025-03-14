@@ -1,6 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-#include <string.h>
+
 #include "THREADSLib.h"
 #include "Scheduler.h"
 #include "Messaging.h"

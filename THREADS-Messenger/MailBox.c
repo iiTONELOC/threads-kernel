@@ -4,13 +4,13 @@
 #include "MessagingProcess.h"
 #include "Messenger.h"
 #include "THREADSLib.h"
-#include <DoublyLinkedList.h>
+#include "DoubleSeaLib.h"
 #include <Windows.h>
 #include "MailUtils.h"
 
 size_t mailBoxId = 0;
 MailBox MAIL_BOXES[MAXMBOX] = {0};
-DoublyLinkedList MBOX_EMPTY_LIST = {0};
+DSL_List MBOX_EMPTY_LIST = {0};
 
 // __________________________ Function Prototypes __________________________
 
@@ -27,15 +27,22 @@ void InitEmptyMailBoxList()
 	/*loop over the mailboxes an init the linked lists*/
 	for (size_t i = 0; i < MAXMBOX; i++)
 	{
-		InitializeDoublyLinkedList(0, OFFSETOF_MSLOT, &MAIL_BOXES[i].deliveredMailList, NULL);
-		InitializeDoublyLinkedList(0, OFFSETOF_MSG_PROC, &MAIL_BOXES[i].waitingProcsRecvList, NULL);
-		InitializeDoublyLinkedList(0, OFFSETOF_MSG_PROC, &MAIL_BOXES[i].waitingProcsSendList, NULL);
+		DSL_InitList(0, OFFSETOF_MSLOT, &MAIL_BOXES[i].deliveredMailList, NULL);
+		DSL_InitList(0, OFFSETOF_MSG_PROC, &MAIL_BOXES[i].waitingProcsRecvList, NULL);
+		DSL_InitList(0, OFFSETOF_MSG_PROC, &MAIL_BOXES[i].waitingProcsSendList, NULL);
 	}
 
-	/* Init the Linked List Structure */
-	InitStaticLinkedList(OFFSETOF_MBOX, MAXMBOX, (void *)&MAIL_BOXES,
-						 SIZEOF_MBOX, OFFSETOF_MBOX_TBL_IDX,
-						 &MBOX_EMPTY_LIST, NULL);
+	/* Init list list */
+	DSL_InitStaticStorageListArgs args = {
+		.data = (void *)&MAIL_BOXES,
+		.offset = OFFSETOF_MBOX,
+		.maxItems = MAXMBOX,
+		.pList = &MBOX_EMPTY_LIST,
+		.structSize = SIZEOF_MBOX,
+		.indexOffset = OFFSETOF_MBOX_TBL_IDX,
+		.orderFunction = NULL};
+
+	DSL_InitStaticStorageListWData(&args);
 }
 
 /**
@@ -50,7 +57,7 @@ void InitEmptyMailBoxList()
 int GetMailboxIdx(int mboxId)
 {
 	/* If the mailbox id is invalid, return -1 */
-	if (mboxId < 0 || mboxId >= MAXMBOX)
+	if (mboxId < 0)
 	{
 		return -1;
 	}
@@ -79,7 +86,7 @@ MailBox *GetNextEmptyMailbox()
 	MailBox *pMailBox;
 
 	/* Remove the node from the head of the list */
-	pMailBox = (MailBox *)Pop(&MBOX_EMPTY_LIST);
+	pMailBox = (MailBox *)DSL_Pop(&MBOX_EMPTY_LIST);
 
 	if (!pMailBox)
 		return NULL;
@@ -121,12 +128,12 @@ void ResetMailbox(MailBox *pMailbox)
 	pMailbox->waitingToClose = 0;
 	pMailbox->maxMessageSize = 0;
 	pMailbox->status = MB_STATUS_EMPTY;
-	InitializeDoublyLinkedList(0, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
-	InitializeDoublyLinkedList(0, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsRecvList, NULL);
-	InitializeDoublyLinkedList(0, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsSendList, NULL);
+	DSL_InitList(0, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
+	DSL_InitList(0, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsRecvList, NULL);
+	DSL_InitList(0, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsSendList, NULL);
 
 	/* Add the mailbox to the empty list */
-	InsertNode((void *)pMailbox, &MBOX_EMPTY_LIST);
+	DSL_InsertNode((void *)pMailbox, &MBOX_EMPTY_LIST);
 }
 
 /**
@@ -141,16 +148,16 @@ void ResetMailbox(MailBox *pMailbox)
 void ResetMailBoxSlots(MailBox *pMailBox)
 {
 	/* List of our slots */
-	DoublyLinkedList slotLists[] = {/*pMailBox->mailSlotsList,*/ pMailBox->deliveredMailList};
+	DSL_List slotLists[] = {/*pMailBox->mailSlotsList,*/ pMailBox->deliveredMailList};
 
 	/* Reset any mailslots, they could be anywhere in the lists*/
 	for (int i = 0; i < sizeof(slotLists) / sizeof(slotLists[0]); i++)
 	{
-		MailSlot *pSlot = (MailSlot *)Pop(&slotLists[i]);
+		MailSlot *pSlot = (MailSlot *)DSL_Pop(&slotLists[i]);
 		while (pSlot)
 		{
 			ResetMailSlot(pSlot);
-			pSlot = (MailSlot *)Pop(&slotLists[i]);
+			pSlot = (MailSlot *)DSL_Pop(&slotLists[i]);
 		}
 	}
 }
@@ -196,16 +203,16 @@ int HandleMailBoxClose(MailBox *pMailBox)
 void ResetMailBoxMsgProcs(MailBox *pMailBox)
 {
 	/* List of messaging processes */
-	DoublyLinkedList listsToCheck[] = {pMailBox->waitingProcsSendList, pMailBox->waitingProcsRecvList};
+	DSL_List listsToCheck[] = {pMailBox->waitingProcsSendList, pMailBox->waitingProcsRecvList};
 
 	/*Reset any messaging processes, they could be anywhere in the waiting lists*/
 	for (int i = 0; i < sizeof(listsToCheck) / sizeof(listsToCheck[0]); i++)
 	{
-		MessagingProcess *pMsgProc = (MessagingProcess *)Pop(&listsToCheck[i]);
+		MessagingProcess *pMsgProc = (MessagingProcess *)DSL_Pop(&listsToCheck[i]);
 		while (pMsgProc)
 		{
 			ResetMessagingProcess(pMsgProc);
-			pMsgProc = (MessagingProcess *)Pop(&listsToCheck[i]);
+			pMsgProc = (MessagingProcess *)DSL_Pop(&listsToCheck[i]);
 		}
 	}
 }
@@ -238,9 +245,9 @@ int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize)
 	pMailbox->maxMessageSize = slotSize; // set the max message size
 
 	/* Initialize the Linked Lists */
-	InitializeDoublyLinkedList(FALSE, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
-	InitializeDoublyLinkedList(FALSE, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsSendList, NULL);
-	InitializeDoublyLinkedList(FALSE, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsRecvList, NULL);
+	DSL_InitList(FALSE, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
+	DSL_InitList(FALSE, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsSendList, NULL);
+	DSL_InitList(FALSE, OFFSETOF_MSG_PROC, &pMailbox->waitingProcsRecvList, NULL);
 	return pMailbox->mboxId;
 }
 
@@ -252,7 +259,7 @@ int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize)
 void _IncrementMailBoxId()
 {
 	/* If we have rolled over*/
-	if (mailBoxId > 0 && (mailBoxId % MAXMBOX) == 0)
+	if (mailBoxId > 0 && (mailBoxId % (MAXMBOX - 1)) == 0)
 	{
 		/* Ensure that we account for the device's mailboxes */
 		mailBoxId = mailBoxId + THREADS_MAX_DEVICES;

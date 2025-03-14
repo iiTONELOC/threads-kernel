@@ -8,6 +8,7 @@
 #include "Scheduler.h"
 #include "THREADSLib.h"
 #include <memory.h>
+#include "DoubleSeaLib.h"
 
 // _________________________________ Function Definitions _________________________________
 

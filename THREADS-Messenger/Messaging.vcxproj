@@ -34,6 +34,7 @@
     <ClCompile Include="MessagingProcess.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Include\DoubleSeaLib.h" />
     <ClInclude Include="Include\MailBox.h" />
     <ClInclude Include="Include\MailSlot.h" />
     <ClInclude Include="Include\MailUtils.h" />
@@ -44,12 +45,12 @@
     <ClInclude Include="MailBoxUtils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DoubleSea\LinkedList.vcxproj">
-      <Project>{a5afe66b-dab3-4c9d-94bd-2e32e2adcca0}</Project>
-    </ProjectReference>
+    <None Include="README.MD" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="README.MD" />
+    <ProjectReference Include="..\DoubleSea\DoubleSeaLib.vcxproj">
+      <Project>{f7a64819-eb75-4d93-a5f1-1e91968a449c}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -184,7 +185,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Include;..\DoubleSea</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Include;..\DoubleSeaLib</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile />
     </ClCompile>
     <Link>

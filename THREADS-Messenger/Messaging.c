@@ -8,7 +8,7 @@
 
    ------------------------------------------------------------------------ */
 #include <THREADSLib.h>
-#include <DoublyLinkedList.h>
+#include <DoubleSeaLib.h>
 #include <MailBox.h>
 #include <MailUtils.h>
 #include <Messaging.h>
@@ -172,9 +172,9 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 		CopyMessageToSlot(pMailSlot, pMsg, msg_size, myPid, mboxId, MS_STATUS_INUSE);
 
 		/* If there is a process waiting to recv then deliver the message directly to them and wake them up */
-		if (pMailBox->waitingProcsRecvList.count > 0)
+		if (pMailBox->waitingProcsRecvList.length > 0)
 		{
-			pWaitingToRecvProcess = (MessagingProcess *)Pop(&pMailBox->waitingProcsRecvList);
+			pWaitingToRecvProcess = (MessagingProcess *)DSL_Pop(&pMailBox->waitingProcsRecvList);
 			pWaitingToRecvProcess->pSlot = pMailSlot;
 			pWaitingToRecvProcess->pSlot->status = MS_STATUS_DELIVERED_TO_PROC;
 			UnblockMessagingProcess(pWaitingToRecvProcess->pid, MP_READY);
@@ -182,17 +182,17 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 		}
 		else
 		{
-			if (pMailBox->deliveredMailList.count < pMailBox->slotCount)
+			if (pMailBox->deliveredMailList.length < pMailBox->slotCount)
 			{
 				pMailSlot->status = MS_STATUS_DELIVERED_TO_MBOX;
-				InsertNode((void *)pMailSlot, &pMailBox->deliveredMailList);
+				DSL_InsertNode((void *)pMailSlot, &pMailBox->deliveredMailList);
 				result = 0;
 			}
 			else if (wait)
 			{
 				/*block ourselves and wait for a slot to become available*/
 				runningMessengerProcess->pSlot = pMailSlot;
-				InsertNode((void *)runningMessengerProcess, &pMailBox->waitingProcsSendList);
+				DSL_InsertNode((void *)runningMessengerProcess, &pMailBox->waitingProcsSendList);
 				BlockMessagingProcess(myPid, MP_BLOCKED_SEND);
 
 				/* After Awoken - Try to send again */
@@ -214,7 +214,7 @@ int mailbox_send(int mboxId, void *pMsg, int msg_size, int wait)
 				else
 				{
 					ResetMailSlot(runningMessengerProcess->pSlot);
-					runningMessengerProcess->pSlot == NULL;
+					runningMessengerProcess->pSlot = NULL;
 					enableInterrupts();
 					return result;
 				}
@@ -272,9 +272,9 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		return -1;
 	}
 
-	if (pMailBox->waitingProcsSendList.count > 0)
+	if (pMailBox->waitingProcsSendList.length > 0)
 	{
-		pWaitingToSendProcess = (MessagingProcess *)Pop(&pMailBox->waitingProcsSendList);
+		pWaitingToSendProcess = (MessagingProcess *)DSL_Pop(&pMailBox->waitingProcsSendList);
 		pMailSlot = pWaitingToSendProcess->pSlot;
 		/*Zero slot mailbox*/
 		if (pMailBox->slotCount == 0)
@@ -327,11 +327,11 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 				}
 
 				/* Add the process stored to the delivered list */
-				InsertNode((void *)runningMessengerProcess->pSlot, &pMailBox->deliveredMailList);
+				DSL_InsertNode((void *)runningMessengerProcess->pSlot, &pMailBox->deliveredMailList);
 				runningMessengerProcess->pSlot = NULL;
 
 				/* Now we need to send back the next item in the delivery list*/
-				pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
+				pMailSlot = (MailSlot *)DSL_Pop(&pMailBox->deliveredMailList);
 				result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 
 				/* free the slot*/
@@ -342,7 +342,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 				/* The Mailbox is full we have no extra slots*/
 
 				/* Now we need to send back the next item in the delivery list*/
-				pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
+				pMailSlot = (MailSlot *)DSL_Pop(&pMailBox->deliveredMailList);
 				result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 
 				/* free the slot*/
@@ -364,9 +364,9 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		/*
 			WE have no waiting senders
 		*/
-		if (pMailBox->deliveredMailList.count > 0)
+		if (pMailBox->deliveredMailList.length > 0)
 		{
-			pMailSlot = (MailSlot *)Pop(&pMailBox->deliveredMailList);
+			pMailSlot = (MailSlot *)DSL_Pop(&pMailBox->deliveredMailList);
 			result = CopyMessageFromSlot(pMailSlot, pMsg, msg_size);
 			runningMessengerProcess->pSlot = NULL;
 
@@ -375,7 +375,7 @@ int mailbox_receive(int mboxId, void *pMsg, int msg_size, int wait)
 		}
 		else if (wait)
 		{
-			InsertNode((void *)runningMessengerProcess, &pMailBox->waitingProcsRecvList);
+			DSL_InsertNode((void *)runningMessengerProcess, &pMailBox->waitingProcsRecvList);
 			BlockMessagingProcess(myPid, MP_BLOCKED_RECEIVE);
 
 			/* After Awoken - CHECK TO SEE IF WE HAD A DIRECT DERIVERY */
@@ -428,7 +428,7 @@ int mailbox_free(int mboxId)
 	}
 
 	/* Check for blockers, and wake them up*/
-	DoublyLinkedList *pBlockedProcessLists[2] = {
+	DSL_List *pBlockedProcessLists[2] = {
 		&pBox->waitingProcsSendList,
 		&pBox->waitingProcsRecvList,
 
@@ -455,9 +455,9 @@ int mailbox_free(int mboxId)
 	/* Kill and Unblock any processes blocked on the mailbox */
 	for (int i = 0; i < 2; i++)
 	{
-		while (pBlockedProcessLists[i]->count > 0)
+		while (pBlockedProcessLists[i]->length > 0)
 		{
-			pProc = (MessagingProcess *)Pop(pBlockedProcessLists[i]);
+			pProc = (MessagingProcess *)DSL_Pop(pBlockedProcessLists[i]);
 			k_kill(pProc->pid, SIG_TERM);
 			UnblockMessagingProcess(pProc->pid, MP_BOX_DESTROYED);
 		}

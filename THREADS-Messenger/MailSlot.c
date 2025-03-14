@@ -1,17 +1,26 @@
 #include "MailSlot.h"
+#include "DoubleSeaLib.h"
 
 size_t NUM_M_SLOTS_IN_USE = 0;
 MailSlot MAIL_SLOTS[MAXSLOTS] = {0};
-DoublyLinkedList MAIL_SLOT_EMPTY_LIST = {0};
+DSL_List MAIL_SLOT_EMPTY_LIST = {0};
 
 /**
  * @brief Initialize a Linked List to Track Empty Mailslots
  */
 void InitEmptyMailSlotList()
 {
-    InitStaticLinkedList(OFFSETOF_MSLOT, MAXSLOTS, (void *)&MAIL_SLOTS,
-                         SIZEOF_MSLOT, OFFSETOF_MSLOT_TBL_IDX,
-                         &MAIL_SLOT_EMPTY_LIST, NULL);
+    /* Initialize the list */
+    DSL_InitStaticStorageListArgs args = {
+        .data = (void *)&MAIL_SLOTS,
+        .offset = OFFSETOF_MSLOT,
+        .maxItems = MAXSLOTS,
+        .pList = &MAIL_SLOT_EMPTY_LIST,
+        .structSize = SIZEOF_MSLOT,
+        .indexOffset = OFFSETOF_MSLOT_TBL_IDX,
+        .orderFunction = NULL};
+
+    DSL_InitStaticStorageListWData(&args);
 }
 
 /**
@@ -27,7 +36,7 @@ MailSlot *GetNextEmptyMailSlot()
     MailSlot *pMailSlot;
 
     /* if the list is empty return NULL */
-    if (MAIL_SLOT_EMPTY_LIST.count == 0 && NUM_M_SLOTS_IN_USE >= MAXSLOTS)
+    if (MAIL_SLOT_EMPTY_LIST.length == 0 && NUM_M_SLOTS_IN_USE >= MAXSLOTS)
     {
         return NULL;
     }
@@ -36,7 +45,7 @@ MailSlot *GetNextEmptyMailSlot()
     NUM_M_SLOTS_IN_USE++;
 
     /* Remove the node from the head of the list */
-    pMailSlot = (MailSlot *)Pop(&MAIL_SLOT_EMPTY_LIST);
+    pMailSlot = (MailSlot *)DSL_Pop(&MAIL_SLOT_EMPTY_LIST);
 
     /* if the mail slot is null stop(1)*/
     if (!pMailSlot)
@@ -71,7 +80,7 @@ void ResetMailSlot(MailSlot *pMailSlot)
     NUM_M_SLOTS_IN_USE--;
 
     /* Add the mailslot to the empty list */
-    InsertNode((void *)pMailSlot, &MAIL_SLOT_EMPTY_LIST);
+    DSL_InsertNode((void *)pMailSlot, &MAIL_SLOT_EMPTY_LIST);
 }
 
 /**

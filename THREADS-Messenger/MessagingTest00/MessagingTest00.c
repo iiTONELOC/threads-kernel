@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "DoubleSeaLib.h"
 #include "THREADSLib.h"
 #include "Scheduler.h"
 #include "Messaging.h"
@@ -13,12 +14,12 @@
 *********************************************************************************/
 int MessagingEntryPoint(void* pArgs)
 {
-    char* testName = GetTestName(__FILE__);
+	char* testName = GetTestName(__FILE__);
 
-    /* Just output a message and exit. */
-    console_output(FALSE, "\n%s: started\n", testName);
+	/* Just output a message and exit. */
+	console_output(FALSE, "\n%s: started\n", testName);
 
-    k_exit(0);
+	k_exit(0);
 
-    return 0;
+	return 0;
 }
