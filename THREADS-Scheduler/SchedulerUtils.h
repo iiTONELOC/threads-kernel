@@ -12,6 +12,8 @@
 
 void TrimRight(char *pString);
 void PrintProcessRow(Process *pProcess);
+void DestroyDoublyLinkedNode(DSL_Node *pNode);
+DSL_Node *CreateDoublyLinkedNode(void *pData);
 void CopyString(char *pSource, char *pDestination, size_t size);
 void PrintProcessTable(Process *usingTablePtr, int size, int currentNumProcesses);
 int ValidateKSpawnParams(char *name, int (*entryPoint)(void *), void *arg, int stacksize,

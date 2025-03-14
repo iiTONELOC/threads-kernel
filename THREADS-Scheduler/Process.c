@@ -20,8 +20,8 @@ int orderFunction(void *pNode1, void *pNode2)
         return 0;
     }
 
-    Process *process1 = (Process *)((DoublyLinkedNode *)pNode1)->pData;
-    Process *process2 = (Process *)((DoublyLinkedNode *)pNode2)->pData;
+    Process *process1 = (Process *)((DSL_Node *)pNode1)->pData;
+    Process *process2 = (Process *)((DSL_Node *)pNode2)->pData;
 
     if (process1 == NULL || process2 == NULL)
     {
@@ -60,14 +60,10 @@ void InitializeProcessToDefault(Process *usingProcessPtr)
     usingProcessPtr->entryPoint = NULL;
     usingProcessPtr->processTableIndex = -1;
     usingProcessPtr->quantum = MAX_PROC_QUANTUM;
-    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
-                               &usingProcessPtr->pChildren, orderFunction);
-    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
-                               &usingProcessPtr->pDeadChildren, orderFunction);
-    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
-                               &usingProcessPtr->pExitingChildren, orderFunction);
-    InitializeDoublyLinkedList(FALSE, DOUBLY_LINKED_NODE_OFFSET,
-                               &usingProcessPtr->pJoiningProcesses, orderFunction);
+    DSL_InitList(FALSE, OFFSETOF_DSL_NODE, &usingProcessPtr->pChildren, orderFunction);
+    DSL_InitList(FALSE, OFFSETOF_DSL_NODE, &usingProcessPtr->pDeadChildren, orderFunction);
+    DSL_InitList(FALSE, OFFSETOF_DSL_NODE, &usingProcessPtr->pExitingChildren, orderFunction);
+    DSL_InitList(FALSE, OFFSETOF_DSL_NODE, &usingProcessPtr->pJoiningProcesses, orderFunction);
 }
 
 /**
@@ -122,14 +118,14 @@ void InitializeNewProcess(Process *usingProcessPtr, char *name,
  * @param pResult Pointer to the result
  */
 void CleanUpAfterChild(Process *pRunningProcess,
-                       DoublyLinkedList *pChildList,
-                       DoublyLinkedNode *pStaticStorage,
-                       DoublyLinkedList *pPriorityListQueue,
+                       DSL_List *pChildList,
+                       DSL_Node *pStaticStorage,
+                       DSL_List *pPriorityListQueue,
                        int *pCode, int *pResult)
 {
     Process *pChild = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticNode = NULL;
+    DSL_Node *pStaticNode = NULL;
+    DSL_Node *pDynamicNode = NULL;
 
     // get the first child in the children list
     pDynamicNode = pChildList->pHead;
@@ -143,9 +139,9 @@ void CleanUpAfterChild(Process *pRunningProcess,
     // clean up after the child
     pStaticNode = FindStaticStorageNode(pChild->pid, pStaticStorage);
     // Remove the child from the children list
-    RemoveNode(pDynamicNode, pChildList);
+    DSL_RemoveNode(pDynamicNode, pChildList);
     // Remove the child from the priority quit list
-    RemoveNode(pStaticNode, &pPriorityListQueue[STATUS_QUIT]);
+    DSL_RemoveNode(pStaticNode, &pPriorityListQueue[STATUS_QUIT]);
     // Clean up the child process
     CleanUpPCB(pChild, pStaticNode);
     // -----------------------------------
@@ -201,11 +197,11 @@ void InitializeProcessTable(Process *usingTablePtr, int size)
  * @param pProcessToClean Pointer to the process to clean up
  * @param pStaticStorageNode Pointer to the static storage node
  */
-void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
+void CleanUpPCB(Process *pProcessToClean, DSL_Node *pStaticStorageNode)
 {
     context_stop(pProcessToClean->context);
     InitializeProcessToDefault(pProcessToClean);
-    InitializeDoublyLinkedNode(FALSE, pStaticStorageNode, NULL);
+    DSL_InitNode(FALSE, pStaticStorageNode, NULL);
 }
 
 /**
@@ -217,10 +213,10 @@ void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode)
  * @return Pointer to the next ready process or NULL if there are none
  */
 Process *GetNextReadyProcess(Process *pRunningProcess,
-                             DoublyLinkedList *pPriorityListQueue)
+                             DSL_List *pPriorityListQueue)
 {
     Process *pNextProcess = NULL;
-    DoublyLinkedNode *pNextLNode = NULL;
+    DSL_Node *pNextLNode = NULL;
     int higherThanPriority = LOWEST_PRIORITY;
 
     // check the currently running process' priority
@@ -249,7 +245,7 @@ Process *GetNextReadyProcess(Process *pRunningProcess,
         {
 
             ChangeProcessStatus(pPriorityListQueue,
-                                (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                                (DSL_Node *)*DSL_FindNode(
                                     &pPriorityListQueue[STATUS_RUNNING], (void *)pRunningProcess),
                                 STATUS_READY);
         }

@@ -43,7 +43,7 @@ int GetStatusListIndex(int status)
  *
  * @return The linked list node or NULL if not found
  */
-DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket)
+DSL_Node *FindStaticStorageNode(int withPid, DSL_Node *pNodeBucket)
 {
     int i = 0;
 
@@ -53,13 +53,13 @@ DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBuck
     {
 
         // If we have NULL data just skip to the next node
-        if (((DoublyLinkedNode *)&pNodeBucket[i])->pData == NULL)
+        if (((DSL_Node *)&pNodeBucket[i])->pData == NULL)
         {
             continue;
         }
 
         // Non-NULL data, check the pid
-        if (((Process *)((DoublyLinkedNode *)&pNodeBucket[i])->pData)->pid == withPid)
+        if (((Process *)((DSL_Node *)&pNodeBucket[i])->pData)->pid == withPid)
         {
             // match found
             return &pNodeBucket[i];
@@ -76,13 +76,13 @@ DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBuck
  * @param pNodeBucket The array of nodes to initialize
  * @param numNodes The number of nodes to initialize
  */
-void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNodeBucket, int numNodes)
+void InitializeDoublyLinkedNodeStorage(DSL_Node *pNodeBucket, int numNodes)
 {
     int i = 0;
 
     for (i = 0; i < numNodes; i++)
     {
-        InitializeDoublyLinkedNode(0, &pNodeBucket[i], NULL);
+        DSL_InitNode(0, &pNodeBucket[i], NULL);
     }
 }
 
@@ -92,13 +92,13 @@ void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNodeBucket, int numNod
  * @param usingArrayPtr The array of priority process queues
  * @param numStates The number of states to initialize
  */
-void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int numStates)
+void InitializePriorityProcessQueueArray(DSL_List *usingArrayPtr, int numStates)
 {
     int i = 0;
 
     for (i = 0; i < numStates; i++)
     {
-        InitializeDoublyLinkedList(0, DOUBLY_LINKED_NODE_OFFSET, &usingArrayPtr[i], orderFunction);
+        DSL_InitList(0, OFFSETOF_DSL_NODE, &usingArrayPtr[i], orderFunction);
     }
 }
 
@@ -108,14 +108,14 @@ void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int nu
  * @param usingQueuePtr The queue to add the node to
  * @param pListNode The node to add
  */
-void AddNodeToPriorityProcessQueue(DoublyLinkedList *usingQueuePtr, DoublyLinkedNode *pListNode)
+void AddNodeToPriorityProcessQueue(DSL_List *usingQueuePtr, DSL_Node *pListNode)
 {
     if (usingQueuePtr == NULL || pListNode == NULL)
     {
         return;
     }
 
-    InsertNode(pListNode, usingQueuePtr);
+    DSL_InsertNode(pListNode, usingQueuePtr);
 }
 
 /**
@@ -124,14 +124,14 @@ void AddNodeToPriorityProcessQueue(DoublyLinkedList *usingQueuePtr, DoublyLinked
  * @param usingListPtr The list to remove the node from
  * @param pListNode The node to remove
  */
-void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode)
+void RemoveNodeFromPriorityProcessQueue(DSL_List *usingListPtr, DSL_Node *pListNode)
 {
     if (usingListPtr == NULL || pListNode == NULL)
     {
         return;
     }
 
-    RemoveNode(pListNode, usingListPtr);
+    DSL_RemoveNode(pListNode, usingListPtr);
 }
 
 /**
@@ -141,7 +141,7 @@ void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLi
  * @param pListNode The node to change the status of
  * @param newStatus The new status to set
  */
-void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode, int newStatus)
+void ChangeProcessStatus(DSL_List *usingListPtr, DSL_Node *pListNode, int newStatus)
 {
     int safeIndex = -1;
 
@@ -175,11 +175,10 @@ void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pList
  * @param pToList Pointer to the list to move the node to
  * @param pNode Pointer to the node to move
  */
-void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList,
-                          DoublyLinkedNode *pNode)
+void MoveDoublyLinkedNode(DSL_List *pFromList, DSL_List *pToList, DSL_Node *pNode)
 {
     // remove the node from the from list
-    RemoveNode((void *)pNode, pFromList);
+    DSL_RemoveNode((void *)pNode, pFromList);
     // insert the node into the to list
-    InsertNode((void *)pNode, pToList);
+    DSL_InsertNode((void *)pNode, pToList);
 }

@@ -3,7 +3,7 @@
 #define PRIORITY_PROCESS_QUEUE
 #include "Constants.h"
 #include "Processes.h"
-#include "DoublyLinkedList.h"
+#include "DoubleSeaLib.h"
 // __________________________ Constants __________________________
 
 const char *STATUS_STRINGS[NUM_PROCESS_STATES];
@@ -11,12 +11,12 @@ const char *STATUS_STRINGS[NUM_PROCESS_STATES];
 /*_______________________Function  Prototypes_______________________*/
 
 int GetStatusListIndex(int status);
-DoublyLinkedNode *FindStaticStorageNode(int withPid, DoublyLinkedNode *pNodeBucket);
-void InitializeDoublyLinkedNodeStorage(DoublyLinkedNode *pNodeBucket, int numNodes);
-void InitializePriorityProcessQueueArray(DoublyLinkedList *usingArrayPtr, int numStates);
-void AddNodeToPriorityProcessQueue(DoublyLinkedList *usingQueuePtr, DoublyLinkedNode *pListNode);
-void RemoveNodeFromPriorityProcessQueue(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode);
-void ChangeProcessStatus(DoublyLinkedList *usingListPtr, DoublyLinkedNode *pListNode, int newStatus);
-void MoveDoublyLinkedNode(DoublyLinkedList *pFromList, DoublyLinkedList *pToList, DoublyLinkedNode *pNode);
+DSL_Node *FindStaticStorageNode(int withPid, DSL_Node *pNodeBucket);
+void InitializeDoublyLinkedNodeStorage(DSL_Node *pNodeBucket, int numNodes);
+void InitializePriorityProcessQueueArray(DSL_List *usingArrayPtr, int numStates);
+void AddNodeToPriorityProcessQueue(DSL_List *usingQueuePtr, DSL_Node *pListNode);
+void RemoveNodeFromPriorityProcessQueue(DSL_List *usingListPtr, DSL_Node *pListNode);
+void ChangeProcessStatus(DSL_List *usingListPtr, DSL_Node *pListNode, int newStatus);
+void MoveDoublyLinkedNode(DSL_List *pFromList, DSL_List *pToList, DSL_Node *pNode);
 
 #endif

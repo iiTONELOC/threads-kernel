@@ -57,9 +57,56 @@ void PrintProcessRow(Process *pProcess)
                    pProcess->pParent == NULL ? -1 : pProcess->pParent->pid,
                    pProcess->priority,
                    statusStr,
-                   pProcess->pChildren.count,
+                   pProcess->pChildren.length,
                    pProcess->cpuTime,
                    pProcess->name);
+}
+
+/**
+ * @brief Destroys a doubly linked node.
+ *
+ * This function destroys a doubly linked node
+ * if it was dynamically allocated. Otherwise, it
+ * resets the node's values.
+ *
+ * @param pNode Pointer to the DSL_Node structure.
+ * @return Nothing
+ */
+void DestroyDoublyLinkedNode(DSL_Node *pNode)
+{
+    if (pNode == NULL)
+    {
+        return;
+    }
+    else if (pNode->dynamic == 1)
+    {
+        free(pNode);
+    }
+    else
+    {
+        DSL_InitNode(0, pNode, NULL);
+    }
+}
+
+/**
+ * @brief Creates a dynamic doubly linked node.
+ *
+ * This function creates a dynamically allocated doubly linked node.
+ *
+ * @param pData Pointer to the data the node holds.
+ * @return Pointer to the created DoublyLinkedNode structure.
+ */
+DSL_Node *CreateDoublyLinkedNode(void *pData)
+{
+    DSL_Node *pNode = (DSL_Node *)malloc(sizeof(DSL_Node));
+
+    if (pNode == NULL)
+    {
+        return NULL;
+    }
+
+    DSL_InitNode(1, pNode, pData);
+    return pNode;
 }
 
 /**

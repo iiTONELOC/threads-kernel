@@ -1,4 +1,5 @@
 #pragma once
+#include "THREADSLib.h"
 
 #define LOWEST_PRIORITY 0
 #define HIGHEST_PRIORITY 5

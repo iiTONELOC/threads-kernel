@@ -8,15 +8,15 @@
 #include "SchedulerUtils.h"
 #include "PriorityProcessQueue.h"
 
-int nextPid = 1;                                        // next process id
-int debugFlag = 0;                                      // debug flag
-int isBooting = 0;                                      // flag to indicate if the system is in bootstrap
-int currentNumProcesses = 0;                            // current number of processes
-Process *runningProcess = NULL;                         // tracks current running process
-Process processTable[MAX_PROCESSES];                    // process table
-interrupt_handler_t *interruptHandlers = NULL;          // interrupt handlers from THREADS API
-DoublyLinkedNode staticNodeStorage[MAX_PROCESSES];      // Storage for process state linked list
-DoublyLinkedList priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue for process states
+int nextPid = 1;                                // next process id
+int debugFlag = 0;                              // debug flag
+int isBooting = 0;                              // flag to indicate if the system is in bootstrap
+int currentNumProcesses = 0;                    // current number of processes
+Process *runningProcess = NULL;                 // tracks current running process
+Process processTable[MAX_PROCESSES];            // process table
+interrupt_handler_t *interruptHandlers = NULL;  // interrupt handlers from THREADS API
+DSL_Node staticNodeStorage[MAX_PROCESSES];      // Storage for process state linked list
+DSL_List priorityListQueue[NUM_PROCESS_STATES]; // Priority list queue for process states
 
 int cpu_time();
 void time_slice();
@@ -101,8 +101,8 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
     int result = 0;
     int proc_slot;
     Process *pNewProc;
-    DoublyLinkedNode *pNewChildProcNode = NULL;
-    DoublyLinkedNode *pRunningProcessLinkedListNode = NULL;
+    DSL_Node *pNewChildProcNode = NULL;
+    DSL_Node *pRunningProcessLinkedListNode = NULL;
 
     result = ValidateKSpawnParams(name, entryPoint, arg, stacksize, priority, debugFlag);
     if (result != 0)
@@ -148,7 +148,7 @@ int k_spawn(char *name, int (*entryPoint)(void *), void *arg, int stacksize, int
         }
 
         // add the child process to the parent's children list
-        InsertNode((void *)pNewChildProcNode, &runningProcess->pChildren);
+        DSL_InsertNode((void *)pNewChildProcNode, &runningProcess->pChildren);
 
         // add the parent process to the child process' pParent
         pNewProc->pParent = runningProcess;
@@ -205,15 +205,15 @@ int k_wait(int *code)
 {
     enforceKernelMode();
     disableInterrupts();
-    int result = 0;                     // return value
-    Process *pChild = NULL;             // Child process
-    DoublyLinkedNode *pTempNode = NULL; // Linked List Node for the Running Process
+    int result = 0;             // return value
+    Process *pChild = NULL;     // Child process
+    DSL_Node *pTempNode = NULL; // Linked List Node for the Running Process
 
     // Look for a running process, if there is a running process then it is the parent of the
     // current process that is trying to exit.
 
     // check for dead children - children that have already quit
-    if (runningProcess != NULL && runningProcess->pDeadChildren.count > 0)
+    if (runningProcess != NULL && runningProcess->pDeadChildren.length > 0)
     {
         CleanUpAfterChild(runningProcess,
                           &runningProcess->pDeadChildren,
@@ -226,7 +226,7 @@ int k_wait(int *code)
         return result;
     }
 
-    if (runningProcess != NULL && runningProcess->pChildren.count == 0)
+    if (runningProcess != NULL && runningProcess->pChildren.length == 0)
     {
         // no processes to wait for
         enableInterrupts();
@@ -234,7 +234,7 @@ int k_wait(int *code)
     }
 
     ChangeProcessStatus(priorityListQueue,
-                        (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                        (DSL_Node *)*DSL_FindNode(
                             &priorityListQueue[STATUS_RUNNING], (void *)runningProcess),
                         STATUS_BLOCKED_WAIT);
     runningProcess = NULL;
@@ -244,7 +244,7 @@ int k_wait(int *code)
     // AFTER PARENT WAS AWAKENED BY THEIR CHILD
     disableInterrupts();
     // get the exit code of the child
-    if (runningProcess->pExitingChildren.count > 0)
+    if (runningProcess->pExitingChildren.length > 0)
     {
         CleanUpAfterChild(runningProcess,
                           &runningProcess->pExitingChildren,
@@ -270,15 +270,14 @@ void k_exit(int code)
 {
     enforceKernelMode();
     disableInterrupts();
+    DSL_Node *pDynamicNode = NULL;
+    DSL_Node *pStaticListNode = NULL;
     Process *pProcessINeedToJoin = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticListNode = NULL;
-
     // terminate the process and set its exit code
     // set the status to QUIT
 
     // check if the process has children
-    if (runningProcess->pChildren.count > 0)
+    if (runningProcess->pChildren.length > 0)
     {
         console_output(debugFlag, "quit(): Process with active children attempting to quit\n");
         stop(1);
@@ -297,26 +296,26 @@ void k_exit(int code)
     }
 
     // Grab the static linked list node for the process from static node storage
-    pStaticListNode = (DoublyLinkedNode *)*FindDoublyLinkedNode(&priorityListQueue[STATUS_RUNNING], (void *)runningProcess);
+    pStaticListNode = (DSL_Node *)*DSL_FindNode(&priorityListQueue[STATUS_RUNNING], (void *)runningProcess);
 
     // set the status of the quitting process to QUIT - requires a static node
     ChangeProcessStatus(priorityListQueue, pStaticListNode, STATUS_QUIT);
 
     // check if the process needs to join a process
-    if (runningProcess->pJoiningProcesses.count > 0)
+    if (runningProcess->pJoiningProcesses.length > 0)
     {
         // for each process that is joining this process - set the status to ready
         // and remove the process from the joining list
-        while (runningProcess->pJoiningProcesses.count > 0)
+        while (runningProcess->pJoiningProcesses.length > 0)
         {
             // get the dynamic linked list node for process
-            pDynamicNode = (DoublyLinkedNode *)runningProcess->pJoiningProcesses.pHead;
-            RemoveNode(
+            pDynamicNode = (DSL_Node *)runningProcess->pJoiningProcesses.pHead;
+            DSL_RemoveNode(
                 runningProcess->pJoiningProcesses.pHead, &runningProcess->pJoiningProcesses);
             pProcessINeedToJoin = (Process *)pDynamicNode->pData;
             // set the status of the process to ready
             ChangeProcessStatus(priorityListQueue,
-                                (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                                (DSL_Node *)*DSL_FindNode(
                                     &priorityListQueue[STATUS_BLOCKED_JOIN], (void *)pProcessINeedToJoin),
                                 STATUS_READY);
             // free the linked list node
@@ -329,7 +328,7 @@ void k_exit(int code)
     // The process has a parent so we need to inform the parent that the child has quit
     if (runningProcess->pParent != NULL)
     {
-        pDynamicNode = (DoublyLinkedNode *)*FindDoublyLinkedNode(&runningProcess->pParent->pChildren, (void *)runningProcess);
+        pDynamicNode = (DSL_Node *)*DSL_FindNode(&runningProcess->pParent->pChildren, (void *)runningProcess);
         // check if the parent is blocked before changing the status
         // if the parent is still running, we have a child process
         // with a higher priority than the parent process
@@ -337,7 +336,7 @@ void k_exit(int code)
         {
             // change the status of the parent to ready
             ChangeProcessStatus(priorityListQueue,
-                                (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                                (DSL_Node *)*DSL_FindNode(
                                     &priorityListQueue[STATUS_BLOCKED_WAIT],
                                     (void *)runningProcess->pParent),
                                 STATUS_READY);
@@ -371,7 +370,7 @@ int k_kill(int pid, int signal)
     enforceKernelMode();
     int result = 0;
     Process *pProcess = NULL;
-    DoublyLinkedNode *pListNode = NULL;
+    DSL_Node *pListNode = NULL;
 
     disableInterrupts();
     // look for the process in the process table
@@ -413,8 +412,8 @@ int k_join(int pid, int *pChildExitCode)
 
     // get the process from the process table
     Process *pProcess = NULL;
-    DoublyLinkedNode *pNewJoiningProcessNode = NULL;
-    DoublyLinkedNode *pStaticListNode = FindStaticStorageNode(pid, staticNodeStorage);
+    DSL_Node *pNewJoiningProcessNode = NULL;
+    DSL_Node *pStaticListNode = FindStaticStorageNode(pid, staticNodeStorage);
 
     if (pStaticListNode != NULL)
     {
@@ -454,16 +453,16 @@ int k_join(int pid, int *pChildExitCode)
     }
 
     // add the running process to the joining processes list of the process we are trying to join
-    InsertNode((void *)pNewJoiningProcessNode, &pProcess->pJoiningProcesses);
+    DSL_InsertNode((void *)pNewJoiningProcessNode, &pProcess->pJoiningProcesses);
 
     // set the status of the running process to blocked join
     ChangeProcessStatus(priorityListQueue,
-                        (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                        (DSL_Node *)*DSL_FindNode(
                             &priorityListQueue[STATUS_RUNNING], (void *)runningProcess),
                         STATUS_BLOCKED_JOIN);
 
     // verify that our node made it the pJoiningProcesses list
-    if (*FindDoublyLinkedNode(&pProcess->pJoiningProcesses, (void *)runningProcess) == NULL)
+    if (*DSL_FindNode(&pProcess->pJoiningProcesses, (void *)runningProcess) == NULL)
     {
         enableInterrupts();
         return -1;
@@ -494,7 +493,7 @@ int unblock(int pid)
     disableInterrupts();
     // get the process from the process table
     Process *pProcess = NULL;
-    DoublyLinkedNode *pListNode = FindStaticStorageNode(pid, staticNodeStorage);
+    DSL_Node *pListNode = FindStaticStorageNode(pid, staticNodeStorage);
 
     if (pListNode != NULL)
     {
@@ -532,7 +531,7 @@ int block(int newStatus)
 
     disableInterrupts();
     ChangeProcessStatus(priorityListQueue,
-                        (DoublyLinkedNode *)*FindDoublyLinkedNode(
+                        (DSL_Node *)*DSL_FindNode(
                             &priorityListQueue[STATUS_RUNNING], (void *)runningProcess),
                         newStatus);
 
@@ -640,8 +639,8 @@ static int watchdog(void *dummy)
 {
     enforceKernelMode();
     Process *pNextReadyProc = NULL;
-    DoublyLinkedNode *pDynamicNode = NULL;
-    DoublyLinkedNode *pStaticListNode = NULL;
+    DSL_Node *pDynamicNode = NULL;
+    DSL_Node *pStaticListNode = NULL;
 
     if (isBooting)
     {
@@ -650,7 +649,7 @@ static int watchdog(void *dummy)
     }
 
     disableInterrupts();
-    DoublyLinkedNode *pNode = (DoublyLinkedNode *)priorityListQueue[STATUS_READY].pHead;
+    DSL_Node *pNode = (DSL_Node *)priorityListQueue[STATUS_READY].pHead;
     enableInterrupts();
 
     if (pNode == NULL || pNode->pData == NULL)
@@ -669,7 +668,7 @@ static void check_deadlock()
     enforceKernelMode();
     int i = 0;
     Process *pCurrentProc = NULL;
-    DoublyLinkedNode *pNextLNode = NULL;
+    DSL_Node *pNextLNode = NULL;
 
     // determine why the watchdog was called
     while (1)
@@ -682,7 +681,7 @@ static void check_deadlock()
         {
             disableInterrupts();
             // get the head of the list
-            pNextLNode = (DoublyLinkedNode *)priorityListQueue[i].pHead;
+            pNextLNode = (DSL_Node *)priorityListQueue[i].pHead;
 
             // if the head is not null, we have a process
             if (pNextLNode != NULL)
@@ -693,9 +692,8 @@ static void check_deadlock()
                 // if the process is not null, we have a process
                 if (pCurrentProc != NULL && pCurrentProc->status != STATUS_RUNNING)
                 {
-                    // print the process name
-                    console_output(FALSE, "Current List is the %s list.\n", STATUS_STRINGS[i]);
-                    console_output(FALSE, "Current process is:  %s .\n", pCurrentProc->name);
+                    // print the process id and stop(1)
+                    console_output(FALSE, "Process id: %d\n", pCurrentProc->pid);
                 }
             }
         }

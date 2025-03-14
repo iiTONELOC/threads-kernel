@@ -35,9 +35,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\DoubleSea\DoublyLinkedList.h" />
-    <ClInclude Include="..\DoubleSea\ListUtils.h" />
     <ClInclude Include="Constants.h" />
+    <ClInclude Include="Include\DoubleSeaLib.h" />
     <ClInclude Include="Include\Scheduler.h" />
     <ClInclude Include="Include\THREADSLib.h" />
     <ClInclude Include="PriorityProcessQueue.h" />
@@ -49,11 +48,6 @@
     <ClCompile Include="Process.c" />
     <ClCompile Include="Scheduler.c" />
     <ClCompile Include="SchedulerUtils.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DoubleSea\LinkedList.vcxproj">
-      <Project>{a5afe66b-dab3-4c9d-94bd-2e32e2adcca0}</Project>
-    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -269,7 +263,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(SolutionDir)\include;..\DoubleSea;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>

@@ -4,17 +4,17 @@
 
 #include <stdlib.h>
 #include "Constants.h"
-#include "DoublyLinkedList.h"
+#include "DoubleSeaLib.h"
 
 /*_______________________Structures _______________________*/
 #pragma pack(1)
 typedef struct _process
 {
 	struct _process *pParent;
-	DoublyLinkedList pChildren;
-	DoublyLinkedList pDeadChildren;
-	DoublyLinkedList pExitingChildren;
-	DoublyLinkedList pJoiningProcesses;
+	DSL_List pChildren;
+	DSL_List pDeadChildren;
+	DSL_List pExitingChildren;
+	DSL_List pJoiningProcesses;
 
 	short pid;					/* Process id (pid) */
 	int status;					/* READY, QUIT, BLOCKED, etc. */
@@ -44,13 +44,13 @@ void InitializeNewProcess(Process *usingProcessPtr, char *name,
 						  int stacksize, int priority, int procSlot,
 						  int nextPid);
 void CleanUpAfterChild(Process *pRunningProcess,
-					   DoublyLinkedList *pChildList,
-					   DoublyLinkedNode *pStaticStorage,
-					   DoublyLinkedList *pPriorityListQueue,
+					   DSL_List *pChildList,
+					   DSL_Node *pStaticStorage,
+					   DSL_List *pPriorityListQueue,
 					   int *pCode, int *pResult);
 int GetEmptyControlBlockIndex(Process *fromProcessTablePtr);
 void InitializeProcessTable(Process *usingTablePtr, int size);
-void CleanUpPCB(Process *pProcessToClean, DoublyLinkedNode *pStaticStorageNode);
-Process *GetNextReadyProcess(Process *pRunningProcess, DoublyLinkedList *pPriorityListQueue);
+void CleanUpPCB(Process *pProcessToClean, DSL_Node *pStaticStorageNode);
+Process *GetNextReadyProcess(Process *pRunningProcess, DSL_List *pPriorityListQueue);
 
 #endif
