@@ -12,13 +12,13 @@ void InitEmptyMailSlotList()
 {
     /* Initialize the list */
     DSL_InitStaticStorageListArgs args = {
-        .data = (void *)&MAIL_SLOTS,
-        .offset = OFFSETOF_MSLOT,
         .maxItems = MAXSLOTS,
-        .pList = &MAIL_SLOT_EMPTY_LIST,
+        .orderFunction = NULL,
+        .offset = OFFSETOF_MSLOT,
         .structSize = SIZEOF_MSLOT,
-        .indexOffset = OFFSETOF_MSLOT_TBL_IDX,
-        .orderFunction = NULL};
+        .data = (void *)&MAIL_SLOTS,
+        .pList = &MAIL_SLOT_EMPTY_LIST,
+        .indexOffset = OFFSETOF_MSLOT_TBL_IDX};
 
     DSL_InitStaticStorageListWData(&args);
 }

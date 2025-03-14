@@ -9,6 +9,7 @@
 #include "THREADSLib.h"
 #include <memory.h>
 #include "DoubleSeaLib.h"
+#include <stdint.h>
 
 // _________________________________ Function Definitions _________________________________
 
@@ -65,6 +66,7 @@ int GetSignals(MessagingProcess *pProcess)
  */
 void InitializeDevices(DeviceManagementData *pDevices)
 {
+	/* Interrupt is extra, the spec lists 7 devices yet THREADS_MAX_DEVICES==8 */
 	char *deviceNames[] = {"disk0", "disk1", "term0", "term1", "term2", "term3", "clock", "interrupt"};
 	for (int i = 0; i < THREADS_MAX_DEVICES; ++i)
 	{
@@ -72,6 +74,7 @@ void InitializeDevices(DeviceManagementData *pDevices)
 		CopyString(deviceNames[i], pDevices[i].deviceName, sizeof(pDevices[i].deviceName));
 		/* Init the device and grab its handle */
 		pDevices[i].deviceHandle = device_initialize(deviceNames[i]);
+
 		if (i <= 1)
 		{
 			pDevices[i].deviceType = DEVICE_DISK;

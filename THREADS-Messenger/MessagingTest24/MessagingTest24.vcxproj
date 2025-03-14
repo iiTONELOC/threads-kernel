@@ -150,7 +150,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)Include;..\DoubleSea</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Include;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -213,9 +213,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\DoubleSea\DoubleSeaLib.vcxproj">
-      <Project>{f7a64819-eb75-4d93-a5f1-1e91968a449c}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\Messaging.vcxproj">
       <Project>{6cdaa8f2-0846-4707-a0b7-060e42da5769}</Project>
     </ProjectReference>

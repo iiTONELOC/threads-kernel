@@ -42,15 +42,9 @@
     <ClInclude Include="Include\MessagingProcess.h" />
     <ClInclude Include="Include\Messenger.h" />
     <ClInclude Include="Include\THREADSLib.h" />
-    <ClInclude Include="MailBoxUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.MD" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DoubleSea\DoubleSeaLib.vcxproj">
-      <Project>{f7a64819-eb75-4d93-a5f1-1e91968a449c}</Project>
-    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -185,7 +179,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)Include;..\DoubleSeaLib</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Include;</AdditionalIncludeDirectories>
       <PrecompiledHeaderOutputFile />
     </ClCompile>
     <Link>

@@ -34,13 +34,14 @@ void InitEmptyMailBoxList()
 
 	/* Init list list */
 	DSL_InitStaticStorageListArgs args = {
-		.data = (void *)&MAIL_BOXES,
-		.offset = OFFSETOF_MBOX,
 		.maxItems = MAXMBOX,
-		.pList = &MBOX_EMPTY_LIST,
+		.orderFunction = NULL,
+		.offset = OFFSETOF_MBOX,
 		.structSize = SIZEOF_MBOX,
+		.pList = &MBOX_EMPTY_LIST,
+		.data = (void *)&MAIL_BOXES,
 		.indexOffset = OFFSETOF_MBOX_TBL_IDX,
-		.orderFunction = NULL};
+	};
 
 	DSL_InitStaticStorageListWData(&args);
 }
@@ -125,7 +126,7 @@ void ResetMailbox(MailBox *pMailbox)
 	pMailbox->pPrev = NULL;
 	pMailbox->slotCount = 0;
 	pMailbox->closerPid = 0;
-	pMailbox->waitingToClose = 0;
+	pMailbox->procsWaitingToClose = 0;
 	pMailbox->maxMessageSize = 0;
 	pMailbox->status = MB_STATUS_EMPTY;
 	DSL_InitList(0, OFFSETOF_MSLOT, &pMailbox->deliveredMailList, NULL);
@@ -177,7 +178,7 @@ int HandleMailBoxClose(MailBox *pMailBox)
 	if (pMailBox->status == MB_STATUS_RELEASED || pMailBox->status == MB_STATUS_EMPTY)
 	{
 		/* We are the last one  */
-		if (pMailBox->waitingToClose == 1)
+		if (pMailBox->procsWaitingToClose == 1)
 		{
 			/* wake up the closer so it can join */
 			int closer = pMailBox->closerPid;
@@ -186,7 +187,7 @@ int HandleMailBoxClose(MailBox *pMailBox)
 			/*	BlockMessagingProcess(k_getpid(), MP_BOX_DESTROYED);*/
 		}
 
-		pMailBox->waitingToClose--;
+		pMailBox->procsWaitingToClose--;
 	}
 	return GetSignals(FindProcessInTable(k_getpid()));
 }
@@ -258,7 +259,7 @@ int ReuseMailbox(MailBox *pMailbox, int slotCount, int slotSize)
  */
 void _IncrementMailBoxId()
 {
-	/* If we have rolled over*/
+	/* If we have rolled over, **our id starts at zero so n = Max - 1** */
 	if (mailBoxId > 0 && (mailBoxId % (MAXMBOX - 1)) == 0)
 	{
 		/* Ensure that we account for the device's mailboxes */

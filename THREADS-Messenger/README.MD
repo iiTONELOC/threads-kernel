@@ -1,6 +1,8 @@
-# Messenger Project Milestone 00
+# Messenger Project Solution
 
 ## CYBV 489 Principles of Operating Systems
+
+`Anthony Tropeano` `Connor Stackhouse`
 
 ## Table of Contents
 
@@ -45,11 +47,13 @@ These rules may appear relatively straightforward, but the implementation of suc
 
 ## Usage
 
-Part of the solution utilizes a Generic Linked List implementation, [DoubleSea](https://github.com/iiTONELOC/DoubleSea) created by Anthony, and is attached as a Git submodule our THREADS project repo.  
+Part of the solution utilizes a Generic Linked List implementation, [DoubleSeaLib](https://github.com/iiTONELOC/DoubleSea) created by Anthony, as a DLL, and is excluded from the `threads-kernel` repo.
 
-For simplicity, a ZIP folder has been provided which includes pre-build output. The solution folder can be opened in Visual Studio and the project rebuilt if necessary but a Batch file has been included in the `bin/` folder and is titled: `RunMessengerTests.bat`
+For simplicity, a ZIP folder has been provided which includes pre-built output and the necessary DLLs and Libs.
 
-Once unzipped, the prebuilt solution can be executed directly using the above script:
+The solution folder can be opened in Visual Studio and the project rebuilt if necessary.
+
+Once unzipped, the prebuilt solution and its tests can be executed directly using the Batch file included in the `bin/` folder titled: `RunMessengerTests.bat`:
 
 ```bash
 cd <path_to_THREADS-Messenger/bin>
@@ -71,54 +75,54 @@ All processes completed.
 
 ## Solution
 
-
 ### Test Case Results
 
-| Test Case Number | Test Result                            |
-|------------------|----------------------------------------|
-| 00               | <p style="color: green"> PASSED </p>   |
-| 01               | <p style="color: green"> PASSED </p>   |
-| 02               | <p style="color: green"> PASSED </p>   |
-| 03               | <p style="color: green"> PASSED </p>   |
-| 04               | <p style="color: green"> PASSED </p>   |
-| 05               | <p style="color: green"> PASSED </p>   |
-| 06               | <p style="color: green"> PASSED </p>   |
-| 07               | <p style="color: green"> PASSED </p>   |
-| 08               | <p style="color: green"> PASSED </p>   |
-| 09               | <p style="color: red">   FAILED </p>   |
-| 10               | <p style="color: green"> PASSED </p>   |
-| 11               | <p style="color: green"> PASSED </p>   |
-| 12               | <p style="color: green"> PASSED </p>   |
-| 13               | <p style="color: green"> PASSED </p>   |
-| 14               | <p style="color: green"> PASSED* </p>  |
-| 15               | <p style="color: green"> PASSED </p>   |
-| 16               | <p style="color: green"> PASSED </p>   |
-| 17               | <p style="color: red">   FAILED </p>   |
-| 18               | <p style="color: red">   FAILED </p>   |
-| 19               | <p style="color: red">   FAILED </p>   |
-| 20               | <p style="color: red">   FAILED </p>   |
-| 21               | <p style="color: green"> PASSED </p>   |
-| 22               | <p style="color: green"> PASSED </p>   |
-| 23               | <p style="color: green"> PASSED </p>   |
-| 24               | <p style="color: green"> PASSED </p>   |
-| 25               | <p style="color: green"> PASSED* </p>  |
-| 26               | <p style="color: red">   FAILED </p>   |
-| 27               | <p style="color: red">   FAILED </p>   |
-| 28               | <p style="color: green"> PASSED </p>   |
-| 29               | <p style="color: green"> PASSED </p>   |
-| 30               | <p style="color: green"> PASSED </p>   |
-| 31               | <p style="color: green"> PASSED </p>   |
-| 32               | <p style="color: green"> PASSED </p>   |
-| 33               | <p style="color: green"> PASSED </p>   |
-| 34               | <p style="color: green"> PASSED </p>   |
-| 35               | <p style="color: green"> PASSED </p>   |
-| 36               | <p style="color: green"> PASSED </p>   |
-| 37               | <p style="color: green"> PASSED </p>   |
+| Test Case Number | Test Result |
+|------------------|-------------|
+| 00               |    PASSED   |
+| 01               |    PASSED   |
+| 02               |    PASSED   |
+| 03               |    PASSED*  |
+| 04               |    PASSED   |
+| 05               |    PASSED   |
+| 06               |    PASSED   |
+| 07               |    PASSED   |
+| 08               |    PASSED   |
+| 09               |    PASSED*  |
+| 10               |    PASSED   |
+| 11               |    PASSED   |
+| 12               |    PASSED   |
+| 13               |    PASSED   |
+| 14               |    PASSED*  |
+| 15               |    PASSED   |
+| 16               |    PASSED   |
+| 17               |    PASSED   |
+| 18               |    PASSED   |
+| 19               |    PASSED   |
+| 20               |    PASSED   |
+| 21               |    PASSED   |
+| 22               |    PASSED   |
+| 23               |    PASSED   |
+| 24               |    PASSED   |
+| 25               |    PASSED*  |
+| 26               |    PASSED   |
+| 27               |    PASSED   |
+| 28               |    PASSED   |
+| 29               |    PASSED   |
+| 30               |    PASSED   |
+| 31               |    PASSED   |
+| 32               |    PASSED   |
+| 33               |    PASSED   |
+| 34               |    PASSED   |
+| 35               |    PASSED   |
+| 36               |    PASSED   |
+| 37               |    PASSED   |
+
+>Note: Test cases with an * indicated that the test passes but does not match the provided output when piped to a file.
 
 ### Test Case Output
 
 ```bash
-
 
 MessagingTest00: started
 All processes completed.
@@ -143,13 +147,13 @@ MessagingTest02: mailbox_create returned id less than zero, id = -1
 All processes completed.
 
 MessagingTest03: started
+MessagingTest03: mailbox_create returned id = 8
+MessagingTest03: sending message to mailbox 8
+MessagingTest03: after send of message, result = 0
 MessagingTest03: receiving message from mailbox 8
 MessagingTest03: after receipt of message, result = 12
 MessagingTest03:   message received = hello there
 All processes completed.
-MessagingTest03: mailbox_create returned id = 8
-MessagingTest03: sending message to mailbox 8
-MessagingTest03: after send of message, result = 0
 
 MessagingTest04: started
 MessagingTest04: mailbox_create returned id = 8
@@ -235,12 +239,12 @@ MessagingTest08-Child2: started
 MessagingTest08-Child3: started
 MessagingTest08-Child4: started
 MessagingTest08-Child5: started
-MessagingTest08-Child2: Message delivery failed: result = -3
-MessagingTest08: Exit status for child MessagingTest08-Child2 is -3
-MessagingTest08-Child3: Message delivery failed: result = -3
-MessagingTest08: Exit status for child MessagingTest08-Child3 is -3
-MessagingTest08-Child4: Message delivery failed: result = -3
-MessagingTest08: Exit status for child MessagingTest08-Child4 is -3
+MessagingTest08-Child2: Message delivery failed: result = -5
+MessagingTest08: Exit status for child MessagingTest08-Child2 is -5
+MessagingTest08-Child3: Message delivery failed: result = -5
+MessagingTest08: Exit status for child MessagingTest08-Child3 is -5
+MessagingTest08-Child4: Message delivery failed: result = -5
+MessagingTest08: Exit status for child MessagingTest08-Child4 is -5
 MessagingTest08-Child5: mailbox_free returned 0
 MessagingTest08: Exit status for child MessagingTest08-Child5 is -3
 All processes completed.
@@ -259,15 +263,15 @@ MessagingTest09-Child3: started
 MessagingTest09-Child4: started
 MessagingTest09-Child5: started
 MessagingTest09-Child6: started
+MessagingTest09-Child2: Message delivery failed: result = -5
+MessagingTest09: Exit status for child MessagingTest09-Child2 is -5
+MessagingTest09-Child3: Message delivery failed: result = -5
+MessagingTest09: Exit status for child MessagingTest09-Child3 is -5
+MessagingTest09-Child4: Message delivery failed: result = -5
+MessagingTest09: Exit status for child MessagingTest09-Child4 is -5
 MessagingTest09-Child6: mailbox_free returned 0
 MessagingTest09: Exit status for child MessagingTest09-Child6 is -3
-MessagingTest09-Child2: Message delivery failed: result = -3
-MessagingTest09: Exit status for child MessagingTest09-Child2 is -3
-MessagingTest09-Child3: Message delivery failed: result = -3
-MessagingTest09: Exit status for child MessagingTest09-Child3 is -3
-MessagingTest09-Child4: Message delivery failed: result = -3
-MessagingTest09: Exit status for child MessagingTest09-Child4 is -3
-MessagingTest09: Exit status for child ≡╝ ╠* is -3
+MessagingTest09: Exit status for child @╗o√R is -3
 All processes completed.
 
 MessagingTest10: started
@@ -414,19 +418,17 @@ All processes completed.
 
 MessagingTest13: started
 MessagingTest13-Child1: started
-
 MessagingTest13-Child1: Returned from waitdevice, status: 0x00000000.
 MessagingTest13: Exit status for child MessagingTest13-Child1 is -3
 All processes completed.
 
-MessagingTest05: started
-MessagingTest05-Child1: started
-MessagingTest05-Child1: Returned from waitdevice, result: 0, status: 0x00000100.
-MessagingTest05: exit status for child 4 is -3
+MessagingTest14: started
+MessagingTest14-Child1: started
+MessagingTest14-Child1: Returned from waitdevice, result: 0, status: 0x00000100.
+MessagingTest14: exit status for child 4 is -3
 All processes completed.
 
 MessagingTest15: started
-
 MessagingTest15: mailbox_create returned id = 8
 MessagingTest15: Sending large message to mailbox 8
 MessagingTest15: mailbox_send failed
@@ -447,15 +449,14 @@ MessagingTest17-Child4: started
 MessagingTest17-Child4: quitting
 MessagingTest17: Exit status for MessagingTest17-Child4 is -3
 MessagingTest17-Child5: started
+MessagingTest17: Exit status for MessagingTest17-Child1 is -5
+MessagingTest17: Exit status for MessagingTest17-Child2 is -5
+MessagingTest17: Exit status for MessagingTest17-Child3 is -5
 MessagingTest17-Child5: mailbox_close returned 0
 MessagingTest17: Exit status for MessagingTest17-Child5 is -3
-MessagingTest17: Exit status for MessagingTest17-Child1 is -3
-MessagingTest17: Exit status for MessagingTest17-Child2 is -3
-MessagingTest17: Exit status for MessagingTest17-Child3 is -3
 All processes completed.
 
 MessagingTest18: started
-
 MessagingTest18: mailbox_create returned id = 8
 MessagingTest18-Child1: started
 MessagingTest18-Child1: Receiving message from mailbox 8
@@ -467,15 +468,14 @@ MessagingTest18-Child4: started
 MessagingTest18-Child4: quitting
 MessagingTest18: Exit status for MessagingTest18-Child4 is -3
 MessagingTest18-Child5: started
+MessagingTest18: Exit status for MessagingTest18-Child1 is -5
+MessagingTest18: Exit status for MessagingTest18-Child2 is -5
+MessagingTest18: Exit status for MessagingTest18-Child3 is -5
 MessagingTest18-Child5: mailbox_close returned 0
 MessagingTest18: Exit status for MessagingTest18-Child5 is -3
-MessagingTest18: Exit status for MessagingTest18-Child1 is -3
-MessagingTest18: Exit status for MessagingTest18-Child2 is -3
-MessagingTest18: Exit status for MessagingTest18-Child3 is -3
 All processes completed.
 
 MessagingTest19: started
-
 MessagingTest19: mailbox_create returned id = 8
 MessagingTest19-Child1: started
 MessagingTest19-Child1: Sending message to mailbox 8
@@ -487,16 +487,15 @@ MessagingTest19-Child4: started
 MessagingTest19-Child4: quitting
 MessagingTest19: Exit status for MessagingTest19-Child4 is -3
 MessagingTest19-Child5: started
+MessagingTest19: Exit status for MessagingTest19-Child1 is -5
+MessagingTest19: Exit status for MessagingTest19-Child2 is -5
+MessagingTest19: Exit status for MessagingTest19-Child3 is -5
 MessagingTest19-Child5: mailbox_close returned 0
 MessagingTest19: Exit status for MessagingTest19-Child5 is -3
-MessagingTest19: Exit status for MessagingTest19-Child1 is -3
-MessagingTest19: Exit status for MessagingTest19-Child2 is -3
-MessagingTest19: Exit status for MessagingTest19-Child3 is -3
 MessagingTest19: Message send failed on released mailbox - SUCCESS
 All processes completed.
 
 MessagingTest20: started
-
 MessagingTest20: mailbox_create returned id = 8
 MessagingTest20-Child1: started
 MessagingTest20-Child1: Receiving message from mailbox 8
@@ -508,16 +507,15 @@ MessagingTest20-Child4: started
 MessagingTest20-Child4: quitting
 MessagingTest20: Exit status for MessagingTest20-Child4 is -3
 MessagingTest20-Child5: started
+MessagingTest20: Exit status for MessagingTest20-Child1 is -5
+MessagingTest20: Exit status for MessagingTest20-Child2 is -5
+MessagingTest20: Exit status for MessagingTest20-Child3 is -5
 MessagingTest20-Child5: mailbox_close returned 0
 MessagingTest20: Exit status for MessagingTest20-Child5 is -3
-MessagingTest20: Exit status for MessagingTest20-Child1 is -3
-MessagingTest20: Exit status for MessagingTest20-Child2 is -3
-MessagingTest20: Exit status for MessagingTest20-Child3 is -3
 MessagingTest20: Message receive failed on released mailbox - SUCCESS
 All processes completed.
 
 MessagingTest21: started
-
 MessagingTest21: mailbox_create returned id = 8
 MessagingTest21-Child1: started
 MessagingTest21-Child1: Sending message 0 to mailbox 8
@@ -534,7 +532,6 @@ MessagingTest21: Exit status for child MessagingTest21-Child2 is -3
 All processes completed.
 
 MessagingTest22: started
-
 MessagingTest22: mailbox_create returned id = 8
 MessagingTest22-Child2: started
 MessagingTest22-Child2: Receiving message 0 from mailbox 8
@@ -551,7 +548,6 @@ MessagingTest22: Exit status for child MessagingTest22-Child1 is -3
 All processes completed.
 
 MessagingTest23: started
-
 MessagingTest23: mailbox_create returned id = 8
 MessagingTest23-Child1: Spawning ReceiveAndExit at priority 2
 MessagingTest23-Child1-Child1: started
@@ -581,7 +577,6 @@ MessagingTest23: Exit status for child MessagingTest23-Child1 is -3
 All processes completed.
 
 MessagingTest24: started
-
 MessagingTest24: mailbox_create returned id = 8
 MessagingTest24-Child1: started
 MessagingTest24-Child1: Delivered message: Message Number 0
@@ -641,16 +636,16 @@ MessagingTest25: mailbox_close returned 0
 
 MessagingTest25: mailbox_close returned 0
 
-MessagingTest25: mailbox_create returned id = 2000
-MessagingTest25: mailbox_create returned id = 2001
-MessagingTest25: mailbox_create returned id = 2002
-MessagingTest25: mailbox_create returned id = 2003
-MessagingTest25: mailbox_create returned id = 2004
-MessagingTest25: mailbox_create returned id = 2005
-MessagingTest25: mailbox_create returned id = 2006
 MessagingTest25: mailbox_create returned id = 2007
 MessagingTest25: mailbox_create returned id = 2008
 MessagingTest25: mailbox_create returned id = 2009
+MessagingTest25: mailbox_create returned id = 2010
+MessagingTest25: mailbox_create returned id = 2011
+MessagingTest25: mailbox_create returned id = 2012
+MessagingTest25: mailbox_create returned id = 2013
+MessagingTest25: mailbox_create returned id = 2014
+MessagingTest25: mailbox_create returned id = 2015
+MessagingTest25: mailbox_create returned id = 2016
 MessagingTest25: mailbox_create returned id less than zero, id = -1
 MessagingTest25: mailbox_create returned id less than zero, id = -1
 MessagingTest25: mailbox_create returned id less than zero, id = -1
@@ -658,7 +653,6 @@ MessagingTest25: mailbox_create returned id less than zero, id = -1
 All processes completed.
 
 MessagingTest26: started
-
 MessagingTest26: mailbox_create returned id = 8
 MessagingTest26: Spawned MessagingTest26-Child1 with priority 4
 MessagingTest26: Spawned MessagingTest26-Child2 with priority 3
@@ -670,29 +664,28 @@ MessagingTest26-Child2: started
 MessagingTest26-Child4: started
 MessagingTest26-Child3: started
 MessagingTest26-Child5: started
-MessagingTest26-Child1: Message receive failed: result = -3
-MessagingTest26-Child2: Message receive failed: result = -3
-MessagingTest26: Exit status for child MessagingTest26-Child2 is -3
-MessagingTest26-Child4: Message receive failed: result = -3
-MessagingTest26: Exit status for child MessagingTest26-Child4 is -3
-MessagingTest26-Child3: Message receive failed: result = -3
-MessagingTest26: Exit status for child MessagingTest26-Child3 is -3
-MessagingTest26-Child1: Message receive failed: result = -3
-MessagingTest26-Child1: Message receive failed: result = -3
-MessagingTest26-Child1: Message receive failed: result = -3
-MessagingTest26-Child1: Message receive failed: result = -3
-MessagingTest26-Child1: Delivered message: Message Number 0
-MessagingTest26-Child1: Delivered message: Message Number 1
-MessagingTest26-Child1: Delivered message: Message Number 2
-MessagingTest26-Child1: Delivered message: Message Number 3
-MessagingTest26-Child1: Delivered message: Message Number 4
-MessagingTest26: Exit status for child MessagingTest26-Child1 is -3
+MessagingTest26-Child1: Message receive failed: result = -5
+MessagingTest26-Child1: Message receive failed: result = -1
+MessagingTest26-Child1: Message receive failed: result = -1
+MessagingTest26-Child1: Message receive failed: result = -1
+MessagingTest26-Child1: Message receive failed: result = -1
+MessagingTest26-Child1: Message delivery failed: result = -1
+MessagingTest26-Child1: Message delivery failed: result = -1
+MessagingTest26-Child1: Message delivery failed: result = -1
+MessagingTest26-Child1: Message delivery failed: result = -1
+MessagingTest26-Child1: Message delivery failed: result = -1
+MessagingTest26: Exit status for child MessagingTest26-Child1 is -5
+MessagingTest26-Child2: Message receive failed: result = -5
+MessagingTest26: Exit status for child MessagingTest26-Child2 is -5
+MessagingTest26-Child4: Message receive failed: result = -5
+MessagingTest26: Exit status for child MessagingTest26-Child4 is -5
+MessagingTest26-Child3: Message receive failed: result = -5
+MessagingTest26: Exit status for child MessagingTest26-Child3 is -5
 MessagingTest26-Child5: mailbox_free returned 0
 MessagingTest26: Exit status for child MessagingTest26-Child5 is -3
 All processes completed.
 
 MessagingTest27: started
-
 MessagingTest27: mailbox_create returned id = 8
 MessagingTest27: Spawned MessagingTest27-Child1 with priority 4
 MessagingTest27: Spawned MessagingTest27-Child2 with priority 3
@@ -707,17 +700,17 @@ MessagingTest27-Child5: started
 MessagingTest27: Exit status for child MessagingTest27-Child5 is -3
 MessagingTest27: Spawned MessagingTest27-Child6 with priority 1
 MessagingTest27-Child6: started
-MessagingTest27-Child4: Message receive failed: result = -3
-MessagingTest27: Exit status for child MessagingTest27-Child4 is -3
-MessagingTest27-Child3: Message receive failed: result = -3
-MessagingTest27: Exit status for child MessagingTest27-Child3 is -3
-MessagingTest27-Child2: Message receive failed: result = -3
-MessagingTest27: Exit status for child MessagingTest27-Child2 is -3
-MessagingTest27-Child1: Message receive failed: result = -3
-MessagingTest27-Child1: Message receive failed: result = -3
-MessagingTest27-Child1: Delivered message: Message Number 0
-MessagingTest27-Child1: Delivered message: Message Number 1
-MessagingTest27: Exit status for child MessagingTest27-Child1 is -3
+MessagingTest27-Child4: Message receive failed: result = -5
+MessagingTest27: Exit status for child MessagingTest27-Child4 is -5
+MessagingTest27-Child3: Message receive failed: result = -5
+MessagingTest27: Exit status for child MessagingTest27-Child3 is -5
+MessagingTest27-Child2: Message receive failed: result = -5
+MessagingTest27: Exit status for child MessagingTest27-Child2 is -5
+MessagingTest27-Child1: Message receive failed: result = -5
+MessagingTest27-Child1: Message receive failed: result = -1
+MessagingTest27-Child1: Message delivery failed: result = -1
+MessagingTest27-Child1: Message delivery failed: result = -1
+MessagingTest27: Exit status for child MessagingTest27-Child1 is -5
 MessagingTest27-Child6: mailbox_free returned 0
 MessagingTest27: Exit status for child MessagingTest27-Child6 is -3
 All processes completed.
@@ -728,12 +721,12 @@ MessagingTest28-Child1: started
 MessagingTest28-Child2: started
 MessagingTest28-Child3: started
 MessagingTest28-Child4: started
-MessagingTest28-Child1: Message receive failed: result = -3
-MessagingTest28: Exit status for child MessagingTest28-Child1 is -3
-MessagingTest28-Child2: Message receive failed: result = -3
-MessagingTest28: Exit status for child MessagingTest28-Child2 is -3
-MessagingTest28-Child3: Message receive failed: result = -3
-MessagingTest28: Exit status for child MessagingTest28-Child3 is -3
+MessagingTest28-Child1: Message receive failed: result = -5
+MessagingTest28: Exit status for child MessagingTest28-Child1 is -5
+MessagingTest28-Child2: Message receive failed: result = -5
+MessagingTest28: Exit status for child MessagingTest28-Child2 is -5
+MessagingTest28-Child3: Message receive failed: result = -5
+MessagingTest28: Exit status for child MessagingTest28-Child3 is -5
 MessagingTest28-Child4: mailbox_free returned 0
 MessagingTest28: Exit status for child MessagingTest28-Child4 is -3
 MessagingTest28: mailbox_receive returned -1: SUCCESS
@@ -745,12 +738,12 @@ MessagingTest29-Child1: started
 MessagingTest29-Child2: started
 MessagingTest29-Child3: started
 MessagingTest29-Child4: started
-MessagingTest29-Child1: Message delivery failed: result = -3
-MessagingTest29: Exit status for child MessagingTest29-Child1 is -3
-MessagingTest29-Child2: Message delivery failed: result = -3
-MessagingTest29: Exit status for child MessagingTest29-Child2 is -3
-MessagingTest29-Child3: Message delivery failed: result = -3
-MessagingTest29: Exit status for child MessagingTest29-Child3 is -3
+MessagingTest29-Child1: Message delivery failed: result = -5
+MessagingTest29: Exit status for child MessagingTest29-Child1 is -5
+MessagingTest29-Child2: Message delivery failed: result = -5
+MessagingTest29: Exit status for child MessagingTest29-Child2 is -5
+MessagingTest29-Child3: Message delivery failed: result = -5
+MessagingTest29: Exit status for child MessagingTest29-Child3 is -5
 MessagingTest29-Child4: mailbox_free returned 0
 MessagingTest29: Exit status for child MessagingTest29-Child4 is -3
 MessagingTest29: mailbox_send returned -1: SUCCESS
@@ -774,21 +767,20 @@ MessagingTest30: Exit status for child MessagingTest30-Child4 is -3
 All processes completed.
 
 MessagingTest31: started
-
 MessagingTest31: mailbox_create returned id = 8
 MessagingTest31-Child3: started
 MessagingTest31-Child2: started
 MessagingTest31-Child1: started
 MessagingTest31-Child4: started
-MessagingTest31: Message receive failed: result = -3
-MessagingTest31-Child3: Message receive failed: result = -3
-MessagingTest31: Exit status for child MessagingTest31-Child3 is -3
-MessagingTest31-Child2: Message receive failed: result = -3
-MessagingTest31: Exit status for child MessagingTest31-Child2 is -3
-MessagingTest31-Child1: Message receive failed: result = -3
-MessagingTest31: Exit status for child MessagingTest31-Child1 is -3
+MessagingTest31: Message receive failed: result = -5
+MessagingTest31-Child3: Message receive failed: result = -5
+MessagingTest31: Exit status for child  is -5
+MessagingTest31-Child2: Message receive failed: result = -5
+MessagingTest31: Exit status for child  is -5
+MessagingTest31-Child1: Message receive failed: result = -5
+MessagingTest31: Exit status for child  is -5
 MessagingTest31-Child4: mailbox_free returned 0
-MessagingTest31: Exit status for child MessagingTest31-Child4 is -3
+MessagingTest31: Exit status for child  is -3
 All processes completed.
 
 MessagingTest32: started
@@ -846,6 +838,5 @@ MessagingTest37: Delivered message: Test Message
 MessagingTest37: Receiving message with a buffer that is too small
 MessagingTest37: Message receive failed: result = -1
 All processes completed.
-
 
 ```
