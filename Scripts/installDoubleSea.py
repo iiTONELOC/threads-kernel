@@ -141,7 +141,7 @@ def copyFilesToProject(toInstallDir: str, projectDir: str):
 
 def buildSeaLib(toInstallDir: str, forProject: str):
     """Builds the DoubleSea library and copies the necessary files to the project directory"""
-    print("  Building DoubleSeaLib...")
+    print("\nBuilding DoubleSeaLib...")
 
     bat_script = os.path.join(toInstallDir, "build_doublesea.bat")
 
@@ -158,13 +158,13 @@ def buildSeaLib(toInstallDir: str, forProject: str):
 
     # Copy built files
     projectDirs = PROJECT_LOCATIONS[forProject]
-    print(f"  Copying files to {forProject}...")
+    print(f"\n Copying files to {forProject}...")
     if forProject == ALL_PROJECTS:
         for projectDir in projectDirs:
             copyFilesToProject(toInstallDir, projectDir)
     else:
         copyFilesToProject(toInstallDir, projectDirs)
-    print("  Files copied successfully!")
+    print("Files copied successfully!")
 
 
 @CatchKeyboardInterrupt
