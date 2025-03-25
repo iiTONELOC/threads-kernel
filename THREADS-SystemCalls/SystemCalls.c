@@ -10,41 +10,65 @@
 #include "libuser.h"
 
 /* -------------------- Typedefs and Structs ------------------------------- */
+
+struct psr_bits
+{
+	unsigned int cur_int_enable : 1;
+	unsigned int cur_mode : 1;
+	unsigned int prev_int_enable : 1;
+	unsigned int prev_mode : 1;
+	unsigned int unused : 28;
+};
+
+union psr_values
+{
+	struct psr_bits bits;
+	unsigned int integer_part;
+};
+
 typedef struct sem_data
 {
+
+	int count;
+	int index;
 	int status;
 	int sem_id;
-	int count;
+	struct sem_data *pNextSem;
+	struct sem_data *pPrevSem;
+	DSL_List waitingProcs;
+
 	/* Add additional members needed. */
 } SemData;
 
 typedef struct user_proc
 {
-	struct user_proc *pNextSibling;
-	struct user_proc *pPrevSibling;
 	struct user_proc *pNextSem;
 	struct user_proc *pPrevSem;
+	struct user_proc *pNextSibling;
+	struct user_proc *pPrevSibling;
 	DSL_List children;
 	int (*startFunc)(char *); /* function where process begins -- launch */
 							  /* Add additional members needed. */
 } UserProcess;
 
 #define MAXSEMS 200
+#define OFFSETOF_SEM_DATA offsetof(SemData, pNextSem)
+#define OFFSETOF_SEM_DATA_INDEX offsetof(SemData, index)
 
 /* -------------------------- Globals ------------------------------------- */
-static UserProcess userProcTable[MAXPROC];
-static SemData semTable[MAXSEMS];
+
 static int nextsem_id = 0;
-
+static SemData semTable[MAXSEMS];
+static UserProcess userProcTable[MAXPROC];
 /* ------------------------- Prototypes ----------------------------------- */
-void sys_exit(int resultCode);
-int sys_wait(int *pStatus);
-int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
 
+int sys_wait(int *pStatus);
+void sys_exit(int resultCode);
 int MessagingEntryPoint(char *);
 extern int SystemCallsEntryPoint(char *);
-static void system_call_handler(system_call_arguments_t *args);
 static int launchUserProcess(char *pArg);
+static void system_call_handler(system_call_arguments_t *args);
+int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
 
 int MessagingEntryPoint(char *arg)
 {
@@ -52,8 +76,12 @@ int MessagingEntryPoint(char *arg)
 	int pid;
 
 	/* Check for kernel mode */
+	checkKernelMode(__func__);
 
 	/* Initialize the semaphore table */
+	DSL_InitStaticStorageListArgs semTableArgs = {semTable, OFFSETOF_SEM_DATA,
+												  MAXSEMS, NULL, OFFSETOF_SEM_DATA_INDEX, 0, NULL};
+	DSL_InitStaticStorageListWData(&semTableArgs);
 
 	/* initialize the system call vector */
 
@@ -137,9 +165,37 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 	return pid;
 }
 
+static void sys_call_dispatcher(system_call_arguments_t *args)
+{
+	/* Handle the request */
+
+	/* set mode to to usermode before returning.*/
+
+	/* call the system call handler */
+	system_call_handler(args);
+}
+
 static void spawn_syscall_handler(system_call_arguments_t *args)
 {
 	/* Handle the request */
 
 	/* set mode to to usermode before returning.*/
+}
+
+/*****************************************************************************
+   Name - checkKernelMode
+   Purpose - Checks the PSR for kernel mode and halts if in user mode
+   Parameters -
+   Returns -
+****************************************************************************/
+static inline void checkKernelMode(const char *functionName)
+{
+	union psr_values psrValue;
+
+	psrValue.integer_part = get_psr();
+	if (psrValue.bits.cur_mode == 0)
+	{
+		console_output(FALSE, "Kernel mode expected, but function called in user mode.\n");
+		stop(1);
+	}
 }
