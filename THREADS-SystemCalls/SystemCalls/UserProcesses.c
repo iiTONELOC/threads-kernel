@@ -15,13 +15,15 @@ void ResetUserProcess(UserProcess *pUserProc)
     pUserProc->pid = 0;
     pUserProc->status = 0;
     pUserProc->priority = 0;
-    pUserProc->privateMboxId = 0;
-    pUserProc->startFunc = NULL;
-    pUserProc->pParent = NULL;
     pUserProc->pNext = NULL;
     pUserProc->pPrev = NULL;
+    pUserProc->pParent = NULL;
+    pUserProc->startArgs = NULL;
+    pUserProc->startFunc = NULL;
     pUserProc->pNextChild = NULL;
     pUserProc->pPrevChild = NULL;
+    pUserProc->privateMboxId = 0;
+
     /* destroy list - do not delete any list nodes from memory*/
     DSL_DestroyList(&pUserProc->children, 0);
     /* Re-init the LL */

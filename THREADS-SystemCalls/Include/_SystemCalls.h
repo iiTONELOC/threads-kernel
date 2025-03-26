@@ -25,6 +25,7 @@ typedef struct user_proc
     int status;
     int priority;
     int tableIndex;
+    char *startArgs;
     int privateMboxId;
     DSL_List children;
     int (*startFunc)(char *);

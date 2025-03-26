@@ -22,12 +22,12 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 /* ------------------------- Prototypes ----------------------------------- */
 
 int sys_wait(int *pStatus);
-void sys_exit(int resultCode); // TDOD: Implement sys_exit
+void sys_exit(int resultCode);
 static void setUserMode(void);
 static void setKernelMode(void);
 int MessagingEntryPoint(char *);
 static void initSystemCallVector(void);
-extern int SystemCallsEntryPoint(char *); // TDOD: Implement SystemCallsEntryPoint
+extern int SystemCallsEntryPoint(char *);
 static int launchUserProcess(char *pArg);
 static void nullsys(system_call_arguments_t *args);
 static void checkKernelMode(const char *functionName);
@@ -73,19 +73,13 @@ int MessagingEntryPoint(char *arg)
  */
 static int launchUserProcess(char *pArg)
 {
-	// job is to start the user process but in usermode not kernel mode, we are
-	// here because of the k_spawn call in sys_spawn, now we have to transition
-	// from kernel mode to user mode
-	// this is where we will init our user process and then call the startup function
-	/* wait for the initialize process to complete. */
-
 	int result = -1;
-	// if signaled when in the sys handler, then Exit
+
+	/* if signaled when in the sys handler, then Exit */
 	if (signaled())
 	{
 		console_output(FALSE, "%s - Process signaled in launch.\n", "launchUserProcess");
 		/* exit */
-
 		sys_exit(&result);
 		return result;
 	}
@@ -94,15 +88,14 @@ static int launchUserProcess(char *pArg)
 	setUserMode();
 
 	/* call the startup function for this process */
-
 	UserProcess *pUserProc = &userProcTable[k_getpid() % MAXPROC];
 
-	result = pUserProc->startFunc(pArg);
+	result = pUserProc->startFunc(pUserProc->startArgs);
 
 	/* Exit if the startup function returns */
 	sys_exit(result);
 
-	return 0;
+	return 0; // ?
 }
 
 int k_semp(int sem_id)
@@ -179,6 +172,7 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 		pCreatedProcess->status = 1;
 		pCreatedProcess->pNext = NULL;
 		pCreatedProcess->pPrev = NULL;
+		pCreatedProcess->startArgs = arg;
 		pCreatedProcess->pNextChild = NULL;
 		pCreatedProcess->pPrevChild = NULL;
 		pCreatedProcess->tableIndex = index;
@@ -248,43 +242,6 @@ static void initSystemCallVector(void)
 }
 
 /**
- * @brief System call interrupt handler for the spawn system call.
- *
- * This function is called by the system call dispatcher when the spawn system call is invoked
- *
- * @param args The system call arguments.
- *
- * @param args->arguments[0] - The function to spawn
- * @param args->arguments[1] - The argument to the function
- * @param args->arguments[2] - The stack size
- * @param args->arguments[3] - The priority
- * @param args->arguments[4] - The name of the process
- *
- * @return void
- */
-static void spawn_syscall_handler(system_call_arguments_t *args)
-{
-	int result = -1;
-
-	/* get the required arguments */
-	char *arg = (char *)args->arguments[1];
-	int priority = (int)args->arguments[3];
-	int stackSize = (int)args->arguments[2];
-	char *name = (char *)args->arguments[4];
-	int (*startFunc)(char *) = (int (*)(char *))args->arguments[0];
-
-	/* try to spawn  the process */
-	result = sys_spawn(name, startFunc, arg, stackSize, priority);
-
-	/* set mode to to usermode before returning.*/
-	setUserMode();
-
-	/* set expected return values */
-	args->arguments[0] = result;
-	args->arguments[3] = (result > 0) ? (0) : (-1);
-}
-
-/**
  * @brief System call dispatcher.
  * This function is called by the system call interrupt handler to dispatch
  * the appropriate system call handler.
@@ -294,13 +251,13 @@ static void spawn_syscall_handler(system_call_arguments_t *args)
  */
 static void sys_call_dispatcher(system_call_arguments_t *args)
 {
+	int result = -1;
+
 	/* Check for valid system call arguments */
 	if (!args || args->call_id < 0 || args->call_id >= THREADS_MAX_SYSCALLS)
 	{
 		console_output(FALSE, "Invalid system call arguments.\n");
-		// Dunno if we wanna (stop) here or just return
-		// maybe change this to static int and return -1
-		stop(1);
+		return result;
 	}
 
 	/* ensure we are in kernel mode */
@@ -310,7 +267,13 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	switch (args->call_id)
 	{
 	case SYS_SPAWN:
-		spawn_syscall_handler(args);
+		/*spawn a process using sys_spawn*/
+		result = sys_spawn((char *)args->arguments[4], (int (*)(char *))args->arguments[0],
+						   (char *)args->arguments[1], (int)args->arguments[2], (int)args->arguments[3]);
+
+		/* set the expected return values */
+		args->arguments[0] = result;
+		args->arguments[3] = (result > 0) ? (0) : (-1);
 		break;
 	case SYS_WAIT:
 		sys_wait((int *)args->arguments[0]);
@@ -351,7 +314,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	default:
 		break;
 	}
-	/* set mode to to usermode before returning.*/
+	/* set mode to user mode before returning.*/
 	setUserMode();
 }
 
