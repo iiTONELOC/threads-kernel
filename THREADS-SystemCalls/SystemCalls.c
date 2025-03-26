@@ -55,8 +55,8 @@ int MessagingEntryPoint(char *arg)
 
 	status = sys_wait(&status);
 
-	console_output(FALSE, "MessagingEntryPoint(): join returned pid = %d, status = %d\n",
-				   pid, status);
+	//console_output(FALSE, "MessagingEntryPoint(): join returned pid = %d, status = %d\n",
+	//			   pid, status);
 
 	return (signaled()) ? (-5) : (0);
 } /* MessagingEntryPoint */
