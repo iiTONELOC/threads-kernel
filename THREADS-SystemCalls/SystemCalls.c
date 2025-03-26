@@ -6,113 +6,101 @@
 #include <Messaging.h>
 #include <Scheduler.h>
 #include <DoubleSeaLib.h>
-#include "SystemCalls.h"
+#include "_SystemCalls.h"
+#include "_Semaphore.h"
+#include "UserProcess.h"
 #include "libuser.h"
 
-/* -------------------- Typedefs and Structs ------------------------------- */
-
-struct psr_bits
-{
-	unsigned int cur_int_enable : 1;
-	unsigned int cur_mode : 1;
-	unsigned int prev_int_enable : 1;
-	unsigned int prev_mode : 1;
-	unsigned int unused : 28;
-};
-
-union psr_values
-{
-	struct psr_bits bits;
-	unsigned int integer_part;
-};
-
-typedef struct sem_data
-{
-
-	int count;
-	int index;
-	int status;
-	int sem_id;
-	struct sem_data *pNextSem;
-	struct sem_data *pPrevSem;
-	DSL_List waitingProcs;
-
-	/* Add additional members needed. */
-} SemData;
-
-typedef struct user_proc
-{
-	struct user_proc *pNextSem;
-	struct user_proc *pPrevSem;
-	struct user_proc *pNextSibling;
-	struct user_proc *pPrevSibling;
-	DSL_List children;
-	int (*startFunc)(char *); /* function where process begins -- launch */
-							  /* Add additional members needed. */
-} UserProcess;
-
-#define MAXSEMS 200
-#define OFFSETOF_SEM_DATA offsetof(SemData, pNextSem)
-#define OFFSETOF_SEM_DATA_INDEX offsetof(SemData, index)
+#define DEBUG 0;
 
 /* -------------------------- Globals ------------------------------------- */
 
-static int nextsem_id = 0;
-static SemData semTable[MAXSEMS];
-static UserProcess userProcTable[MAXPROC];
+static DSL_List semFreeList = {0};				 /* list of free semaphores */
+static SemData semTable[MAX_SEMS] = {0};		 /* semaphore table (Static storage) */
+static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static storage) */
+
 /* ------------------------- Prototypes ----------------------------------- */
 
 int sys_wait(int *pStatus);
-void sys_exit(int resultCode);
+void sys_exit(int resultCode); // TDOD: Implement sys_exit
+static void setUserMode(void);
+static void setKernelMode(void);
 int MessagingEntryPoint(char *);
-extern int SystemCallsEntryPoint(char *);
+static void initSystemCallVector(void);
+extern int SystemCallsEntryPoint(char *); // TDOD: Implement SystemCallsEntryPoint
 static int launchUserProcess(char *pArg);
-static void system_call_handler(system_call_arguments_t *args);
+static void nullsys(system_call_arguments_t *args);
+static void checkKernelMode(const char *functionName);
+static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
+
+/* ----------------------------- Definitions ---------------------------------- */
 
 int MessagingEntryPoint(char *arg)
 {
-	int status = -1;
 	int pid;
+	int status = -1;
 
 	/* Check for kernel mode */
 	checkKernelMode(__func__);
 
-	/* Initialize the semaphore table */
-	DSL_InitStaticStorageListArgs semTableArgs = {semTable, OFFSETOF_SEM_DATA,
-												  MAXSEMS, NULL, OFFSETOF_SEM_DATA_INDEX, 0, NULL};
-	DSL_InitStaticStorageListWData(&semTableArgs);
+	/* initialize semaphore table */
+	InitializeSemTable(semTable, &semFreeList);
 
 	/* initialize the system call vector */
-
-	/* Initialize the process table */
+	initSystemCallVector();
 
 	/* launch the first user process, then wait */
 	pid = sys_spawn("SystemCalls", SystemCallsEntryPoint, NULL, THREADS_MIN_STACK_SIZE * 4, 3);
 
+	status = sys_wait(&status);
+
 	console_output(FALSE, "MessagingEntryPoint(): join returned pid = %d, status = %d\n",
 				   pid, status);
 
-	return 0;
+	return (signaled()) ? (-5) : (0);
 } /* MessagingEntryPoint */
 
+/**
+ * @brief Launch control for the user process.
+ *
+ * This function is the link between kernel and user mode. It is called by the kernel
+ * to start the user process.
+ *
+ * @param pArg - The argument to the user process.
+ *
+ * @return int - The result of the user process. *
+ */
 static int launchUserProcess(char *pArg)
 {
-
+	// job is to start the user process but in usermode not kernel mode, we are
+	// here because of the k_spawn call in sys_spawn, now we have to transition
+	// from kernel mode to user mode
+	// this is where we will init our user process and then call the startup function
 	/* wait for the initialize process to complete. */
 
+	int result = -1;
 	// if signaled when in the sys handler, then Exit
 	if (signaled())
 	{
 		console_output(FALSE, "%s - Process signaled in launch.\n", "launchUserProcess");
 		/* exit */
+
+		sys_exit(&result);
+		return result;
 	}
 
 	/* Set mode to user mode */
+	setUserMode();
 
 	/* call the startup function for this process */
 
+	UserProcess *pUserProc = &userProcTable[k_getpid() % MAXPROC];
+
+	result = pUserProc->startFunc(pArg);
+
 	/* Exit if the startup function returns */
+	sys_exit(result);
 
 	return 0;
 }
@@ -142,12 +130,33 @@ int k_semfree(int sem_id)
 	return result;
 }
 
+int sys_wait(int *pStatus)
+{
+	int result = -1;
+	result = k_wait(pStatus);
+	return (signaled()) ? (-5) : (result);
+}
+
+/**
+ * @brief System call wrapper for spawning a new process.
+ *
+ * @param name - The name of the process.
+ * @param startFunc - The function to start the process.
+ * @param arg - The argument to the function.
+ * @param stackSize - The stack size for the process.
+ * @param priority - The priority of the process.
+ */
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority)
 {
 	int parentPid;
 	int pid = -1;
 
 	/* validate the parameters */
+	if (!name || !startFunc || stackSize < THREADS_MIN_STACK_SIZE || priority < 0)
+	{
+		console_output(FALSE, "Invalid parameters for sys_spawn.\n");
+		return -1;
+	}
 
 	/* we are the parent*/
 	parentPid = k_getpid();
@@ -160,26 +169,190 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 	}
 	else
 	{
-		/* We now have the pid of the new process, what now? */
+		/* get the process and its parent from the table */
+		int index = pid % MAXPROC;
+		UserProcess *pCreatedProcess = &userProcTable[index];
+		UserProcess *pParentProcess = &userProcTable[parentPid % MAXPROC];
+
+		/* set the pCreatedProcess data */
+		pCreatedProcess->pid = pid;
+		pCreatedProcess->status = 1;
+		pCreatedProcess->pNext = NULL;
+		pCreatedProcess->pPrev = NULL;
+		pCreatedProcess->pNextChild = NULL;
+		pCreatedProcess->pPrevChild = NULL;
+		pCreatedProcess->tableIndex = index;
+		pCreatedProcess->priority = priority;
+		pCreatedProcess->startFunc = startFunc;
+		pCreatedProcess->pParent = pParentProcess;
+		pCreatedProcess->privateMboxId = mailbox_create(0, 0);
+
+		if (pCreatedProcess->privateMboxId < 0)
+		{
+			console_output(FALSE, "Failed to create mailbox for user process.");
+			return -1;
+		}
+
+		DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pCreatedProcess->children, NULL);
+
+		/* Set the created process' parent's data */
+
+		/* add the process to the parent's children list
+		 * if the parent has no children, then initialize the list to ensure it is ready for use.*/
+		if (pParentProcess->children.length <= 0)
+		{
+			DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pParentProcess->children, NULL);
+		}
+
+		DSL_InsertNode(pCreatedProcess, &pParentProcess->children);
 	}
 	return pid;
 }
 
-static void sys_call_dispatcher(system_call_arguments_t *args)
+/**
+ * @brief System call wrapper for exiting a process.
+ *
+ * @param resultCode - The result code of the process.
+ */
+void sys_exit(int resultCode)
 {
-	/* Handle the request */
-
-	/* set mode to to usermode before returning.*/
-
-	/* call the system call handler */
-	system_call_handler(args);
+	k_exit(resultCode);
+	setUserMode();
 }
 
+/**
+ * @brief Initializes the system call vector.
+ *
+ * This function initializes the system call vector with the appropriate system call handlers.
+ *
+ * @return void
+ */
+static void initSystemCallVector(void)
+{
+	/* initialize the system call vector */
+	for (int i = 0; i < THREADS_MAX_SYSCALLS; i++)
+	{
+		/* Referring to SystemCalls.h, and the SystemCalls API spec
+		we can see that the supported system calls are from 3 to 20
+		and range from spawn to getpid.
+		*/
+		if (i >= SUPPORTED_SYS_CALL_START && i <= SUPPORTED_SYS_CALL_END)
+		{
+			systemCallVector[i] = sys_call_dispatcher;
+		}
+		else
+		{
+			systemCallVector[i] = nullsys;
+		}
+	}
+}
+
+/**
+ * @brief System call interrupt handler for the spawn system call.
+ *
+ * This function is called by the system call dispatcher when the spawn system call is invoked
+ *
+ * @param args The system call arguments.
+ *
+ * @param args->arguments[0] - The function to spawn
+ * @param args->arguments[1] - The argument to the function
+ * @param args->arguments[2] - The stack size
+ * @param args->arguments[3] - The priority
+ * @param args->arguments[4] - The name of the process
+ *
+ * @return void
+ */
 static void spawn_syscall_handler(system_call_arguments_t *args)
 {
-	/* Handle the request */
+	int result = -1;
+
+	/* get the required arguments */
+	char *arg = (char *)args->arguments[1];
+	int priority = (int)args->arguments[3];
+	int stackSize = (int)args->arguments[2];
+	char *name = (char *)args->arguments[4];
+	int (*startFunc)(char *) = (int (*)(char *))args->arguments[0];
+
+	/* try to spawn  the process */
+	result = sys_spawn(name, startFunc, arg, stackSize, priority);
 
 	/* set mode to to usermode before returning.*/
+	setUserMode();
+
+	/* set expected return values */
+	args->arguments[0] = result;
+	args->arguments[3] = (result > 0) ? (0) : (-1);
+}
+
+/**
+ * @brief System call dispatcher.
+ * This function is called by the system call interrupt handler to dispatch
+ * the appropriate system call handler.
+ *
+ * @param args - The system call arguments.
+ * @return void
+ */
+static void sys_call_dispatcher(system_call_arguments_t *args)
+{
+	/* Check for valid system call arguments */
+	if (!args || args->call_id < 0 || args->call_id >= THREADS_MAX_SYSCALLS)
+	{
+		console_output(FALSE, "Invalid system call arguments.\n");
+		// Dunno if we wanna (stop) here or just return
+		// maybe change this to static int and return -1
+		stop(1);
+	}
+
+	/* ensure we are in kernel mode */
+	setKernelMode();
+
+	// Call the appropriate system call handler
+	switch (args->call_id)
+	{
+	case SYS_SPAWN:
+		spawn_syscall_handler(args);
+		break;
+	case SYS_WAIT:
+		sys_wait((int *)args->arguments[0]);
+		break;
+	case SYS_EXIT:
+		sys_exit(args->arguments[0]);
+		break;
+	case SYS_MAILBOX_CREATE:
+		break;
+	case SYS_MAILBOX_FREE:
+		break;
+	case SYS_MAILBOX_SEND:
+		break;
+	case SYS_MAILBOX_RECEIVE:
+		break;
+	case SYS_SLEEP:
+		break;
+	case SYS_DISKREAD:
+		break;
+	case SYS_DISKWRITE:
+		break;
+	case SYS_DISKSIZE:
+		break;
+	case SYS_SEMCREATE:
+		break;
+	case SYS_SEMP:
+		break;
+	case SYS_SEMV:
+		break;
+	case SYS_SEMFREE:
+		break;
+	case SYS_GETTIMEOFDAY:
+		break;
+	case SYS_CPUTIME:
+		break;
+	case SYS_GETPID:
+		break;
+	default:
+		break;
+	}
+	/* set mode to to usermode before returning.*/
+	setUserMode();
 }
 
 /*****************************************************************************
@@ -190,12 +363,44 @@ static void spawn_syscall_handler(system_call_arguments_t *args)
 ****************************************************************************/
 static inline void checkKernelMode(const char *functionName)
 {
-	union psr_values psrValue;
-
-	psrValue.integer_part = get_psr();
-	if (psrValue.bits.cur_mode == 0)
+	if ((get_psr() & PSR_KERNEL_MODE) == 0)
 	{
 		console_output(FALSE, "Kernel mode expected, but function called in user mode.\n");
 		stop(1);
 	}
+}
+
+/* an error method to handle invalid syscalls */
+static void nullsys(system_call_arguments_t *args)
+{
+	console_output(FALSE, "nullsys(): Invalid syscall %d. Halting...\n", args->call_id);
+	stop(1);
+} /* nullsys */
+
+/**
+ * @brief Sets the processor mode to user mode.
+ *
+ * This function sets the processor mode to user mode using bitwise operations.
+ *
+ * Check C Primer Plus pp. 679 - 683 for more information on bitwise operations.
+ */
+static void setUserMode(void)
+{
+	/* the Kernel mode bit is in bit position 1 and we can use the PSR_KERNEL_MODE for the mask
+	   a Value of 0 in the Kernel mode bit position will set the processor to user mode */
+	set_psr(get_psr() & ~PSR_KERNEL_MODE);
+}
+
+/**
+ * @brief Sets the processor mode to kernel mode.
+ *
+ * This function sets the processor mode to kernel mode using bitwise operations.
+ *
+ * Check C Primer Plus pp. 679 - 683 for more information on bitwise operations.
+ */
+static void setKernelMode(void)
+{
+	/* the Kernel mode bit is in bit position 1 and we can use the PSR_KERNEL_MODE for the mask
+	   a Value of 1 in the Kernel mode bit position will set the processor to kernel mode */
+	set_psr(get_psr() | PSR_KERNEL_MODE);
 }

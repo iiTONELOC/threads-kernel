@@ -24,6 +24,12 @@
     <ClCompile Include="..\libuser.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Semaphores.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UserProcesses.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Include\Messaging.h">
@@ -38,7 +44,16 @@
     <ClInclude Include="..\Include\THREADSLib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\TList.h">
+    <ClInclude Include="..\Include\_SystemCalls.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\DoubleSeaLib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\_Semaphore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\UserProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

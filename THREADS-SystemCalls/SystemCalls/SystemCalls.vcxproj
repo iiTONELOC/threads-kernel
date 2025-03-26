@@ -29,13 +29,18 @@
   <ItemGroup>
     <ClCompile Include="..\libuser.c" />
     <ClCompile Include="..\SystemCalls.c" />
+    <ClCompile Include="Semaphores.c" />
+    <ClCompile Include="UserProcesses.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Include\DoubleSeaLib.h" />
     <ClInclude Include="..\Include\Messaging.h" />
     <ClInclude Include="..\Include\Scheduler.h" />
     <ClInclude Include="..\Include\SystemCalls.h" />
     <ClInclude Include="..\Include\THREADSLib.h" />
-    <ClInclude Include="..\Include\TList.h" />
+    <ClInclude Include="..\Include\UserProcess.h" />
+    <ClInclude Include="..\Include\_Semaphore.h" />
+    <ClInclude Include="..\Include\_SystemCalls.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\bin\RunSysCallTests.bat" />

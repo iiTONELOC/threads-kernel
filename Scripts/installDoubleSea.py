@@ -88,7 +88,7 @@ def promptForDir(dir: str | None = None) -> str:
 
 
 @CatchKeyboardInterrupt
-def determineProjectToAttachLibTo() -> str:
+def getProject() -> str:
     """Prompt the user to select the project to attach the library to"""
 
     global PROJECTS
@@ -175,7 +175,7 @@ def installDoubleSea(dir: str | None = None):
     installDir = promptForDir(dir)
 
     # Determine the project to attach the library to
-    project = determineProjectToAttachLibTo()
+    project = getProject()
 
     print(f"\nDownloading DoubleSeaLib to {installDir} for {project}, please wait...")
 
