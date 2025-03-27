@@ -33,6 +33,7 @@ static void nullsys(system_call_arguments_t *args);
 static void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
+void sys_cputime(int* cpuTime);
 
 /* ----------------------------- Definitions ---------------------------------- */
 
@@ -54,9 +55,6 @@ int MessagingEntryPoint(char *arg)
 	pid = sys_spawn("SystemCalls", SystemCallsEntryPoint, NULL, THREADS_MIN_STACK_SIZE * 4, 3);
 
 	status = sys_wait(&status);
-
-	//console_output(FALSE, "MessagingEntryPoint(): join returned pid = %d, status = %d\n",
-	//			   pid, status);
 
 	return (signaled()) ? (-5) : (0);
 } /* MessagingEntryPoint */
@@ -80,7 +78,7 @@ static int launchUserProcess(char *pArg)
 	{
 		console_output(FALSE, "%s - Process signaled in launch.\n", "launchUserProcess");
 		/* exit */
-		sys_exit(&result);
+		sys_exit(result);
 		return result;
 	}
 
@@ -123,6 +121,15 @@ int k_semfree(int sem_id)
 	return result;
 }
 
+/**
+ * @brief System call wrapper for waiting for a process to complete.
+ *
+ * @param pStatus - Pointer to an int that receives the exit code of the process
+ * 
+ * @return The pid of the process that exited
+ * @return -1 if there are no child processes to wait for
+ * @return -5 if the process was signalled while waiting
+ */
 int sys_wait(int *pStatus)
 {
 	int result = -1;
@@ -212,6 +219,18 @@ void sys_exit(int resultCode)
 {
 	k_exit(resultCode);
 	setUserMode();
+}
+
+/**
+ * @brief System call wrapper getting the CPUTime for the process.
+ *
+ * @param cpuTime - int pointer to hold the CPU time.
+ */
+void sys_cputime(int* cpuTime)
+{
+	/* Use the kernel mode cpu time function */
+	/* This might be incorrect because read_time isn't defined in the THREADS spec... */
+	*cpuTime = read_time();
 }
 
 /**
@@ -308,6 +327,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_GETTIMEOFDAY:
 		break;
 	case SYS_CPUTIME:
+		sys_cputime(args->arguments[0]);
 		break;
 	case SYS_GETPID:
 		break;
