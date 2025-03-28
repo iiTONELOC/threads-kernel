@@ -6,6 +6,7 @@
 #include <Messaging.h>
 #include <Scheduler.h>
 #include <DoubleSeaLib.h>
+#include <time.h>
 #include "_SystemCalls.h"
 #include "_Semaphore.h"
 #include "UserProcess.h"
@@ -34,6 +35,7 @@ static void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
 void sys_cputime(int* cpuTime);
+void sys_getTimeOfDay(int* tod);
 
 /* ----------------------------- Definitions ---------------------------------- */
 
@@ -234,6 +236,17 @@ void sys_cputime(int* cpuTime)
 }
 
 /**
+ * @brief System call wrapper getting the time of day.
+ *
+ * @param tod - int pointer to time (seconds since epoch)
+ */
+void sys_getTimeOfDay(int* tod)
+{
+	/* Not 100% sure if this is correct - cast the return value of time() to an int. */
+	*tod = (int)time(NULL);
+}
+
+/**
  * @brief Initializes the system call vector.
  *
  * This function initializes the system call vector with the appropriate system call handlers.
@@ -325,6 +338,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_SEMFREE:
 		break;
 	case SYS_GETTIMEOFDAY:
+		sys_getTimeOfDay(args->arguments[0]);
 		break;
 	case SYS_CPUTIME:
 		sys_cputime(args->arguments[0]);
