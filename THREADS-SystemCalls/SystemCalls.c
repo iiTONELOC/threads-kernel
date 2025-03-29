@@ -1,4 +1,5 @@
 #define SYSTEM_CALLS_PROJECT
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -24,6 +25,8 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 int sys_wait(int *pStatus);
 void sys_exit(int resultCode);
 static void setUserMode(void);
+void sys_cputime(int *cpuTime);
+void sys_getTimeOfDay(int *tod);
 static void setKernelMode(void);
 int MessagingEntryPoint(char *);
 static void initSystemCallVector(void);
@@ -60,7 +63,7 @@ int MessagingEntryPoint(char *arg)
 	/* launch the first user process, then wait */
 	pid = sys_spawn("SystemCalls", SystemCallsEntryPoint, NULL, THREADS_MIN_STACK_SIZE * 4, 3);
 
-	sys_wait(&status);
+	status = sys_wait(&status);
 
 	return (signaled()) ? (-5) : (0);
 } /* MessagingEntryPoint */
@@ -94,7 +97,7 @@ static int launchUserProcess(char *pArg)
 	{
 		console_output(FALSE, "%s - Process signaled in launch.\n", "launchUserProcess");
 		/* exit */
-		sys_exit(&result);
+		sys_exit(result);
 		return result;
 	}
 
@@ -138,6 +141,15 @@ int k_semfree(int sem_id)
 	return result;
 }
 
+/**
+ * @brief System call wrapper for waiting for a process to complete.
+ *
+ * @param pStatus - Pointer to an int that receives the exit code of the process
+ *
+ * @return The pid of the process that exited
+ * @return -1 if there are no child processes to wait for
+ * @return -5 if the process was signalled while waiting
+ */
 int sys_wait(int *pStatus)
 {
 	int result = -1;
@@ -280,6 +292,29 @@ void sys_exit(int resultCode)
 }
 
 /**
+ * @brief System call wrapper getting the CPUTime for the process.
+ *
+ * @param cpuTime - int pointer to hold the CPU time.
+ */
+void sys_cputime(int *cpuTime)
+{
+	/* Use the kernel mode cpu time function */
+	/* This might be incorrect because read_time isn't defined in the THREADS spec... */
+	*cpuTime = read_time();
+}
+
+/**
+ * @brief System call wrapper getting the time of day.
+ *
+ * @param tod - int pointer to time (seconds since epoch)
+ */
+void sys_getTimeOfDay(int *tod)
+{
+	/* Not 100% sure if this is correct - cast the return value of time() to an int. */
+	*tod = (int)time(NULL);
+}
+
+/**
  * @brief Initializes the system call vector.
  *
  * This function initializes the system call vector with the appropriate system call handlers.
@@ -371,8 +406,10 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_SEMFREE:
 		break;
 	case SYS_GETTIMEOFDAY:
+		sys_getTimeOfDay(args->arguments[0]);
 		break;
 	case SYS_CPUTIME:
+		sys_cputime(args->arguments[0]);
 		break;
 	case SYS_GETPID:
 		break;
