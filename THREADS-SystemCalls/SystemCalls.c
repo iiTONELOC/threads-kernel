@@ -1,4 +1,5 @@
 #define SYSTEM_CALLS_PROJECT
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -6,7 +7,6 @@
 #include <Messaging.h>
 #include <Scheduler.h>
 #include <DoubleSeaLib.h>
-#include <time.h>
 #include "_SystemCalls.h"
 #include "_Semaphore.h"
 #include "UserProcess.h"
@@ -25,6 +25,8 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 int sys_wait(int *pStatus);
 void sys_exit(int resultCode);
 static void setUserMode(void);
+void sys_cputime(int *cpuTime);
+void sys_getTimeOfDay(int *tod);
 static void setKernelMode(void);
 int MessagingEntryPoint(char *);
 static void initSystemCallVector(void);
@@ -34,8 +36,6 @@ static void nullsys(system_call_arguments_t *args);
 static void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
-void sys_cputime(int* cpuTime);
-void sys_getTimeOfDay(int* tod);
 
 /* ----------------------------- Definitions ---------------------------------- */
 
@@ -127,7 +127,7 @@ int k_semfree(int sem_id)
  * @brief System call wrapper for waiting for a process to complete.
  *
  * @param pStatus - Pointer to an int that receives the exit code of the process
- * 
+ *
  * @return The pid of the process that exited
  * @return -1 if there are no child processes to wait for
  * @return -5 if the process was signalled while waiting
@@ -228,7 +228,7 @@ void sys_exit(int resultCode)
  *
  * @param cpuTime - int pointer to hold the CPU time.
  */
-void sys_cputime(int* cpuTime)
+void sys_cputime(int *cpuTime)
 {
 	/* Use the kernel mode cpu time function */
 	/* This might be incorrect because read_time isn't defined in the THREADS spec... */
@@ -240,7 +240,7 @@ void sys_cputime(int* cpuTime)
  *
  * @param tod - int pointer to time (seconds since epoch)
  */
-void sys_getTimeOfDay(int* tod)
+void sys_getTimeOfDay(int *tod)
 {
 	/* Not 100% sure if this is correct - cast the return value of time() to an int. */
 	*tod = (int)time(NULL);
