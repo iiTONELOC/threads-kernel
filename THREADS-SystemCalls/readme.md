@@ -1,4 +1,4 @@
-# Messenger Project Solution
+# System Calls Project Solution
 
 ## CYBV 489 Principles of Operating Systems
 
@@ -74,13 +74,13 @@ The solution folder can be opened in Visual Studio and the project rebuilt if ne
 Once unzipped, the prebuilt solution and its tests can be executed directly using the Batch file included in the `bin/` folder titled: `RunSysCallTests.bat`:
 
 ```bash
-cd <path_to_THREADS-Messenger/bin>
+cd <path_to_THREADS-SystemCalls/bin>
 
 .\RunSysCallTests.bat
 
 # expected output
 
-MessagingTest00: started
+SystemCallsTest00: started
 All processes completed.
 
 # ... Truncated Output ...
