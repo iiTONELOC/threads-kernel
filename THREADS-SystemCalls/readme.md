@@ -99,7 +99,7 @@ All processes completed.
 
 ### Test Case Output
 
-[Solution Output file](bin\\ExpectedSysCallOut.txt)
+[Solution Output file](bin/ExpectedSysCallOut.txt)
 ```bash
 
 SystemCallsTest00: started
