@@ -20,7 +20,7 @@ mailbox system developed in the Messaging project.
 ### User Level Processes and System Calls
 
 - The System Calls project enables processes to run in user mode while accessing the kernel-level features developed in the Scheduler and Messaging projects
-- Processes created, or spawned, in this phase processes cannot directly access kernel-levelfunctions like k_spawn or k_wait. Instead, the processes access these functions through asystem call which traps the kernel and executes the call on the process’s behalf. The kernel is trapped through an interrupt that occurs when a system call is made. This interrupt,THREADS_SYS_CALL_INTERRUPT, invokes a system call handler that is responsible for the system call’s implementation. 
+- Processes created, or spawned, in this phase processes cannot directly access kernel-level functions like k_spawn or k_wait. Instead, the processes access these functions through a system call which traps the kernel and executes the call on the process’s behalf. The kernel is trapped through an interrupt that occurs when a system call is made. This interrupt,THREADS_SYS_CALL_INTERRUPT, invokes a system call handler that is responsible for the system call’s implementation. 
 - Some good news is that the THREADS_SYS_CALL_INTERRUPT handler function is already implemented and is part of the provided Messaging project. The Messaging project sets the system call interrupt handler upon kernel start up and will invoke system calls through a system call vector table called systemCallVector. This vector is defined for you in the starter project. The vector holds a function pointer for each of the system calls that the kernel supports.
 - For the System Calls project, we are implementing the system calls defined in Table
 
@@ -39,6 +39,7 @@ mailbox system developed in the Messaging project.
 |SYS_GETPID | GetPID |
 
 - The System Calls project implementation must set a handler for each of these system calls. The following code illustrates how to set a handler for the Spawn call as an example.
+
 ```C
  systemCallVector[SYS_SPAWN] = spawn_system_call_handler; 
  ```
@@ -52,7 +53,8 @@ mailbox system developed in the Messaging project.
 > 1. k_semv – Increment the semaphore
 > 1. k_semfree – Free the semaphore
 
-- Semaphore management is performed using kernel-level functions. Semaphores each have a unique identifier that is returned from the k_semcreate function. 
+- Semaphore management is performed using kernel-level functions. Semaphores each have a unique identifier that is returned from the k_semcreate function.  
+  
 - Semaphores are incremented and decremented using the k_semv and k_semp functions, respectively. The k_semfree
 releases a semaphore. 
 
@@ -81,6 +83,7 @@ cd <path_to_THREADS-SystemCalls/bin>
 # expected output
 
 SystemCallsTest00: started
+SystemCallsTest00: Kernel is in user mode, TEST PASSED.
 All processes completed.
 
 # ... Truncated Output ...
@@ -100,6 +103,7 @@ All processes completed.
 ### Test Case Output
 
 [Solution Output file](bin/ExpectedSysCallOut.txt)
+
 ```bash
 
 SystemCallsTest00: started

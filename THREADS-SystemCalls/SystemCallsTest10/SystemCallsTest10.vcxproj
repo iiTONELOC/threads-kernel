@@ -161,7 +161,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)Lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SystemCalls.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;DoubleSeaLib.lib;TList.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SystemCalls.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;DoubleSeaLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -180,7 +180,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)Lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SystemCalls.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;DoubleSeaLib.lib;TList.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SystemCalls.lib;THREADS.lib;Messaging.lib;Scheduler.lib;THREADSMain.lib;DoubleSeaLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
