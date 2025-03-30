@@ -6,7 +6,7 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
+- [Overview](#system-calls-project-scope)
 - [Contributors](#contributors)
 - [Usage](#usage)
 - [Solution](#solution)
