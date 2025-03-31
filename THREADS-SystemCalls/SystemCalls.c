@@ -1,5 +1,4 @@
 #define SYSTEM_CALLS_PROJECT
-#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -30,11 +29,14 @@ void sys_cputime(int *cpuTime);
 void sys_getTimeOfDay(int *tod);
 static void setKernelMode(void);
 int MessagingEntryPoint(char *);
+static void sys_getPid(int *pid);
 static void initSystemCallVector(void);
 extern int SystemCallsEntryPoint(char *);
 static int launchUserProcess(char *pArg);
 static void nullsys(system_call_arguments_t *args);
 static void checkKernelMode(const char *functionName);
+static void sys_procLeaveCriticalArea(UserProcess *pProcess);
+static void sys_procEnterCriticalArea(UserProcess *pProcess);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
 
@@ -141,6 +143,15 @@ int k_semfree(int sem_id)
 	return result;
 }
 
+static void sys_getPid(int *pid)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+
+	/* get the process id */
+	*pid = k_getpid();
+}
+
 /**
  * @brief System call wrapper for waiting for a process to complete.
  *
@@ -152,20 +163,48 @@ int k_semfree(int sem_id)
  */
 int sys_wait(int *pStatus)
 {
+	/* check for kernel mode */
+	checkKernelMode(__func__);
 	int result = -1;
-	/* wait for the child process to exit */
+
+	/* wait for the child process to exit
+		k_wait returns the pid of the process that exited or -1, or -5 if signaled
+	*/
 	result = k_wait(pStatus);
 
+	/* Error occurred - TODO: Handle Errors */
 	if (result < 0)
 	{
+		if (result == -1)
+		{
+			console_output(FALSE, "Error::sys_wait: No child processes to wait for.\n");
+		}
+		else if (result == -5)
+		{
+			console_output(FALSE, "Error::sys_wait: Process was signaled while waiting.\n");
+		}
+		else
+		{
+			console_output(FALSE, "Error::sys_wait: Unknown error occurred in sys_wait.\n");
+		}
 		return result;
 	}
 
 	/* get the process that exited */
 	UserProcess *pExitingChild = &userProcTable[result % MAXPROC];
 
-	/* Allow it to exit - it blocked itself in sys_exit */
-	mailbox_send(pExitingChild->privateMboxId, NULL, 0, TRUE);
+	/* see if the exiting process has a parent, if so remove it from its parent's list */
+	sys_procEnterCriticalArea(pExitingChild);
+	if (pExitingChild->pParent != NULL)
+	{
+		/* remove this process from the list of children */
+		DSL_RemoveNode(pExitingChild, &pExitingChild->pParent->children);
+	}
+	sys_procLeaveCriticalArea(pExitingChild);
+
+	/*
+		TODO:?? Do we need to check if the process exists in a wait list for a semaphore?
+	*/
 
 	return (signaled()) ? (-5) : (result);
 }
@@ -181,6 +220,8 @@ int sys_wait(int *pStatus)
  */
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority)
 {
+	/* check for kernel mode */
+	checkKernelMode(__func__);
 	int parentPid;
 	int pid = -1;
 
@@ -213,17 +254,13 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 		pCreatedProcess->status = 1;
 		pCreatedProcess->pNext = NULL;
 		pCreatedProcess->pPrev = NULL;
+		pCreatedProcess->startArgs = arg;
 		pCreatedProcess->pNextChild = NULL;
 		pCreatedProcess->pPrevChild = NULL;
 		pCreatedProcess->priority = priority;
 		pCreatedProcess->startFunc = startFunc;
 		pCreatedProcess->pParent = pParentProcess;
-		if (arg != NULL)
-		{
-			strncpy(pCreatedProcess->startArgs, arg, MAXARG - 1);
-		}
 		DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pCreatedProcess->children, NULL);
-
 		/* Set the created process' parent's data */
 		DSL_InsertNode(pCreatedProcess, &pParentProcess->children);
 
@@ -266,25 +303,22 @@ static void initTables(void)
  */
 void sys_exit(int resultCode)
 {
-	k_exit(resultCode);
-	// TODO: Implement the rest of the function
-	// Just like the scheduler, we need to remove the process from the parent's children list
-	// and then signal the parent process to continue.
-
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+	int exitCode = 0;
+	UserProcess *pChild;
 	int pid = k_getpid();
 
-	UserProcess *pChild;
 	int tableIndex = pid % MAXPROC;
 	UserProcess *pProcess = &userProcTable[tableIndex];
 
 	/* Check for children */
+	sys_procEnterCriticalArea(pProcess);
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
-		/* block ourselves and wait for our children to exit */
-		mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
-		k_wait(&resultCode);
-		/* Unblock the child process */
-		mailbox_send(pProcess->privateMboxId, NULL, 0, TRUE);
+		sys_procLeaveCriticalArea(pProcess);
+		k_wait(&exitCode);
+		sys_procEnterCriticalArea(pProcess);
 	}
 
 	/* Remove the process from the parent's children list */
@@ -292,9 +326,9 @@ void sys_exit(int resultCode)
 	{
 		DSL_RemoveNode(pProcess, &pProcess->pParent->children);
 	}
+	// ResetUserProcess(pProcess);
+	sys_procLeaveCriticalArea(pProcess);
 
-	/* block ourselves */
-	mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
 	k_exit(resultCode);
 }
 
@@ -305,8 +339,9 @@ void sys_exit(int resultCode)
  */
 void sys_cputime(int *cpuTime)
 {
+	/* check for kernel mode */
+	checkKernelMode(__func__);
 	/* Use the kernel mode cpu time function */
-	/* This might be incorrect because read_time isn't defined in the THREADS spec... */
 	*cpuTime = read_time();
 }
 
@@ -317,8 +352,9 @@ void sys_cputime(int *cpuTime)
  */
 void sys_getTimeOfDay(int *tod)
 {
-	/* Not 100% sure if this is correct - cast the return value of time() to an int. */
-	*tod = (int)time(NULL);
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+	*tod = system_clock();
 }
 
 /**
@@ -358,6 +394,8 @@ static void initSystemCallVector(void)
  */
 static void sys_call_dispatcher(system_call_arguments_t *args)
 {
+	/* check for kernel mode */
+	checkKernelMode(__func__);
 
 	/* --------------------------- KERNEL-SPACE --------------------------- */
 
@@ -386,7 +424,11 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		args->arguments[3] = (result > 0) ? (0) : (-1);
 		break;
 	case SYS_WAIT:
-		sys_wait((int *)args->arguments[0]);
+		result = sys_wait((int *)&args->arguments[1]);
+		/* set the expected return values */
+		args->arguments[3] = args->arguments[0];
+		args->arguments[0] = result;
+
 		break;
 	case SYS_EXIT:
 		sys_exit(args->arguments[0]);
@@ -416,12 +458,13 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_SEMFREE:
 		break;
 	case SYS_GETTIMEOFDAY:
-		sys_getTimeOfDay(args->arguments[0]);
+		sys_getTimeOfDay((int *)&args->arguments[0]);
 		break;
 	case SYS_CPUTIME:
-		sys_cputime(args->arguments[0]);
+		sys_cputime((int *)&args->arguments[0]);
 		break;
 	case SYS_GETPID:
+		sys_getPid((int *)&args->arguments[0]);
 		break;
 	default:
 		break;
@@ -479,4 +522,36 @@ static void setKernelMode(void)
 	/* the Kernel mode bit is in bit position 1 and we can use the PSR_KERNEL_MODE for the mask
 	   a Value of 1 in the Kernel mode bit position will set the processor to kernel mode */
 	set_psr(get_psr() | PSR_KERNEL_MODE);
+}
+
+/**
+ * @brief Marks the process as outside its critical section using system mailboxes.
+ *
+ *  This is used to synchronize the process with the kernel.
+ *
+ * @param pProcess - The process to enable interrupts for.
+ *
+ * @note Uses a single-slot mailbox to synchronize with the kernel.
+ */
+static void sys_procLeaveCriticalArea(UserProcess *pProcess)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+	mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
+}
+
+/**
+ * @brief Marks the process as being inside its critical section using system mailboxes.
+ *
+ *  This is used to synchronize the process with the kernel.
+ *
+ * @param pProcess - The process to disable interrupts for.
+ *
+ * @note Uses a single-slot mailbox to synchronize with the kernel.
+ */
+static void sys_procEnterCriticalArea(UserProcess *pProcess)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+	mailbox_send(pProcess->privateMboxId, NULL, 0, TRUE);
 }

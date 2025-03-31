@@ -22,7 +22,6 @@ void ResetUserProcess(UserProcess *pUserProc)
     pUserProc->startFunc = NULL;
     pUserProc->pNextChild = NULL;
     pUserProc->pPrevChild = NULL;
-    pUserProc->privateMboxId = 0;
 
     /* destroy list - do not delete any list nodes from memory*/
     DSL_DestroyList(&pUserProc->children, 0);

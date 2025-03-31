@@ -2,8 +2,8 @@
 
 /* -------------------------- Globals ------------------------------------- */
 
+int sys_semCount = 0;     /* number of semaphores in use */
 static int nextSemId = 0; /* next semaphore id to use */
-int semCount = 0;         /* number of semaphores in use */
 
 /* ------------------------- Definitions ----------------------------------- */
 
@@ -31,7 +31,7 @@ void ResetSem(SemData *pSem)
     /* don't clean nodes, this will reset any processes waiting */
     DSL_DestroyList(&pSem->waitingProcs, 0);
     DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, NULL);
-    semCount--;
+    sys_semCount--;
 }
 
 /**
@@ -67,7 +67,7 @@ void InitializeSem(SemData *pSem)
  */
 int GetNextEmptySemIndex(SemData *pSemTable, int size)
 {
-    if (pSemTable == NULL || size <= 0 || size > MAX_SEMS || semCount > MAX_SEMS)
+    if (pSemTable == NULL || size <= 0 || size > MAX_SEMS || sys_semCount > MAX_SEMS)
     {
         return -1; /* Invalid semaphore table or size */
     }
@@ -89,12 +89,12 @@ int GetNextEmptySemIndex(SemData *pSemTable, int size)
  * @param pSemTable - Pointer to the semaphore table.
  * @param size - Size of the semaphore table.
  * @return Pointer to the next empty semaphore or NULL if none found.
- * @note This function will increment the semaphore ID, semCount and return the
+ * @note This function will increment the semaphore ID, sys_semCount and return the
  *       next empty semaphore from the table.
  */
 SemData *GetNextEmptySemaphore(SemData *pSemTable, int size)
 {
-    if (pSemTable == NULL || size <= 0 || size > MAX_SEMS || semCount > MAX_SEMS)
+    if (pSemTable == NULL || size <= 0 || size > MAX_SEMS || sys_semCount > MAX_SEMS)
     {
         return NULL; /* Invalid semaphore table or size */
     }
@@ -109,7 +109,7 @@ SemData *GetNextEmptySemaphore(SemData *pSemTable, int size)
     /* Increment the semaphore ID, status and return it */
     pSemTable[index].semId = nextSemId++;
     pSemTable[index].status = SEM_IN_USE;
-    semCount++;
+    sys_semCount++;
     return &pSemTable[index];
 }
 
