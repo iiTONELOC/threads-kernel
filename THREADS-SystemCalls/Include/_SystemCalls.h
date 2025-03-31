@@ -6,12 +6,25 @@
 
 /* -------------------------------- Typedefs and Structs ------------------------------- */
 
+enum SEMAPHORE_STATUS
+{
+    SEM_FREE = 0,
+    SEM_IN_USE = 1,
+    SEM_WAITING = 2,
+    SEM_INVALID = -1,
+    SEM_STATUS_COUNT = 3
+};
+
+/* -------------------------------- Typedefs and Structs ------------------------------- */
+
 typedef struct sem_data
 {
+    int semId;
     int count;
     int status;
-    int sem_id;
+    int mutexId; // - mailbox id for the mutex
     int tableIndex;
+    int privateMboxId; // - mailbox id for the semaphore
     DSL_List waitingProcs;
     struct sem_data *pNextSem;
     struct sem_data *pPrevSem;
@@ -29,20 +42,23 @@ typedef struct user_proc
     int privateMboxId;
     DSL_List children;
     int (*startFunc)(char *);
+    /*parent*/
     struct user_proc *pParent;
+    /*semaphore use*/
     struct user_proc *pNext;
     struct user_proc *pPrev;
+    /*parent use*/
     struct user_proc *pNextChild;
     struct user_proc *pPrevChild;
 
 } UserProcess;
 
-#define MAX_SEMS MAXSEMS
-#define SUPPORTED_SYS_CALL_END 20
-#define SUPPORTED_SYS_CALL_START 3
-#define OFFSETOF_SEM_DATA offsetof(SemData, pNextSem)
-#define OFFSETOF_SEM_DATA_INDEX offsetof(SemData, tableIndex)
-#define OFFSETOF_USER_PROC_NEXT_NODE offsetof(UserProcess, pNext)
-#define OFFSETOF_USER_PROC_CHILD_NODES offsetof(UserProcess, pNextChild)
+#define MAX_SEMS MAXSEMS                                                 // more readable alias for MAXSEMS
+#define SUPPORTED_SYS_CALL_END 20                                        // last supported system call vector index
+#define SUPPORTED_SYS_CALL_START 3                                       // first supported system call vector index
+#define OFFSETOF_SEM_DATA offsetof(SemData, pNextSem)                    // offset of the next semaphore in the list - NOT SURE IF THIS WILL BE USED
+#define OFFSETOF_SEM_DATA_INDEX offsetof(SemData, tableIndex)            // offset of the semaphore index in SemData
+#define OFFSETOF_USER_PROC_NEXT_NODE offsetof(UserProcess, pNext)        // offset of the next user process in the list - FOR SEMAPHORE USE
+#define OFFSETOF_USER_PROC_CHILD_NODES offsetof(UserProcess, pNextChild) // offset of the next user process in the list - FOR PARENT USE
 
 #endif // _SYSTEMCALLS_H

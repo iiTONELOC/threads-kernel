@@ -23,6 +23,7 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 /* ------------------------- Prototypes ----------------------------------- */
 
 int sys_wait(int *pStatus);
+static void initTables(void);
 void sys_exit(int resultCode);
 static void setUserMode(void);
 void sys_cputime(int *cpuTime);
@@ -41,14 +42,16 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 
 int MessagingEntryPoint(char *arg)
 {
+	/* --------------------------- KERNEL-SPACE --------------------------- */
+
 	int pid;
 	int status = -1;
 
 	/* Check for kernel mode */
 	checkKernelMode(__func__);
 
-	/* initialize semaphore table */
-	InitializeSemTable(semTable, &semFreeList);
+	/* initialize user process and semaphore tables */
+	initTables();
 
 	/* initialize the system call vector */
 	initSystemCallVector();
@@ -69,12 +72,24 @@ int MessagingEntryPoint(char *arg)
  *
  * @param pArg - The argument to the user process.
  *
- * @return int - The result of the user process. *
+ * @return int - The result of the user process.
  */
 static int launchUserProcess(char *pArg)
 {
-	int result = -1;
+	/* --------------------------- KERNEL-SPACE --------------------------- */
 
+	int result = -1;
+	int pid = k_getpid();
+	int tableIndex = pid % MAXPROC;
+
+	/* wait for the initialize process to complete.
+		 We can't block by disabling interrupts here,
+		 so we will use a mailbox to synchronize the
+		 process and achieve the same effect.
+	 */
+	mailbox_receive(userProcTable[tableIndex].privateMboxId, NULL, 0, TRUE);
+
+	/* AFTER UNBLOCK  */
 	/* if signaled when in the sys handler, then Exit */
 	if (signaled())
 	{
@@ -87,13 +102,16 @@ static int launchUserProcess(char *pArg)
 	/* Set mode to user mode */
 	setUserMode();
 
+	/* --------------------------- USER-SPACE --------------------------- */
+
 	/* call the startup function for this process */
-	UserProcess *pUserProc = &userProcTable[k_getpid() % MAXPROC];
+	UserProcess *pUserProc = &userProcTable[tableIndex];
 
 	result = pUserProc->startFunc(pUserProc->startArgs);
 
-	/* Exit if the startup function returns */
-	sys_exit(result);
+	/* Exit if the startup function returns
+		- Have to use the system call Exit to exit the userland process */
+	Exit(result);
 
 	return 0; // ?
 }
@@ -135,7 +153,20 @@ int k_semfree(int sem_id)
 int sys_wait(int *pStatus)
 {
 	int result = -1;
+	/* wait for the child process to exit */
 	result = k_wait(pStatus);
+
+	if (result < 0)
+	{
+		return result;
+	}
+
+	/* get the process that exited */
+	UserProcess *pExitingChild = &userProcTable[result % MAXPROC];
+
+	/* Allow it to exit - it blocked itself in sys_exit */
+	mailbox_send(pExitingChild->privateMboxId, NULL, 0, TRUE);
+
 	return (signaled()) ? (-5) : (result);
 }
 
@@ -163,7 +194,7 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 	/* we are the parent*/
 	parentPid = k_getpid();
 
-	// create the new process
+	/* create the new process */
 	pid = k_spawn(name, launchUserProcess, arg, stackSize, priority);
 	if (pid < 0)
 	{
@@ -176,40 +207,56 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 		UserProcess *pCreatedProcess = &userProcTable[index];
 		UserProcess *pParentProcess = &userProcTable[parentPid % MAXPROC];
 
-		/* set the pCreatedProcess data */
+		/* set the pCreatedProcess data
+			- index and mailboxes were added already */
 		pCreatedProcess->pid = pid;
 		pCreatedProcess->status = 1;
 		pCreatedProcess->pNext = NULL;
 		pCreatedProcess->pPrev = NULL;
-		pCreatedProcess->startArgs = arg;
 		pCreatedProcess->pNextChild = NULL;
 		pCreatedProcess->pPrevChild = NULL;
-		pCreatedProcess->tableIndex = index;
 		pCreatedProcess->priority = priority;
 		pCreatedProcess->startFunc = startFunc;
 		pCreatedProcess->pParent = pParentProcess;
-		pCreatedProcess->privateMboxId = mailbox_create(0, 0);
-
-		if (pCreatedProcess->privateMboxId < 0)
+		if (arg != NULL)
 		{
-			console_output(FALSE, "Failed to create mailbox for user process.");
-			return -1;
+			strncpy(pCreatedProcess->startArgs, arg, MAXARG - 1);
 		}
-
 		DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pCreatedProcess->children, NULL);
 
 		/* Set the created process' parent's data */
-
-		/* add the process to the parent's children list
-		 * if the parent has no children, then initialize the list to ensure it is ready for use.*/
-		if (pParentProcess->children.length <= 0)
-		{
-			DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pParentProcess->children, NULL);
-		}
-
 		DSL_InsertNode(pCreatedProcess, &pParentProcess->children);
+
+		/* send a message to the process to start - don't block*/
+		mailbox_send(pCreatedProcess->privateMboxId, NULL, 0, FALSE);
 	}
 	return pid;
+}
+
+/**
+ * @brief Initializes the semaphore and user process tables.
+ */
+static void initTables(void)
+{
+	/* loop over the semaphore table and init the semaphore and user processes
+		by attaching mailboxes to them.
+		We loop MAX_SEMS(n) instead of (MAX_SEMS + MAXPROC)(n)
+	*/
+	for (int i = 0; i < MAX_SEMS; ++i)
+	{
+		/* if we are less than the max processes, handle user processes as well */
+		if (i < MAXPROC)
+		{
+			userProcTable[i].tableIndex = i;
+			/* add a mailbox to the user process table */
+			userProcTable[i].privateMboxId = mailbox_create(1, sizeof(int));
+			/* remaining process fields are NULL for now -
+				they will be set when a process is spawned */
+		}
+
+		/* initialize the semaphore table w/defaults */
+		InitializeSemWData(&semTable[i], -1, 0, SEM_FREE);
+	}
 }
 
 /**
@@ -220,7 +267,35 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 void sys_exit(int resultCode)
 {
 	k_exit(resultCode);
-	setUserMode();
+	// TODO: Implement the rest of the function
+	// Just like the scheduler, we need to remove the process from the parent's children list
+	// and then signal the parent process to continue.
+
+	int pid = k_getpid();
+
+	UserProcess *pChild;
+	int tableIndex = pid % MAXPROC;
+	UserProcess *pProcess = &userProcTable[tableIndex];
+
+	/* Check for children */
+	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
+	{
+		/* block ourselves and wait for our children to exit */
+		mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
+		k_wait(&resultCode);
+		/* Unblock the child process */
+		mailbox_send(pProcess->privateMboxId, NULL, 0, TRUE);
+	}
+
+	/* Remove the process from the parent's children list */
+	if (pProcess->pParent != NULL)
+	{
+		DSL_RemoveNode(pProcess, &pProcess->pParent->children);
+	}
+
+	/* block ourselves */
+	mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
+	k_exit(resultCode);
 }
 
 /**
@@ -283,6 +358,9 @@ static void initSystemCallVector(void)
  */
 static void sys_call_dispatcher(system_call_arguments_t *args)
 {
+
+	/* --------------------------- KERNEL-SPACE --------------------------- */
+
 	int result = -1;
 
 	/* Check for valid system call arguments */
@@ -350,6 +428,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	}
 	/* set mode to user mode before returning.*/
 	setUserMode();
+	/* --------------------------- USER-SPACE --------------------------- */
 }
 
 /*****************************************************************************
