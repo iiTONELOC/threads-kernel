@@ -18,7 +18,7 @@ void ResetUserProcess(UserProcess *pUserProc)
     pUserProc->pNext = NULL;
     pUserProc->pPrev = NULL;
     pUserProc->pParent = NULL;
-    pUserProc->startArgs = NULL;
+    memset(pUserProc->startArgs, 0, MAX_START_ARG_LEN);
     pUserProc->startFunc = NULL;
     pUserProc->pNextChild = NULL;
     pUserProc->pPrevChild = NULL;

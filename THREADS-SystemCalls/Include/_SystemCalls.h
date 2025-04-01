@@ -1,6 +1,7 @@
 #pragma once
 #ifndef _SYSTEMCALLS_H
 #define _SYSTEMCALLS_H
+#define MAX_START_ARG_LEN 512
 #include <DoubleSeaLib.h>
 #include "SystemCalls.h"
 
@@ -38,7 +39,7 @@ typedef struct user_proc
     int status;
     int priority;
     int tableIndex;
-    char *startArgs;
+    char startArgs[MAX_START_ARG_LEN];
     int privateMboxId;
     DSL_List children;
     int (*startFunc)(char *);

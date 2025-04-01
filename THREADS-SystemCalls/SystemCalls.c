@@ -254,7 +254,10 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 		pCreatedProcess->status = 1;
 		pCreatedProcess->pNext = NULL;
 		pCreatedProcess->pPrev = NULL;
-		pCreatedProcess->startArgs = arg;
+		if (arg != NULL)
+		{
+			strncpy(pCreatedProcess->startArgs, arg, MAX_START_ARG_LEN);
+		}
 		pCreatedProcess->pNextChild = NULL;
 		pCreatedProcess->pPrevChild = NULL;
 		pCreatedProcess->priority = priority;
@@ -314,6 +317,7 @@ void sys_exit(int resultCode)
 
 	/* Check for children */
 	sys_procEnterCriticalArea(pProcess);
+
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
 		sys_procLeaveCriticalArea(pProcess);
@@ -321,11 +325,6 @@ void sys_exit(int resultCode)
 		sys_procEnterCriticalArea(pProcess);
 	}
 
-	/* Remove the process from the parent's children list */
-	if (pProcess->pParent != NULL)
-	{
-		DSL_RemoveNode(pProcess, &pProcess->pParent->children);
-	}
 	// ResetUserProcess(pProcess);
 	sys_procLeaveCriticalArea(pProcess);
 
