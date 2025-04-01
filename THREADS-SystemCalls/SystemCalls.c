@@ -93,7 +93,8 @@ static int launchUserProcess(char *pArg)
 
 	/* AFTER UNBLOCK  */
 	/* if signaled when in the sys handler, then Exit */
-	if (signaled())
+	int _signaled = signaled();
+	if (_signaled)
 	{
 		console_output(FALSE, "%s - Process signaled in launch.\n", "launchUserProcess");
 		/* exit */
@@ -237,11 +238,7 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 
 	/* create the new process */
 	pid = k_spawn(name, launchUserProcess, arg, stackSize, priority);
-	if (pid < 0)
-	{
-		console_output(FALSE, "Failed to create user process.");
-	}
-	else
+	if (pid > 0)
 	{
 		/* get the process and its parent from the table */
 		int index = pid % MAXPROC;
@@ -321,6 +318,8 @@ void sys_exit(int resultCode)
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
 		sys_procLeaveCriticalArea(pProcess);
+		/* Not sure if we are allowed, but we need to signal the child */
+		k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
 		k_wait(&exitCode);
 		sys_procEnterCriticalArea(pProcess);
 	}

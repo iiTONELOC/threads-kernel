@@ -1,0 +1,533 @@
+
+SystemCallsTest00: started
+SystemCallsTest00: Kernel is in user mode, TEST PASSED.
+All processes completed.
+
+SystemCallsTest01: started
+SystemCallsTest01: after spawn of 5
+SystemCallsTest01: Parent done. Calling Exit.
+launchUserProcess - Process signaled in launch.
+All processes completed.
+
+SystemCallsTest02: started and returning -1.
+All processes completed.
+
+SystemCallsTest03: started
+
+SystemCallsTest03-Child1: started
+
+SystemCallsTest03-Child1: Spawning one child
+SystemCallsTest03-Child1-Child1: started
+SystemCallsTest03-Child1-Child1: exiting
+SystemCallsTest03-Child1: after spawn of child with PID 6
+SystemCallsTest03-Child1: finished
+SystemCallsTest03: after spawn of child with PID 5
+SystemCallsTest03: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest04: started
+SystemCallsTest04: sem_result = 0, semaphore = 0
+SystemCallsTest04: sem_result = 0, semaphore = 1
+All processes completed.
+
+SystemCallsTest05: started
+SystemCallsTest05: SemCreate returned  0 at index   0
+SystemCallsTest05: SemCreate returned  0 at index   1
+SystemCallsTest05: SemCreate returned  0 at index   2
+SystemCallsTest05: SemCreate returned  0 at index   3
+SystemCallsTest05: SemCreate returned  0 at index   4
+SystemCallsTest05: SemCreate returned  0 at index   5
+SystemCallsTest05: SemCreate returned  0 at index   6
+SystemCallsTest05: SemCreate returned  0 at index   7
+SystemCallsTest05: SemCreate returned  0 at index   8
+SystemCallsTest05: SemCreate returned  0 at index   9
+SystemCallsTest05: SemCreate returned  0 at index  10
+SystemCallsTest05: SemCreate returned  0 at index  11
+SystemCallsTest05: SemCreate returned  0 at index  12
+SystemCallsTest05: SemCreate returned  0 at index  13
+SystemCallsTest05: SemCreate returned  0 at index  14
+SystemCallsTest05: SemCreate returned  0 at index  15
+SystemCallsTest05: SemCreate returned  0 at index  16
+SystemCallsTest05: SemCreate returned  0 at index  17
+SystemCallsTest05: SemCreate returned  0 at index  18
+SystemCallsTest05: SemCreate returned  0 at index  19
+SystemCallsTest05: SemCreate returned  0 at index  20
+SystemCallsTest05: SemCreate returned  0 at index  21
+SystemCallsTest05: SemCreate returned  0 at index  22
+SystemCallsTest05: SemCreate returned  0 at index  23
+SystemCallsTest05: SemCreate returned  0 at index  24
+SystemCallsTest05: SemCreate returned  0 at index  25
+SystemCallsTest05: SemCreate returned  0 at index  26
+SystemCallsTest05: SemCreate returned  0 at index  27
+SystemCallsTest05: SemCreate returned  0 at index  28
+SystemCallsTest05: SemCreate returned  0 at index  29
+SystemCallsTest05: SemCreate returned  0 at index  30
+SystemCallsTest05: SemCreate returned  0 at index  31
+SystemCallsTest05: SemCreate returned  0 at index  32
+SystemCallsTest05: SemCreate returned  0 at index  33
+SystemCallsTest05: SemCreate returned  0 at index  34
+SystemCallsTest05: SemCreate returned  0 at index  35
+SystemCallsTest05: SemCreate returned  0 at index  36
+SystemCallsTest05: SemCreate returned  0 at index  37
+SystemCallsTest05: SemCreate returned  0 at index  38
+SystemCallsTest05: SemCreate returned  0 at index  39
+SystemCallsTest05: SemCreate returned  0 at index  40
+SystemCallsTest05: SemCreate returned  0 at index  41
+SystemCallsTest05: SemCreate returned  0 at index  42
+SystemCallsTest05: SemCreate returned  0 at index  43
+SystemCallsTest05: SemCreate returned  0 at index  44
+SystemCallsTest05: SemCreate returned  0 at index  45
+SystemCallsTest05: SemCreate returned  0 at index  46
+SystemCallsTest05: SemCreate returned  0 at index  47
+SystemCallsTest05: SemCreate returned  0 at index  48
+SystemCallsTest05: SemCreate returned  0 at index  49
+SystemCallsTest05: SemCreate returned  0 at index  50
+SystemCallsTest05: SemCreate returned  0 at index  51
+SystemCallsTest05: SemCreate returned  0 at index  52
+SystemCallsTest05: SemCreate returned  0 at index  53
+SystemCallsTest05: SemCreate returned  0 at index  54
+SystemCallsTest05: SemCreate returned  0 at index  55
+SystemCallsTest05: SemCreate returned  0 at index  56
+SystemCallsTest05: SemCreate returned  0 at index  57
+SystemCallsTest05: SemCreate returned  0 at index  58
+SystemCallsTest05: SemCreate returned  0 at index  59
+SystemCallsTest05: SemCreate returned  0 at index  60
+SystemCallsTest05: SemCreate returned  0 at index  61
+SystemCallsTest05: SemCreate returned  0 at index  62
+SystemCallsTest05: SemCreate returned  0 at index  63
+SystemCallsTest05: SemCreate returned  0 at index  64
+SystemCallsTest05: SemCreate returned  0 at index  65
+SystemCallsTest05: SemCreate returned  0 at index  66
+SystemCallsTest05: SemCreate returned  0 at index  67
+SystemCallsTest05: SemCreate returned  0 at index  68
+SystemCallsTest05: SemCreate returned  0 at index  69
+SystemCallsTest05: SemCreate returned  0 at index  70
+SystemCallsTest05: SemCreate returned  0 at index  71
+SystemCallsTest05: SemCreate returned  0 at index  72
+SystemCallsTest05: SemCreate returned  0 at index  73
+SystemCallsTest05: SemCreate returned  0 at index  74
+SystemCallsTest05: SemCreate returned  0 at index  75
+SystemCallsTest05: SemCreate returned  0 at index  76
+SystemCallsTest05: SemCreate returned  0 at index  77
+SystemCallsTest05: SemCreate returned  0 at index  78
+SystemCallsTest05: SemCreate returned  0 at index  79
+SystemCallsTest05: SemCreate returned  0 at index  80
+SystemCallsTest05: SemCreate returned  0 at index  81
+SystemCallsTest05: SemCreate returned  0 at index  82
+SystemCallsTest05: SemCreate returned  0 at index  83
+SystemCallsTest05: SemCreate returned  0 at index  84
+SystemCallsTest05: SemCreate returned  0 at index  85
+SystemCallsTest05: SemCreate returned  0 at index  86
+SystemCallsTest05: SemCreate returned  0 at index  87
+SystemCallsTest05: SemCreate returned  0 at index  88
+SystemCallsTest05: SemCreate returned  0 at index  89
+SystemCallsTest05: SemCreate returned  0 at index  90
+SystemCallsTest05: SemCreate returned  0 at index  91
+SystemCallsTest05: SemCreate returned  0 at index  92
+SystemCallsTest05: SemCreate returned  0 at index  93
+SystemCallsTest05: SemCreate returned  0 at index  94
+SystemCallsTest05: SemCreate returned  0 at index  95
+SystemCallsTest05: SemCreate returned  0 at index  96
+SystemCallsTest05: SemCreate returned  0 at index  97
+SystemCallsTest05: SemCreate returned  0 at index  98
+SystemCallsTest05: SemCreate returned  0 at index  99
+SystemCallsTest05: SemCreate returned  0 at index 100
+SystemCallsTest05: SemCreate returned  0 at index 101
+SystemCallsTest05: SemCreate returned  0 at index 102
+SystemCallsTest05: SemCreate returned  0 at index 103
+SystemCallsTest05: SemCreate returned  0 at index 104
+SystemCallsTest05: SemCreate returned  0 at index 105
+SystemCallsTest05: SemCreate returned  0 at index 106
+SystemCallsTest05: SemCreate returned  0 at index 107
+SystemCallsTest05: SemCreate returned  0 at index 108
+SystemCallsTest05: SemCreate returned  0 at index 109
+SystemCallsTest05: SemCreate returned  0 at index 110
+SystemCallsTest05: SemCreate returned  0 at index 111
+SystemCallsTest05: SemCreate returned  0 at index 112
+SystemCallsTest05: SemCreate returned  0 at index 113
+SystemCallsTest05: SemCreate returned  0 at index 114
+SystemCallsTest05: SemCreate returned  0 at index 115
+SystemCallsTest05: SemCreate returned  0 at index 116
+SystemCallsTest05: SemCreate returned  0 at index 117
+SystemCallsTest05: SemCreate returned  0 at index 118
+SystemCallsTest05: SemCreate returned  0 at index 119
+SystemCallsTest05: SemCreate returned  0 at index 120
+SystemCallsTest05: SemCreate returned  0 at index 121
+SystemCallsTest05: SemCreate returned  0 at index 122
+SystemCallsTest05: SemCreate returned  0 at index 123
+SystemCallsTest05: SemCreate returned  0 at index 124
+SystemCallsTest05: SemCreate returned  0 at index 125
+SystemCallsTest05: SemCreate returned  0 at index 126
+SystemCallsTest05: SemCreate returned  0 at index 127
+SystemCallsTest05: SemCreate returned  0 at index 128
+SystemCallsTest05: SemCreate returned  0 at index 129
+SystemCallsTest05: SemCreate returned  0 at index 130
+SystemCallsTest05: SemCreate returned  0 at index 131
+SystemCallsTest05: SemCreate returned  0 at index 132
+SystemCallsTest05: SemCreate returned  0 at index 133
+SystemCallsTest05: SemCreate returned  0 at index 134
+SystemCallsTest05: SemCreate returned  0 at index 135
+SystemCallsTest05: SemCreate returned  0 at index 136
+SystemCallsTest05: SemCreate returned  0 at index 137
+SystemCallsTest05: SemCreate returned  0 at index 138
+SystemCallsTest05: SemCreate returned  0 at index 139
+SystemCallsTest05: SemCreate returned  0 at index 140
+SystemCallsTest05: SemCreate returned  0 at index 141
+SystemCallsTest05: SemCreate returned  0 at index 142
+SystemCallsTest05: SemCreate returned  0 at index 143
+SystemCallsTest05: SemCreate returned  0 at index 144
+SystemCallsTest05: SemCreate returned  0 at index 145
+SystemCallsTest05: SemCreate returned  0 at index 146
+SystemCallsTest05: SemCreate returned  0 at index 147
+SystemCallsTest05: SemCreate returned  0 at index 148
+SystemCallsTest05: SemCreate returned  0 at index 149
+SystemCallsTest05: SemCreate returned  0 at index 150
+SystemCallsTest05: SemCreate returned  0 at index 151
+SystemCallsTest05: SemCreate returned  0 at index 152
+SystemCallsTest05: SemCreate returned  0 at index 153
+SystemCallsTest05: SemCreate returned  0 at index 154
+SystemCallsTest05: SemCreate returned  0 at index 155
+SystemCallsTest05: SemCreate returned  0 at index 156
+SystemCallsTest05: SemCreate returned  0 at index 157
+SystemCallsTest05: SemCreate returned  0 at index 158
+SystemCallsTest05: SemCreate returned  0 at index 159
+SystemCallsTest05: SemCreate returned  0 at index 160
+SystemCallsTest05: SemCreate returned  0 at index 161
+SystemCallsTest05: SemCreate returned  0 at index 162
+SystemCallsTest05: SemCreate returned  0 at index 163
+SystemCallsTest05: SemCreate returned  0 at index 164
+SystemCallsTest05: SemCreate returned  0 at index 165
+SystemCallsTest05: SemCreate returned  0 at index 166
+SystemCallsTest05: SemCreate returned  0 at index 167
+SystemCallsTest05: SemCreate returned  0 at index 168
+SystemCallsTest05: SemCreate returned  0 at index 169
+SystemCallsTest05: SemCreate returned  0 at index 170
+SystemCallsTest05: SemCreate returned  0 at index 171
+SystemCallsTest05: SemCreate returned  0 at index 172
+SystemCallsTest05: SemCreate returned  0 at index 173
+SystemCallsTest05: SemCreate returned  0 at index 174
+SystemCallsTest05: SemCreate returned  0 at index 175
+SystemCallsTest05: SemCreate returned  0 at index 176
+SystemCallsTest05: SemCreate returned  0 at index 177
+SystemCallsTest05: SemCreate returned  0 at index 178
+SystemCallsTest05: SemCreate returned  0 at index 179
+SystemCallsTest05: SemCreate returned  0 at index 180
+SystemCallsTest05: SemCreate returned  0 at index 181
+SystemCallsTest05: SemCreate returned  0 at index 182
+SystemCallsTest05: SemCreate returned  0 at index 183
+SystemCallsTest05: SemCreate returned  0 at index 184
+SystemCallsTest05: SemCreate returned  0 at index 185
+SystemCallsTest05: SemCreate returned  0 at index 186
+SystemCallsTest05: SemCreate returned  0 at index 187
+SystemCallsTest05: SemCreate returned  0 at index 188
+SystemCallsTest05: SemCreate returned  0 at index 189
+SystemCallsTest05: SemCreate returned  0 at index 190
+SystemCallsTest05: SemCreate returned  0 at index 191
+SystemCallsTest05: SemCreate returned  0 at index 192
+SystemCallsTest05: SemCreate returned  0 at index 193
+SystemCallsTest05: SemCreate returned  0 at index 194
+SystemCallsTest05: SemCreate returned  0 at index 195
+SystemCallsTest05: SemCreate returned  0 at index 196
+SystemCallsTest05: SemCreate returned  0 at index 197
+SystemCallsTest05: SemCreate returned  0 at index 198
+SystemCallsTest05: SemCreate returned  0 at index 199
+SystemCallsTest05: SemCreate returned -1 at index 200
+SystemCallsTest05: SemCreate returned -1 at index 201
+All processes completed.
+
+SystemCallsTest06: started
+SystemCallsTest06: sem_result = 0, semaphore = 0
+SystemCallsTest06-Child1: started
+SystemCallsTest06-Child1: Calling SemP on semaphore 0
+SystemCallsTest06: after spawn of child with PID 5
+SystemCallsTest06-Child2: started
+SystemCallsTest06-Child2: Calling SemV on semaphore 0
+SystemCallsTest06-Child2: SemV returned 0
+SystemCallsTest06-Child2: exiting
+SystemCallsTest06-Child1: SemP returned 0
+SystemCallsTest06-Child1: exiting
+SystemCallsTest06: after spawn of child with PID 6
+SystemCallsTest06: Wait returned for child with PID 6 and status 9
+SystemCallsTest06: Wait returned for child with PID 5 and status 9
+SystemCallsTest06: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest07: started
+SystemCallsTest07: sem_result = 0, semaphore = 0
+SystemCallsTest07-Child1: started
+SystemCallsTest07-Child1: Calling SemP on semaphore 0
+SystemCallsTest07: after spawn of child with PID 5
+SystemCallsTest07-Child2: started
+SystemCallsTest07-Child2: Calling SemP on semaphore 0
+SystemCallsTest07: after spawn of child with PID 6
+SystemCallsTest07-Child3: started
+SystemCallsTest07-Child3: Calling SemP on semaphore 0
+SystemCallsTest07: after spawn of child with PID 7
+SystemCallsTest07-Child4: started
+SystemCallsTest07-Child4: Calling SemV on semaphore 0
+SystemCallsTest07-Child4: SemV returned 0
+SystemCallsTest07-Child4: Calling SemV on semaphore 0
+SystemCallsTest07-Child4: SemV returned 0
+SystemCallsTest07-Child4: Calling SemV on semaphore 0
+SystemCallsTest07-Child4: SemV returned 0
+SystemCallsTest07-Child4: exiting
+SystemCallsTest07-Child1: SemP returned 0
+SystemCallsTest07-Child1: exiting
+SystemCallsTest07-Child2: SemP returned 0
+SystemCallsTest07-Child2: exiting
+SystemCallsTest07-Child3: SemP returned 0
+SystemCallsTest07-Child3: exiting
+SystemCallsTest07: after spawn of child with PID 8
+SystemCallsTest07: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest08: started
+SystemCallsTest08: Creating MAXSEMS semaphores
+SystemCallsTest08: Freeing one semaphore
+SystemCallsTest08: TEST PASSED - SemCreate returned  0
+All processes completed.
+
+SystemCallsTest09: started
+SystemCallsTest09: sem_result = 0, semaphore = 0
+SystemCallsTest09-Child1: started
+SystemCallsTest09-Child1: Calling SemP on semaphore 0
+SystemCallsTest09: after spawn of child with PID 5
+SystemCallsTest09-Child2: started
+SystemCallsTest09-Child2: Calling SemP on semaphore 0
+SystemCallsTest09: after spawn of child with PID 6
+SystemCallsTest09-Child3: started
+SystemCallsTest09-Child3: Calling SemP on semaphore 0
+SystemCallsTest09: after spawn of child with PID 7
+SystemCallsTest09-Child4: started
+SystemCallsTest09-Child4: Calling SemFree on semaphore 0
+SystemCallsTest09-Child4: SemFree returned 1 on semaphore 0
+SystemCallsTest09-Child4: exiting
+SystemCallsTest09: after spawn of child with PID 8
+SystemCallsTest09: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest10: started
+SystemCallsTest10-Child1: started
+SystemCallsTest10-Child1: Sleep complete - 2000577
+SystemCallsTest10: after spawn of child with PID 5
+SystemCallsTest10-Child1: started
+SystemCallsTest10-Child1: Sleep complete - 2015655
+SystemCallsTest10: after spawn of child with PID 6
+SystemCallsTest10-Child1: started
+SystemCallsTest10-Child1: Sleep complete - 2006024
+SystemCallsTest10: after spawn of child with PID 7
+SystemCallsTest10: Wait returned for child with PID 5 and status 9
+SystemCallsTest10: Wait returned for child with PID 6 and status 9
+SystemCallsTest10: Wait returned for child with PID 7 and status 9
+SystemCallsTest10: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest11: started
+SystemCallsTest11-Child1: started
+SystemCallsTest11-Child1: Sleep complete - 2017
+SystemCallsTest11: after spawn of child with PID 5
+SystemCallsTest11-Child1: started
+SystemCallsTest11-Child1: Sleep complete - 2010
+SystemCallsTest11: after spawn of child with PID 6
+SystemCallsTest11-Child1: started
+SystemCallsTest11-Child1: Sleep complete - 2001
+SystemCallsTest11: after spawn of child with PID 7
+SystemCallsTest11: Wait returned for child with PID 5 and status 9
+SystemCallsTest11: Wait returned for child with PID 6 and status 9
+SystemCallsTest11: Wait returned for child with PID 7 and status 9
+SystemCallsTest11: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest12: started
+SystemCallsTest12-Child1: started
+SystemCallsTest12-Child1: my PID is 5
+SystemCallsTest12: after spawn of child with PID 5
+SystemCallsTest12-Child1: started
+SystemCallsTest12-Child1: my PID is 6
+SystemCallsTest12: after spawn of child with PID 6
+SystemCallsTest12-Child1: started
+SystemCallsTest12-Child1: my PID is 7
+SystemCallsTest12: after spawn of child with PID 7
+SystemCallsTest12: Wait returned for child with PID 5 and status 9
+SystemCallsTest12: Wait returned for child with PID 6 and status 9
+SystemCallsTest12: Wait returned for child with PID 7 and status 9
+SystemCallsTest12: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest13: started
+SystemCallsTest13: sem_result = 0, semaphore = 0
+SystemCallsTest13-Child1: started
+SystemCallsTest13-Child1: Calling SemP on semaphore 0
+SystemCallsTest13: after spawn of child with PID 5
+SystemCallsTest13-Child2: started
+SystemCallsTest13-Child2: Calling SemP on semaphore 0
+SystemCallsTest13: after spawn of child with PID 6
+SystemCallsTest13: After SemFree with processes blocked
+SystemCallsTest13: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest14: started
+SystemCallsTest14: after spawn of 5
+SystemCallsTest14-Child1: started
+SystemCallsTest14-Child1: exiting
+SystemCallsTest14: Wait returned for child with PID 5 and status 9
+SystemCallsTest14: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest15: started
+SystemCallsTest15: after spawn of child with PID 5
+SystemCallsTest15-Child1: started
+SystemCallsTest15-Child1-Child1: started
+SystemCallsTest15-Child1-Child1: after spawn of 7
+SystemCallsTest15-Child1-Child1: after spawn of 8
+SystemCallsTest15-Child1-Child1: after spawn of 9
+SystemCallsTest15-Child1: after spawn of 6
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+SystemCallsTest15-Child1: Wait returned for child with PID 6 and status 10
+SystemCallsTest15-Child1: after spawn of 10
+SystemCallsTest15-Child1-Child2: started
+SystemCallsTest15-Child1-Child2: exiting
+SystemCallsTest15-Child1: Wait returned for child with PID 10 and status 9
+SystemCallsTest15-Child1: Parent done. Calling Exit.
+SystemCallsTest15: Wait returned for child with PID 5 and status 9
+SystemCallsTest15: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest16: started
+SystemCallsTest16: sem_result = 0, semaphore = 0
+SystemCallsTest16-Child1: started
+SystemCallsTest16-Child1: Calling SemP on semaphore 0
+SystemCallsTest16-Child1: SemP returned 0
+SystemCallsTest16-Child1: Calling SemP on semaphore 0
+SystemCallsTest16-Child1: SemP returned 0
+SystemCallsTest16-Child1: Calling SemP on semaphore 0
+SystemCallsTest16: after spawn of child with PID 5
+SystemCallsTest16: after spawn of child with PID 6
+SystemCallsTest16-Child1: SemP returned 0
+SystemCallsTest16-Child1: Calling SemP on semaphore 0
+SystemCallsTest16-Child2: started
+SystemCallsTest16-Child2: Calling SemV on semaphore 0
+SystemCallsTest16-Child1: SemP returned 0
+SystemCallsTest16-Child1: Calling SemP on semaphore 0
+SystemCallsTest16: after Semv
+SystemCallsTest16-Child2: SemV returned 0
+SystemCallsTest16-Child2: Calling SemV on semaphore 0
+SystemCallsTest16-Child1: SemP returned 0
+SystemCallsTest16-Child1: exiting
+SystemCallsTest16-Child2: SemV returned 0
+SystemCallsTest16-Child2: exiting
+SystemCallsTest16: Wait returned for child with PID 5 and status 9
+SystemCallsTest16: Wait returned for child with PID 6 and status 9
+SystemCallsTest16: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest17: started
+SystemCallsTest17: after spawn of child with PID 5
+SystemCallsTest17-Child1: started
+SystemCallsTest17-Child1-Child1: started
+SystemCallsTest17-Child1-Child1: after spawn of 7
+SystemCallsTest17-Child1-Child1: after spawn of 8
+SystemCallsTest17-Child1-Child1: after spawn of 9
+SystemCallsTest17-Child1-Child1: after spawn of 10
+SystemCallsTest17-Child1-Child1: after spawn of 11
+SystemCallsTest17-Child1-Child1: after spawn of 12
+SystemCallsTest17-Child1-Child1: after spawn of 13
+SystemCallsTest17-Child1-Child1: after spawn of 14
+SystemCallsTest17-Child1-Child1: after spawn of 15
+SystemCallsTest17-Child1-Child1: after spawn of 16
+SystemCallsTest17-Child1-Child1: after spawn of 17
+SystemCallsTest17-Child1-Child1: after spawn of 18
+SystemCallsTest17-Child1-Child1: after spawn of 19
+SystemCallsTest17-Child1-Child1: after spawn of 20
+SystemCallsTest17-Child1-Child1: after spawn of 21
+SystemCallsTest17-Child1-Child1: after spawn of 22
+SystemCallsTest17-Child1-Child1: after spawn of 23
+SystemCallsTest17-Child1-Child1: after spawn of 24
+SystemCallsTest17-Child1-Child1: after spawn of 25
+SystemCallsTest17-Child1-Child1: after spawn of 26
+SystemCallsTest17-Child1-Child1: after spawn of 27
+SystemCallsTest17-Child1-Child1: after spawn of 28
+SystemCallsTest17-Child1-Child1: after spawn of 29
+SystemCallsTest17-Child1-Child1: after spawn of 30
+SystemCallsTest17-Child1-Child1: after spawn of 31
+SystemCallsTest17-Child1-Child1: after spawn of 32
+SystemCallsTest17-Child1-Child1: after spawn of 33
+SystemCallsTest17-Child1-Child1: after spawn of 34
+SystemCallsTest17-Child1-Child1: after spawn of 35
+SystemCallsTest17-Child1-Child1: after spawn of 36
+SystemCallsTest17-Child1-Child1: after spawn of 37
+SystemCallsTest17-Child1-Child1: after spawn of 38
+SystemCallsTest17-Child1-Child1: after spawn of 39
+SystemCallsTest17-Child1-Child1: after spawn of 40
+SystemCallsTest17-Child1-Child1: after spawn of 41
+SystemCallsTest17-Child1-Child1: after spawn of 42
+SystemCallsTest17-Child1-Child1: after spawn of 43
+SystemCallsTest17-Child1-Child1: after spawn of 44
+SystemCallsTest17-Child1-Child1: after spawn of 45
+SystemCallsTest17-Child1-Child1: after spawn of 46
+SystemCallsTest17-Child1-Child1: after spawn of 47
+SystemCallsTest17-Child1-Child1: after spawn of 48
+SystemCallsTest17-Child1-Child1: after spawn of 49
+SystemCallsTest17-Child1-Child1: after spawn of 50
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: Exiting and terminating all child processes.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+SystemCallsTest17-Child1: after spawn of 6
+SystemCallsTest17-Child1: Wait returned for child with PID 6 and status 9
+SystemCallsTest17-Child1-Child2: started with PID 56
+SystemCallsTest17-Child1: after spawn of 56
+SystemCallsTest17-Child1: Wait returned for child with PID 56 and status 0
+SystemCallsTest17-Child1: Parent done. Calling Exit.
+SystemCallsTest17: Wait returned for child with PID 5 and status 9
+SystemCallsTest17: Parent done. Calling Exit.
+All processes completed.
