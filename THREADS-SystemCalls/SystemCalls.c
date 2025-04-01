@@ -14,7 +14,6 @@
 #define DEBUG 0;
 
 /* -------------------------- Globals ------------------------------------- */
-
 static DSL_List semFreeList = {0};				 /* list of free semaphores */
 static SemData semTable[MAX_SEMS] = {0};		 /* semaphore table (Static storage) */
 static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static storage) */
@@ -131,9 +130,46 @@ int k_semv(int sem_id)
 	return result;
 }
 
+/**
+ * @brief Kernel level semaphore creation.
+ *
+ * This function creates a semaphore with the specified initial value.
+ *
+ * @param initial_value - The initial value of the semaphore.
+ * @return int - The semaphore ID if successful, -1 if an error occurred.
+ */
 int k_semcreate(int initial_value)
 {
+	checkKernelMode(__func__);
 	int sem_id = -1;
+	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
+	if (initial_value < 0)
+	{
+		console_output(FALSE, "Error::k_semcreate: Invalid initial value.\n");
+		return -1;
+	}
+
+	if (sys_semCount >= MAX_SEMS)
+	{
+		return -1;
+	}
+
+	/* get the next empty semaphore from the semaphore table */
+	sys_procEnterCriticalArea(pProcess);
+	SemData *pSem = GetNextEmptySemaphore(semTable, MAX_SEMS);
+	sem_id = pSem != NULL ? pSem->semId : -1;
+
+	if (sem_id < 0)
+	{
+		console_output(FALSE, "Error::k_semcreate: No empty semaphores available.\n");
+	}
+	else
+	{
+		/* set the value and status */
+		pSem->count = initial_value;
+		pSem->status = SEM_IN_USE;
+	}
+	sys_procLeaveCriticalArea(pProcess);
 	return sem_id;
 }
 
@@ -305,28 +341,28 @@ void sys_exit(int resultCode)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
+
 	int exitCode = 0;
 	UserProcess *pChild;
 	int pid = k_getpid();
-
 	int tableIndex = pid % MAXPROC;
 	UserProcess *pProcess = &userProcTable[tableIndex];
 
 	/* Check for children */
 	sys_procEnterCriticalArea(pProcess);
-
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
 		sys_procLeaveCriticalArea(pProcess);
-		/* Not sure if we are allowed, but we need to signal the child */
+		/* Send the kill signal to the child */
 		k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
+		/* wait for it to exit */
 		k_wait(&exitCode);
 		sys_procEnterCriticalArea(pProcess);
 	}
 
-	// ResetUserProcess(pProcess);
 	sys_procLeaveCriticalArea(pProcess);
 
+	/* call k_exit to terminate the process */
 	k_exit(resultCode);
 }
 
@@ -364,21 +400,10 @@ void sys_getTimeOfDay(int *tod)
  */
 static void initSystemCallVector(void)
 {
-	/* initialize the system call vector */
-	for (int i = 0; i < THREADS_MAX_SYSCALLS; i++)
+
+	for (int i = SUPPORTED_SYS_CALL_START; i <= SUPPORTED_SYS_CALL_END; i++)
 	{
-		/* Referring to SystemCalls.h, and the SystemCalls API spec
-		we can see that the supported system calls are from 3 to 20
-		and range from spawn to getpid.
-		*/
-		if (i >= SUPPORTED_SYS_CALL_START && i <= SUPPORTED_SYS_CALL_END)
-		{
-			systemCallVector[i] = sys_call_dispatcher;
-		}
-		else
-		{
-			systemCallVector[i] = nullsys;
-		}
+		systemCallVector[i] = sys_call_dispatcher;
 	}
 }
 
@@ -448,6 +473,10 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_DISKSIZE:
 		break;
 	case SYS_SEMCREATE:
+		/* create a semaphore using sys_semcreate */
+		result = k_semcreate((int)args->arguments[0]);
+		args->arguments[0] = result;
+		args->arguments[3] = (result >= 0) ? (0) : (-1);
 		break;
 	case SYS_SEMP:
 		break;
@@ -465,6 +494,8 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		sys_getPid((int *)&args->arguments[0]);
 		break;
 	default:
+		/* invalid syscall - call the nullsys handler */
+		nullsys(args);
 		break;
 	}
 	/* set mode to user mode before returning.*/
