@@ -141,11 +141,13 @@ int k_semp(int sem_id)
 	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
 	userProcEnterCriticalArea(pProcess);
 	/* get the semaphore from the semaphore table */
-	SemData *pSem = &semTable[sem_id];
+	SemData *pSem = &semTable[sem_id % MAX_SEMS];
 
-	if (pSem->status != SEM_IN_USE)
+	if (pSem->status == SEM_FREE || pSem->status == SEM_INVALID)
 	{
+		/* check if the semaphore is free or invalid */
 		console_output(FALSE, "Error::k_semp: Semaphore not in use.\n");
+
 		if (pSem->status == SEM_FREE)
 		{
 			// TODO: Handle the case where the semaphore is free
@@ -224,7 +226,7 @@ int k_semv(int sem_id)
 	userProcEnterCriticalArea(pProcess);
 
 	/* get the semaphore from the semaphore table */
-	SemData *pSem = &semTable[sem_id];
+	SemData *pSem = &semTable[sem_id % MAX_SEMS];
 	if (pSem->status = SEM_FREE || pSem->status == SEM_INVALID)
 	{
 		console_output(FALSE, "Error::k_semv: Semaphore not in use.\n");
@@ -464,17 +466,22 @@ void sys_exit(int resultCode)
 	userProcEnterCriticalArea(pProcess);
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
-		userProcLeaveCriticalArea(pProcess);
-		/* Send the kill signal to the child */
-		k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
-		/* wait for it to exit */
-		k_wait(&exitCode);
-		userProcEnterCriticalArea(pProcess);
-	}
+		/* if the child is still alive */
+		if (pChild->status == USER_PROC_IN_USE)
+		{
+			userProcLeaveCriticalArea(pProcess);
+			/* Send the kill signal to the child */
+			k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
+			/* wait for it to exit */
+			k_wait(&exitCode);
+			userProcEnterCriticalArea(pProcess);
+		}
+		}
 
 	userProcLeaveCriticalArea(pProcess);
 
 	/* call k_exit to terminate the process */
+	pProcess->status = USER_PROC_FREE;
 	k_exit(resultCode);
 }
 
