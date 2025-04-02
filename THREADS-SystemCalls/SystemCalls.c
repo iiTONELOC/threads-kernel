@@ -33,9 +33,6 @@ static void initSystemCallVector(void);
 extern int SystemCallsEntryPoint(char *);
 static int launchUserProcess(char *pArg);
 static void nullsys(system_call_arguments_t *args);
-static void checkKernelMode(const char *functionName);
-static void sys_procLeaveCriticalArea(UserProcess *pProcess);
-static void sys_procEnterCriticalArea(UserProcess *pProcess);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, int priority);
 
@@ -68,8 +65,8 @@ int MessagingEntryPoint(char *arg)
 /**
  * @brief Launch control for the user process.
  *
- * This function is the link between kernel and user mode. It is called by the kernel
- * to start the user process.
+ * 		  This function is the link between kernel and user mode.
+ *        It is called by the kernel to start the user process.
  *
  * @param pArg - The argument to the user process.
  *
@@ -118,22 +115,143 @@ static int launchUserProcess(char *pArg)
 	return 0; // ?
 }
 
+/**
+ * @brief Semaphore P operation.
+ *
+ * 		  This function decrements the value of
+ *        the specified semaphore. If the value is greater than 0, it decrements the value and returns.
+ *        If the value is 0, it blocks the calling process until the semaphore is incremented above 0.
+ *
+ * @param sem_id - The ID of the semaphore to decrement.
+ * @return int - The result of the semaphore operation.
+ * 			     If successful, returns 0. If an error occurs, returns -1.
+ *
+ * @note There may be more than one process waiting on a semaphore to be incremented=
+ *       If a semaphore is freed, all waiting processes must Exit immediately with error code of 1.
+ */
 int k_semp(int sem_id)
 {
+	checkKernelMode(__func__);
 	int result = -1;
+	if (sem_id < 0 || sem_id >= MAX_SEMS)
+	{
+		console_output(FALSE, "Error::k_semp: Invalid semaphore ID.\n");
+		return result;
+	}
+	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
+	userProcEnterCriticalArea(pProcess);
+	/* get the semaphore from the semaphore table */
+	SemData *pSem = &semTable[sem_id];
+
+	if (pSem->status != SEM_IN_USE)
+	{
+		console_output(FALSE, "Error::k_semp: Semaphore not in use.\n");
+		if (pSem->status == SEM_FREE)
+		{
+			// TODO: Handle the case where the semaphore is free
+			// \033[31m is an ANSI escape code for red text
+			// \033[0m is an ANSI escape code to reset the text color
+			console_output(FALSE, "\033[31mError::k_semp: Semaphore is free.\033[0m\n");
+		}
+		userProcLeaveCriticalArea(pProcess);
+		return result;
+	}
+
+	/* check the current value of the semaphore */
+
+	if (pSem->count > 0)
+	{
+		/* decrement the semaphore count */
+		pSem->count--;
+		result = 0; // success
+	}
+	else
+	{
+		/* Block the current proccess on the semaphore */
+		userProcBlockOnSemaphore(pProcess, pSem);
+
+		/* AFTER the process becomes unblocked */
+		if (pSem->status == SEM_FREE)
+		{
+			/* check if the process was signaled while waiting */
+			// TODO: Handle the case where the semaphore is free
+			// \033[31m is an ANSI escape code for red text
+			// \033[0m is an ANSI escape code to reset the text color
+			console_output(FALSE, "\033[31mError::k_semp: Semaphore is free.\033[0m\n");
+		}
+
+		/* check if the process was signaled while waiting */
+		if (signaled())
+		{
+			console_output(FALSE, "Error::k_semp: Process was signaled while waiting.\n");
+			result = -5; // signaled
+		}
+		else
+		{
+			/* semaphore was incremented, decrement the count */
+			pSem->count--;
+			result = 0; // success
+		}
+	}
+
+	userProcLeaveCriticalArea(pProcess);
+
 	return result;
 }
 
+/**
+ * @brief Semaphore V operation.
+ *
+ * 		 This function increments the value of the specified semaphore.
+ *
+ * @param sem_id - The ID of the semaphore to increment.
+ * @return int - The result of the semaphore operation. 0 if successful, -1 if an error occurred.
+ * @note If there are processes waiting on the semaphore, one of them, will be
+ *       unblocked and allowed to continue. The semaphore count is incremented by 1.
+ */
 int k_semv(int sem_id)
 {
+	checkKernelMode(__func__);
 	int result = -1;
+
+	if (sem_id < 0 || sem_id >= MAX_SEMS)
+	{
+		console_output(FALSE, "Error::k_semv: Invalid semaphore ID.\n");
+		return result;
+	}
+
+	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
+	userProcEnterCriticalArea(pProcess);
+
+	/* get the semaphore from the semaphore table */
+	SemData *pSem = &semTable[sem_id];
+	if (pSem->status = SEM_FREE || pSem->status == SEM_INVALID)
+	{
+		console_output(FALSE, "Error::k_semv: Semaphore not in use.\n");
+		userProcLeaveCriticalArea(pProcess);
+		return result;
+	}
+
+	/* increment the semaphore count */
+	pSem->count++;
+	result = 0; // success
+
+	/* check if there are any processes waiting on the semaphore */
+	if (pSem->count > 0)
+	{
+		/* unblock one of the waiting processes */
+		UserProcess *pWaitingProc = DSL_Pop(&pSem->waitingProcs);
+		userProcUnblockOnSemaphore(pWaitingProc, pSem);
+	}
+
+	userProcLeaveCriticalArea(pProcess);
 	return result;
 }
 
 /**
  * @brief Kernel level semaphore creation.
  *
- * This function creates a semaphore with the specified initial value.
+ * 		 This function creates a semaphore with the specified initial value.
  *
  * @param initial_value - The initial value of the semaphore.
  * @return int - The semaphore ID if successful, -1 if an error occurred.
@@ -155,7 +273,7 @@ int k_semcreate(int initial_value)
 	}
 
 	/* get the next empty semaphore from the semaphore table */
-	sys_procEnterCriticalArea(pProcess);
+	userProcEnterCriticalArea(pProcess);
 	SemData *pSem = GetNextEmptySemaphore(semTable, MAX_SEMS);
 	sem_id = pSem != NULL ? pSem->semId : -1;
 
@@ -169,7 +287,7 @@ int k_semcreate(int initial_value)
 		pSem->count = initial_value;
 		pSem->status = SEM_IN_USE;
 	}
-	sys_procLeaveCriticalArea(pProcess);
+	userProcLeaveCriticalArea(pProcess);
 	return sem_id;
 }
 
@@ -231,13 +349,13 @@ int sys_wait(int *pStatus)
 	UserProcess *pExitingChild = &userProcTable[result % MAXPROC];
 
 	/* see if the exiting process has a parent, if so remove it from its parent's list */
-	sys_procEnterCriticalArea(pExitingChild);
+	userProcEnterCriticalArea(pExitingChild);
 	if (pExitingChild->pParent != NULL)
 	{
 		/* remove this process from the list of children */
 		DSL_RemoveNode(pExitingChild, &pExitingChild->pParent->children);
 	}
-	sys_procLeaveCriticalArea(pExitingChild);
+	userProcLeaveCriticalArea(pExitingChild);
 
 	/*
 		TODO:?? Do we need to check if the process exists in a wait list for a semaphore?
@@ -276,29 +394,22 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 	pid = k_spawn(name, launchUserProcess, arg, stackSize, priority);
 	if (pid > 0)
 	{
-		/* get the process and its parent from the table */
+		// /* get the process and its parent from the table */
 		int index = pid % MAXPROC;
 		UserProcess *pCreatedProcess = &userProcTable[index];
-		UserProcess *pParentProcess = &userProcTable[parentPid % MAXPROC];
 
-		/* set the pCreatedProcess data
-			- index and mailboxes were added already */
-		pCreatedProcess->pid = pid;
-		pCreatedProcess->status = 1;
-		pCreatedProcess->pNext = NULL;
-		pCreatedProcess->pPrev = NULL;
-		if (arg != NULL)
-		{
-			strncpy(pCreatedProcess->startArgs, arg, MAX_START_ARG_LEN);
-		}
-		pCreatedProcess->pNextChild = NULL;
-		pCreatedProcess->pPrevChild = NULL;
-		pCreatedProcess->priority = priority;
-		pCreatedProcess->startFunc = startFunc;
-		pCreatedProcess->pParent = pParentProcess;
-		DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pCreatedProcess->children, NULL);
-		/* Set the created process' parent's data */
-		DSL_InsertNode(pCreatedProcess, &pParentProcess->children);
+		ResuseProcArgs args = {
+			.arg = arg,
+			.pid = pid,
+			.name = name,
+			.priority = priority,
+			.parentPid = parentPid,
+			.startFunc = startFunc,
+			.stackSize = stackSize,
+			.pUserProcTable = userProcTable,
+		};
+
+		ReuseUserProcess(&args);
 
 		/* send a message to the process to start - don't block*/
 		mailbox_send(pCreatedProcess->privateMboxId, NULL, 0, FALSE);
@@ -323,6 +434,7 @@ static void initTables(void)
 			userProcTable[i].tableIndex = i;
 			/* add a mailbox to the user process table */
 			userProcTable[i].privateMboxId = mailbox_create(1, sizeof(int));
+			userProcTable[i].semWaitMboxId = mailbox_create(1, sizeof(int));
 			/* remaining process fields are NULL for now -
 				they will be set when a process is spawned */
 		}
@@ -349,18 +461,18 @@ void sys_exit(int resultCode)
 	UserProcess *pProcess = &userProcTable[tableIndex];
 
 	/* Check for children */
-	sys_procEnterCriticalArea(pProcess);
+	userProcEnterCriticalArea(pProcess);
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
-		sys_procLeaveCriticalArea(pProcess);
+		userProcLeaveCriticalArea(pProcess);
 		/* Send the kill signal to the child */
 		k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
 		/* wait for it to exit */
 		k_wait(&exitCode);
-		sys_procEnterCriticalArea(pProcess);
+		userProcEnterCriticalArea(pProcess);
 	}
 
-	sys_procLeaveCriticalArea(pProcess);
+	userProcLeaveCriticalArea(pProcess);
 
 	/* call k_exit to terminate the process */
 	k_exit(resultCode);
@@ -479,8 +591,14 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		args->arguments[3] = (result >= 0) ? (0) : (-1);
 		break;
 	case SYS_SEMP:
+		/* P operation on a semaphore using sys_semp */
+		result = k_semp((int)args->arguments[0]);
+		args->arguments[3] = (result >= 0) ? (0) : (-1);
 		break;
 	case SYS_SEMV:
+		/* V operation on a semaphore using sys_semv */
+		result = k_semv((int)args->arguments[0]);
+		args->arguments[3] = (result >= 0) ? (0) : (-1);
 		break;
 	case SYS_SEMFREE:
 		break;
@@ -501,21 +619,6 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	/* set mode to user mode before returning.*/
 	setUserMode();
 	/* --------------------------- USER-SPACE --------------------------- */
-}
-
-/*****************************************************************************
-   Name - checkKernelMode
-   Purpose - Checks the PSR for kernel mode and halts if in user mode
-   Parameters -
-   Returns -
-****************************************************************************/
-static inline void checkKernelMode(const char *functionName)
-{
-	if ((get_psr() & PSR_KERNEL_MODE) == 0)
-	{
-		console_output(FALSE, "Kernel mode expected, but function called in user mode.\n");
-		stop(1);
-	}
 }
 
 /* an error method to handle invalid syscalls */
@@ -551,36 +654,4 @@ static void setKernelMode(void)
 	/* the Kernel mode bit is in bit position 1 and we can use the PSR_KERNEL_MODE for the mask
 	   a Value of 1 in the Kernel mode bit position will set the processor to kernel mode */
 	set_psr(get_psr() | PSR_KERNEL_MODE);
-}
-
-/**
- * @brief Marks the process as outside its critical section using system mailboxes.
- *
- *  This is used to synchronize the process with the kernel.
- *
- * @param pProcess - The process to enable interrupts for.
- *
- * @note Uses a single-slot mailbox to synchronize with the kernel.
- */
-static void sys_procLeaveCriticalArea(UserProcess *pProcess)
-{
-	/* check for kernel mode */
-	checkKernelMode(__func__);
-	mailbox_receive(pProcess->privateMboxId, NULL, 0, TRUE);
-}
-
-/**
- * @brief Marks the process as being inside its critical section using system mailboxes.
- *
- *  This is used to synchronize the process with the kernel.
- *
- * @param pProcess - The process to disable interrupts for.
- *
- * @note Uses a single-slot mailbox to synchronize with the kernel.
- */
-static void sys_procEnterCriticalArea(UserProcess *pProcess)
-{
-	/* check for kernel mode */
-	checkKernelMode(__func__);
-	mailbox_send(pProcess->privateMboxId, NULL, 0, TRUE);
 }

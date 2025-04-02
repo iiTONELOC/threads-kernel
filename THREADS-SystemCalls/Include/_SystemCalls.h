@@ -16,6 +16,15 @@ enum SEMAPHORE_STATUS
     SEM_STATUS_COUNT = 3
 };
 
+enum USER_PROC_STATUS // Not valid kernel level values - userland only
+{
+    USER_PROC_FREE = 0,
+    USER_PROC_IN_USE = 1,
+    USER_PROC_WAITING = 2,
+    USER_PROC_INVALID = -1,
+    USER_PROC_STATUS_COUNT = 3
+};
+
 /* -------------------------------- Typedefs and Structs ------------------------------- */
 
 typedef struct sem_data
@@ -29,8 +38,6 @@ typedef struct sem_data
     DSL_List waitingProcs;
     struct sem_data *pNextSem;
     struct sem_data *pPrevSem;
-
-    /* Add additional members needed. */
 } SemData;
 
 typedef struct user_proc
@@ -39,8 +46,8 @@ typedef struct user_proc
     int status;
     int priority;
     int tableIndex;
-    char startArgs[MAX_START_ARG_LEN];
     int privateMboxId;
+    int semWaitMboxId;
     DSL_List children;
     int (*startFunc)(char *);
     /*parent*/
@@ -51,6 +58,7 @@ typedef struct user_proc
     /*parent use*/
     struct user_proc *pNextChild;
     struct user_proc *pPrevChild;
+    char startArgs[MAX_START_ARG_LEN];
 
 } UserProcess;
 
