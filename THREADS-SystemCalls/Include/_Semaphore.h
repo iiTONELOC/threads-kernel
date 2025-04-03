@@ -45,6 +45,7 @@ int GetNextEmptySemIndex(SemData *pSemTable, int size);
  *       next empty semaphore from the table.
  */
 SemData *GetNextEmptySemaphore(SemData *pSemTable, int size);
+
 /**
  * @brief Initializes the semaphore data structure with the given parameters.
  *

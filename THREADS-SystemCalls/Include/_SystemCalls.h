@@ -33,13 +33,9 @@ typedef struct sem_data
     int semId;
     int count;
     int status;
-    int mutexId; // - mailbox id for the mutex
     int tableIndex;
     int errorOnFree;
-    int privateMboxId; // - mailbox id for the semaphore
     DSL_List waitingProcs;
-    struct sem_data *pNextSem;
-    struct sem_data *pPrevSem;
 } SemData;
 
 typedef struct user_proc
@@ -67,8 +63,6 @@ typedef struct user_proc
 #define MAX_SEMS MAXSEMS                                                 // more readable alias for MAXSEMS
 #define SUPPORTED_SYS_CALL_END 20                                        // last supported system call vector index
 #define SUPPORTED_SYS_CALL_START 3                                       // first supported system call vector index
-#define OFFSETOF_SEM_DATA offsetof(SemData, pNextSem)                    // offset of the next semaphore in the list - NOT SURE IF THIS WILL BE USED
-#define OFFSETOF_SEM_DATA_INDEX offsetof(SemData, tableIndex)            // offset of the semaphore index in SemData
 #define OFFSETOF_USER_PROC_NEXT_NODE offsetof(UserProcess, pNext)        // offset of the next user process in the list - FOR SEMAPHORE USE
 #define OFFSETOF_USER_PROC_CHILD_NODES offsetof(UserProcess, pNextChild) // offset of the next user process in the list - FOR PARENT USE
 

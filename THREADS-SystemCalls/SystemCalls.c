@@ -11,10 +11,10 @@
 #include "UserProcess.h"
 #include "libuser.h"
 
-// #define DEBUG 0;
+#define DEBUG 0;
 
 /* -------------------------- Globals ------------------------------------- */
-static DSL_List semFreeList = {0};				 /* list of free semaphores */
+
 static SemData semTable[MAX_SEMS] = {0};		 /* semaphore table (Static storage) */
 static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static storage) */
 
@@ -23,7 +23,7 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 int sys_wait(int *pStatus);
 static void initTables(void);
 void sys_exit(int resultCode);
-void setUserMode(void);
+static void setUserMode(void);
 void sys_cputime(int *cpuTime);
 void sys_getTimeOfDay(int *tod);
 static void setKernelMode(void);
@@ -112,7 +112,7 @@ static int launchUserProcess(char *pArg)
 		- Have to use the system call Exit to exit the userland process */
 	Exit(result);
 
-	return 0; // ?
+	return 0;
 }
 
 /**
@@ -220,6 +220,7 @@ int k_semv(int sem_id)
 	}
 
 	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
+
 	UserProcEnterCriticalArea(pProcess);
 
 	/* get the semaphore from the semaphore table */
@@ -355,6 +356,11 @@ int k_semfree(int sem_id)
 	return result;
 }
 
+/**
+ * @brief System call wrapper for getting the process ID.
+ *
+ * @param pid - Pointer to an int that receives the process ID.
+ **/
 static void sys_getPid(int *pid)
 {
 	/* check for kernel mode */
@@ -628,9 +634,6 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		break;
 	case SYS_EXIT:
 		sys_exit(args->arguments[0]);
-		break;
-	case SYS_SLEEP:
-		// TODO: Implement sleep
 		break;
 	case SYS_SEMCREATE:
 		/* create a semaphore using sys_semcreate */

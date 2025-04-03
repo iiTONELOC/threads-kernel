@@ -6,14 +6,13 @@
 #include "Scheduler.h"
 #include "Messaging.h"
 #include "libuser.h"
-#include <stdint.h>
 
 static testNameBuffer[512];
 
 /* Can only get this for the test name since there is one buffer for this. */
-char* GetTestName(char* filename)
+char *GetTestName(char *filename)
 {
-	char* testName;
+	char *testName;
 
 	testName = filename;
 	if (strrchr(filename, '\\'))
@@ -21,14 +20,14 @@ char* GetTestName(char* filename)
 		testName = strrchr(filename, '\\') + 1;
 	}
 
-	strncpy((char*)testNameBuffer, testName, strlen(testName) - 2);
+	strncpy((char *)testNameBuffer, testName, strlen(testName) - 2);
 
-	return (char*)testNameBuffer;
+	return (char *)testNameBuffer;
 }
 
-char* CreateSysCallsTestArgs(char* buffer, int bufferSize, char* prefix, int childId, int semHandle, int sempCount, int semvCount, int options)
+char *CreateSysCallsTestArgs(char *buffer, int bufferSize, char *prefix, int childId, int semHandle, int sempCount, int semvCount, int options)
 {
-	char* separator;
+	char *separator;
 
 	snprintf(buffer, bufferSize, "%s-Child%d:%d-%d-%d-%d", prefix, childId, semHandle, sempCount, semvCount, options);
 
@@ -37,10 +36,10 @@ char* CreateSysCallsTestArgs(char* buffer, int bufferSize, char* prefix, int chi
 	return separator;
 }
 
-int StartDoSemsAndExit(char* strArgs)
+int StartDoSemsAndExit(char *strArgs)
 {
 	int i, result;
-	char* separator;
+	char *separator;
 	int sempCount = 0;
 	int semvCount = 0;
 	int options = 0;
@@ -106,12 +105,6 @@ int StartDoSemsAndExit(char* strArgs)
 	if (options & SYSCALL_TEST_OPTION_SEMFREE)
 	{
 		console_output(FALSE, "%s: Calling SemFree on semaphore %d\n", strArgs, semHandle);
-
-		uint32_t psr = get_psr();
-		/*set_psr(get_psr() & ~PSR_KERNEL_MODE);*/
-
-		//set_psr(get_psr() | PSR_KERNEL_MODE);
-		psr = get_psr();
 		result = SemFree(semHandle);
 		console_output(FALSE, "%s: SemFree returned %d on semaphore %d\n", strArgs, result, semHandle);
 	}

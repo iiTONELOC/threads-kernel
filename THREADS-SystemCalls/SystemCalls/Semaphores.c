@@ -13,7 +13,7 @@ static int nextSemId = 0; /* next semaphore id to use */
  *
  * @param pSem - Pointer to the semaphore data structure to reset.
  * @note This function sets the semaphore count to 0 and marks it as free.
- *       But does not free the mailboxes associated with the semaphore.
+ *
  *       It is assumed that the semaphore is not in use when this function is called.
  *       This function decrements the semaphore count.
  */
@@ -27,8 +27,6 @@ void ResetSem(SemData *pSem)
     pSem->count = 0;
     pSem->semId = -1;
     pSem->errorOnFree = 0;
-    pSem->pNextSem = NULL;
-    pSem->pPrevSem = NULL;
     pSem->status = SEM_FREE;
     /* don't clean nodes, this will reset any processes waiting */
     DSL_DestroyList(&pSem->waitingProcs, 0);
@@ -48,12 +46,8 @@ void InitializeSem(SemData *pSem)
     /* Initialize the semaphore data structure with default values */
     pSem->count = 0;
     pSem->semId = -1;
-    pSem->mutexId = -1;
     pSem->tableIndex = -1;
-    pSem->pNextSem = NULL;
-    pSem->pPrevSem = NULL;
     pSem->status = SEM_FREE;
-    pSem->privateMboxId = -1;
 
     /* Initialize the waiting processes list */
     DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, OrderProcessList);
@@ -119,7 +113,7 @@ SemData *GetNextEmptySemaphore(SemData *pSemTable, int size)
  * @brief Initializes the semaphore data structure with the given parameters.
  *
  * @note This function initializes the semaphore data structure with the specified ID,
- * count, and status. It also creates a private mailbox for the semaphore.
+ * count, and status.
  *
  * @param pSem - Pointer to the semaphore data structure to initialize.
  * @param sem_id - Semaphore ID.
@@ -132,6 +126,4 @@ void InitializeSemWData(SemData *pSem, int sem_id, int count, int status)
     pSem->semId = sem_id;
     pSem->count = count;
     pSem->status = status;
-    pSem->privateMboxId = mailbox_create(1, sizeof(int));
-    pSem->mutexId = mailbox_create(1, sizeof(int));
 }
