@@ -124,7 +124,7 @@ void UserProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem)
  * @param pSem - The semaphore to unblock on.
  */
 void UserProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem)
-{
+{   
     if (!pSem || !pProcess)
     {
         return; /* Invalid semaphore or process pointer */
@@ -137,7 +137,7 @@ void UserProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem)
     pProcess->status = USER_PROC_IN_USE;
 
     /* if there are no more waiting processes set the sems status */
-    if (pSem->waitingProcs.length == 0)
+    if (pSem->waitingProcs.length == 0 && pSem->status != SEM_FREEING)
     {
         pSem->status = SEM_IN_USE;
     }

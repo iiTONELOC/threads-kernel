@@ -169,15 +169,13 @@ int k_semp(int sem_id)
 		UserProcBlockOnSemaphore(pProcess, pSem);
 
 		/* AFTER the process becomes unblocked */
-		if (pSem->status == SEM_FREE)
+		if (pSem->status == SEM_FREEING)
 		{
 			/* check if the process was signaled while waiting */
 			pSem->errorOnFree = 1; // set the error code for the semaphore
 
 			UserProcLeaveCriticalArea(pProcess);
-			// setUserMode(); // set the mode to user mode
-			// Exit(1);
-			sys_exit(1);
+			k_exit(1);
 			return -1; // error
 		}
 
@@ -331,8 +329,8 @@ int k_semfree(int sem_id)
 		return result;
 	}
 
-	/* set our status to free */
-	pSem->status = SEM_FREE;
+	/* set our status to freeing */
+	pSem->status = SEM_FREEING;
 
 	/* check if the semaphore has waiting processes */
 	if (pSem->waitingProcs.length > 0)
@@ -652,8 +650,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		break;
 	case SYS_SEMFREE:
 		result = k_semfree((int)args->arguments[0]);
-		// console_output(FALSE, "sys_semfree: result = %d\n", result);
-		args->arguments[3] = (result >= 0) ? (result) : (-1);
+		args->arguments[3] = result;
 		break;
 	case SYS_GETTIMEOFDAY:
 		sys_getTimeOfDay((int *)&args->arguments[0]);

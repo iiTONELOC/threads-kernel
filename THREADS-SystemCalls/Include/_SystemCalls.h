@@ -13,7 +13,8 @@ enum SEMAPHORE_STATUS
     SEM_IN_USE = 1,
     SEM_WAITING = 2,
     SEM_INVALID = -1,
-    SEM_STATUS_COUNT = 3
+    SEM_FREEING = 3,
+    SEM_STATUS_COUNT = 4
 };
 
 enum USER_PROC_STATUS // Not valid kernel level values - userland only
