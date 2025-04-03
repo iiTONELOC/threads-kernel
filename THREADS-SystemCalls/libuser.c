@@ -6,7 +6,7 @@
  *
  */
 
-// #include <libuser.h>
+ // #include <libuser.h>
 #include <THREADSLib.h>
 #include <SystemCalls.h>
 
@@ -35,21 +35,21 @@
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int Spawn(char *name, int (*func)(char *), char *arg, int stack_size,
-          int priority, int *pid)
+int Spawn(char* name, int (*func)(char*), char* arg, int stack_size,
+	int priority, int* pid)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_SPAWN;
-    sa.arguments[0] = (intptr_t)func;
-    sa.arguments[1] = (intptr_t)arg;
-    sa.arguments[2] = (intptr_t)stack_size;
-    sa.arguments[3] = (intptr_t)priority;
-    sa.arguments[4] = (intptr_t)name;
-    system_call(&sa);
-    *pid = (int)sa.arguments[0];
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_SPAWN;
+	sa.arguments[0] = (intptr_t)func;
+	sa.arguments[1] = (intptr_t)arg;
+	sa.arguments[2] = (intptr_t)stack_size;
+	sa.arguments[3] = (intptr_t)priority;
+	sa.arguments[4] = (intptr_t)name;
+	system_call(&sa);
+	*pid = (int)sa.arguments[0];
+	return (int)sa.arguments[3];
 } /* end of Spawn */
 
 /*
@@ -65,16 +65,16 @@ int Spawn(char *name, int (*func)(char *), char *arg, int stack_size,
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int Wait(int *pid, int *status)
+int Wait(int* pid, int* status)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_WAIT;
-    system_call(&sa);
-    *pid = (int)sa.arguments[0];
-    *status = (int)sa.arguments[1];
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_WAIT;
+	system_call(&sa);
+	*pid = (int)sa.arguments[0];
+	*status = (int)sa.arguments[1];
+	return (int)sa.arguments[3];
 
 } /* End of Wait */
 
@@ -91,13 +91,13 @@ int Wait(int *pid, int *status)
  */
 void Exit(int status)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_EXIT;
-    sa.arguments[0] = (intptr_t)status;
-    system_call(&sa);
-    return;
+	CHECKMODE;
+	sa.call_id = SYS_EXIT;
+	sa.arguments[0] = (intptr_t)status;
+	system_call(&sa);
+	return;
 
 } /* End of Exit */
 
@@ -112,16 +112,16 @@ void Exit(int status)
  *                      (output value: completion status)
  *
  */
-int SemCreate(int value, int *semaphore)
+int SemCreate(int value, int* semaphore)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_SEMCREATE;
-    sa.arguments[0] = (intptr_t)value;
-    system_call(&sa);
-    *semaphore = (int)sa.arguments[0];
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_SEMCREATE;
+	sa.arguments[0] = (intptr_t)value;
+	system_call(&sa);
+	*semaphore = (int)sa.arguments[0];
+	return (int)sa.arguments[3];
 } /* end of SemCreate */
 
 /*
@@ -136,13 +136,13 @@ int SemCreate(int value, int *semaphore)
  */
 int SemP(int semaphore)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_SEMP;
-    sa.arguments[0] = (intptr_t)semaphore;
-    system_call(&sa);
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_SEMP;
+	sa.arguments[0] = (intptr_t)semaphore;
+	system_call(&sa);
+	return (int)sa.arguments[3];
 } /* end of SemP */
 
 /*
@@ -157,13 +157,13 @@ int SemP(int semaphore)
  */
 int SemV(int semaphore)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_SEMV;
-    sa.arguments[0] = (intptr_t)semaphore;
-    system_call(&sa);
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_SEMV;
+	sa.arguments[0] = (intptr_t)semaphore;
+	system_call(&sa);
+	return (int)sa.arguments[3];
 } /* end of SemV */
 
 /*
@@ -178,13 +178,13 @@ int SemV(int semaphore)
  */
 int SemFree(int semaphore)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_SEMFREE;
-    sa.arguments[0] = (intptr_t)semaphore;
-    system_call(&sa);
-    return (int)sa.arguments[3];
+	CHECKMODE;
+	sa.call_id = SYS_SEMFREE;
+	sa.arguments[0] = (intptr_t)semaphore;
+	system_call(&sa);
+	return (int)sa.arguments[3];
 } /* end of SemFree */
 
 /*
@@ -196,15 +196,15 @@ int SemFree(int semaphore)
  *                (output value: the time of day)
  *
  */
-void GetTimeofDay(int *tod)
+void GetTimeofDay(int* tod)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_GETTIMEOFDAY;
-    system_call(&sa);
-    *tod = (int)sa.arguments[0];
-    return;
+	CHECKMODE;
+	sa.call_id = SYS_GETTIMEOFDAY;
+	system_call(&sa);
+	*tod = (int)sa.arguments[0];
+	return;
 } /* end of GetTimeofDay */
 
 /*
@@ -217,15 +217,15 @@ void GetTimeofDay(int *tod)
  *                (output value: the CPU time of the process)
  *
  */
-void CPUTime(int *cpu)
+void CPUTime(int* cpu)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_CPUTIME;
-    system_call(&sa);
-    *cpu = (int)sa.arguments[0];
-    return;
+	CHECKMODE;
+	sa.call_id = SYS_CPUTIME;
+	system_call(&sa);
+	*cpu = (int)sa.arguments[0];
+	return;
 } /* end of CPUTime */
 
 /*
@@ -238,15 +238,15 @@ void CPUTime(int *cpu)
  *                (output value: the PID)
  *
  */
-void GetPID(int *pid)
+void GetPID(int* pid)
 {
-    system_call_arguments_t sa;
+	system_call_arguments_t sa;
 
-    CHECKMODE;
-    sa.call_id = SYS_GETPID;
-    system_call(&sa);
-    *pid = (int)sa.arguments[0];
-    return;
+	CHECKMODE;
+	sa.call_id = SYS_GETPID;
+	system_call(&sa);
+	*pid = (int)sa.arguments[0];
+	return;
 } /* end of GetPID */
 
 /* end libuser.c */

@@ -29,12 +29,13 @@ typedef struct resuse_proc_args
 void checkKernelMode(const char *functionName);
 
 /**
- * @brief Resets the user process to its initial state.
+ * @brief Orders the process list based on the priority
  *
- * @param pUserProc -  Pointer to the user process to reset.
- * @note this does not reset the tableIndex
+ * @param pNode1 - The first process to compare.
+ * @param pNode2 - The second process to compare.
+ * @return The difference between the two priorites.
  */
-void ResetUserProcess(UserProcess *pUserProc);
+int OrderProcessList(void *pNode1, void *pNode2);
 
 /**
  * @brief Marks the process as outside its critical section using system mailboxes.
@@ -45,7 +46,7 @@ void ResetUserProcess(UserProcess *pUserProc);
  *
  * @note Uses a single-slot mailbox to synchronize with the kernel.
  */
-void userProcLeaveCriticalArea(UserProcess *pProcess);
+void UserProcLeaveCriticalArea(UserProcess *pProcess);
 
 /**
  * @brief Marks the process as being inside its critical section using system mailboxes.
@@ -56,7 +57,7 @@ void userProcLeaveCriticalArea(UserProcess *pProcess);
  *
  * @note Uses a single-slot mailbox to synchronize with the kernel.
  */
-void userProcEnterCriticalArea(UserProcess *pProcess);
+void UserProcEnterCriticalArea(UserProcess *pProcess);
 
 /**
  * @brief Blocks the process on a semaphore.
@@ -66,7 +67,7 @@ void userProcEnterCriticalArea(UserProcess *pProcess);
  * @param pProcess - The process to block on the semaphore.
  * @param pSem - The semaphore to block on.
  */
-void userProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem);
+void UserProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem);
 
 /**
  * @brief Unblocks the process on a semaphore.
@@ -76,7 +77,7 @@ void userProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem);
  * @param pProcess - The process to unblock on the semaphore.
  * @param pSem - The semaphore to unblock on.
  */
-void userProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem);
+void UserProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem);
 
 /**
  * @brief Creates a new process in the user process table.

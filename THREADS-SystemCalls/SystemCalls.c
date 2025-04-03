@@ -11,7 +11,7 @@
 #include "UserProcess.h"
 #include "libuser.h"
 
-#define DEBUG 0;
+// #define DEBUG 0;
 
 /* -------------------------- Globals ------------------------------------- */
 static DSL_List semFreeList = {0};				 /* list of free semaphores */
@@ -23,7 +23,7 @@ static UserProcess userProcTable[MAXPROC] = {0}; /* user process table (Static s
 int sys_wait(int *pStatus);
 static void initTables(void);
 void sys_exit(int resultCode);
-static void setUserMode(void);
+void setUserMode(void);
 void sys_cputime(int *cpuTime);
 void sys_getTimeOfDay(int *tod);
 static void setKernelMode(void);
@@ -139,7 +139,7 @@ int k_semp(int sem_id)
 		return result;
 	}
 	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
-	userProcEnterCriticalArea(pProcess);
+	UserProcEnterCriticalArea(pProcess);
 	/* get the semaphore from the semaphore table */
 	SemData *pSem = &semTable[sem_id % MAX_SEMS];
 
@@ -150,17 +150,13 @@ int k_semp(int sem_id)
 
 		if (pSem->status == SEM_FREE)
 		{
-			// TODO: Handle the case where the semaphore is free
-			// \033[31m is an ANSI escape code for red text
-			// \033[0m is an ANSI escape code to reset the text color
-			console_output(FALSE, "\033[31mError::k_semp: Semaphore is free.\033[0m\n");
+			// Should not be free here!
 		}
-		userProcLeaveCriticalArea(pProcess);
+		UserProcLeaveCriticalArea(pProcess);
 		return result;
 	}
 
 	/* check the current value of the semaphore */
-
 	if (pSem->count > 0)
 	{
 		/* decrement the semaphore count */
@@ -170,16 +166,19 @@ int k_semp(int sem_id)
 	else
 	{
 		/* Block the current proccess on the semaphore */
-		userProcBlockOnSemaphore(pProcess, pSem);
+		UserProcBlockOnSemaphore(pProcess, pSem);
 
 		/* AFTER the process becomes unblocked */
 		if (pSem->status == SEM_FREE)
 		{
 			/* check if the process was signaled while waiting */
-			// TODO: Handle the case where the semaphore is free
-			// \033[31m is an ANSI escape code for red text
-			// \033[0m is an ANSI escape code to reset the text color
-			console_output(FALSE, "\033[31mError::k_semp: Semaphore is free.\033[0m\n");
+			pSem->errorOnFree = 1; // set the error code for the semaphore
+
+			UserProcLeaveCriticalArea(pProcess);
+			// setUserMode(); // set the mode to user mode
+			// Exit(1);
+			sys_exit(1);
+			return -1; // error
 		}
 
 		/* check if the process was signaled while waiting */
@@ -196,7 +195,7 @@ int k_semp(int sem_id)
 		}
 	}
 
-	userProcLeaveCriticalArea(pProcess);
+	UserProcLeaveCriticalArea(pProcess);
 
 	return result;
 }
@@ -223,14 +222,14 @@ int k_semv(int sem_id)
 	}
 
 	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
-	userProcEnterCriticalArea(pProcess);
+	UserProcEnterCriticalArea(pProcess);
 
 	/* get the semaphore from the semaphore table */
 	SemData *pSem = &semTable[sem_id % MAX_SEMS];
 	if (pSem->status = SEM_FREE || pSem->status == SEM_INVALID)
 	{
 		console_output(FALSE, "Error::k_semv: Semaphore not in use.\n");
-		userProcLeaveCriticalArea(pProcess);
+		UserProcLeaveCriticalArea(pProcess);
 		return result;
 	}
 
@@ -243,11 +242,18 @@ int k_semv(int sem_id)
 	{
 		/* unblock one of the waiting processes */
 		UserProcess *pWaitingProc = DSL_Pop(&pSem->waitingProcs);
-		userProcUnblockOnSemaphore(pWaitingProc, pSem);
+		UserProcUnblockOnSemaphore(pWaitingProc, pSem);
+
+		/* check if the process was signaled while waiting */
+		if (signaled())
+		{
+			console_output(FALSE, "Error::k_semv: Process was signaled while waiting.\n");
+			result = -5; // signaled
+		}
 	}
 
-	userProcLeaveCriticalArea(pProcess);
-	return result;
+	UserProcLeaveCriticalArea(pProcess);
+	return pSem->errorOnFree ? -1 : result; // return -1 if there was an error on free, else return result
 }
 
 /**
@@ -275,7 +281,7 @@ int k_semcreate(int initial_value)
 	}
 
 	/* get the next empty semaphore from the semaphore table */
-	userProcEnterCriticalArea(pProcess);
+	UserProcEnterCriticalArea(pProcess);
 	SemData *pSem = GetNextEmptySemaphore(semTable, MAX_SEMS);
 	sem_id = pSem != NULL ? pSem->semId : -1;
 
@@ -289,14 +295,65 @@ int k_semcreate(int initial_value)
 		pSem->count = initial_value;
 		pSem->status = SEM_IN_USE;
 	}
-	userProcLeaveCriticalArea(pProcess);
+	UserProcLeaveCriticalArea(pProcess);
 	return sem_id;
 }
 
+/**
+ * @brief Kernel level semaphore deletion.
+ *
+ * 		 This function closes the semaphore and unblocks and notifies any waiting processes.
+ *
+ * @param sem_id - The ID of the semaphore to free.
+
+ * @return int - 0 if successful, 1 if freed - but a process was waiting, -1 if an error occurred when
+				decrementing the semaphore.
+ */
 int k_semfree(int sem_id)
 {
+	if (sem_id < 0 || sem_id >= MAX_SEMS)
+	{
+		console_output(FALSE, "Error::k_semfree: Invalid semaphore ID.\n");
+		return -1;
+	}
+	checkKernelMode(__func__);
 	int result = -1;
 
+	UserProcess *pProcess = &userProcTable[k_getpid() % MAXPROC];
+	UserProcEnterCriticalArea(pProcess);
+
+	/* get the semaphore */
+	SemData *pSem = &semTable[sem_id % MAX_SEMS];
+	if (pSem->status == SEM_FREE || pSem->status == SEM_INVALID)
+	{
+		console_output(FALSE, "Error::k_semfree: Semaphore not in use.\n");
+		UserProcLeaveCriticalArea(pProcess);
+		return result;
+	}
+
+	/* set our status to free */
+	pSem->status = SEM_FREE;
+
+	/* check if the semaphore has waiting processes */
+	if (pSem->waitingProcs.length > 0)
+	{
+		/* unblock all waiting processes */
+		UserProcess *pWaitingProc = NULL;
+		while ((pWaitingProc = DSL_Pop(&pSem->waitingProcs)) != NULL)
+		{
+			/* enter*/
+			UserProcUnblockOnSemaphore(pWaitingProc, pSem);
+		}
+		result = 1; // freed but waiting processes were unblocked
+	}
+	else
+	{
+		result = 0; // freed successfully
+	}
+
+	/* free the semaphore */
+	ResetSem(pSem);
+	UserProcLeaveCriticalArea(pProcess);
 	return result;
 }
 
@@ -351,13 +408,13 @@ int sys_wait(int *pStatus)
 	UserProcess *pExitingChild = &userProcTable[result % MAXPROC];
 
 	/* see if the exiting process has a parent, if so remove it from its parent's list */
-	userProcEnterCriticalArea(pExitingChild);
+	UserProcEnterCriticalArea(pExitingChild);
 	if (pExitingChild->pParent != NULL)
 	{
 		/* remove this process from the list of children */
 		DSL_RemoveNode(pExitingChild, &pExitingChild->pParent->children);
 	}
-	userProcLeaveCriticalArea(pExitingChild);
+	UserProcLeaveCriticalArea(pExitingChild);
 
 	/*
 		TODO:?? Do we need to check if the process exists in a wait list for a semaphore?
@@ -396,7 +453,6 @@ int sys_spawn(char *name, int (*startFunc)(char *), char *arg, int stackSize, in
 	pid = k_spawn(name, launchUserProcess, arg, stackSize, priority);
 	if (pid > 0)
 	{
-		// /* get the process and its parent from the table */
 		int index = pid % MAXPROC;
 		UserProcess *pCreatedProcess = &userProcTable[index];
 
@@ -463,25 +519,25 @@ void sys_exit(int resultCode)
 	UserProcess *pProcess = &userProcTable[tableIndex];
 
 	/* Check for children */
-	userProcEnterCriticalArea(pProcess);
+	UserProcEnterCriticalArea(pProcess);
 	while ((pChild = DSL_Pop(&pProcess->children)) != NULL)
 	{
 		/* if the child is still alive */
 		if (pChild->status == USER_PROC_IN_USE)
 		{
-			userProcLeaveCriticalArea(pProcess);
+			UserProcLeaveCriticalArea(pProcess);
 			/* Send the kill signal to the child */
 			k_kill(((UserProcess *)pChild)->pid, SIG_TERM);
 			/* wait for it to exit */
 			k_wait(&exitCode);
-			userProcEnterCriticalArea(pProcess);
+			UserProcEnterCriticalArea(pProcess);
 		}
-		}
-
-	userProcLeaveCriticalArea(pProcess);
+	}
 
 	/* call k_exit to terminate the process */
 	pProcess->status = USER_PROC_FREE;
+	UserProcLeaveCriticalArea(pProcess);
+
 	k_exit(resultCode);
 }
 
@@ -575,21 +631,8 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_EXIT:
 		sys_exit(args->arguments[0]);
 		break;
-	case SYS_MAILBOX_CREATE:
-		break;
-	case SYS_MAILBOX_FREE:
-		break;
-	case SYS_MAILBOX_SEND:
-		break;
-	case SYS_MAILBOX_RECEIVE:
-		break;
 	case SYS_SLEEP:
-		break;
-	case SYS_DISKREAD:
-		break;
-	case SYS_DISKWRITE:
-		break;
-	case SYS_DISKSIZE:
+		// TODO: Implement sleep
 		break;
 	case SYS_SEMCREATE:
 		/* create a semaphore using sys_semcreate */
@@ -608,6 +651,9 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		args->arguments[3] = (result >= 0) ? (0) : (-1);
 		break;
 	case SYS_SEMFREE:
+		result = k_semfree((int)args->arguments[0]);
+		// console_output(FALSE, "sys_semfree: result = %d\n", result);
+		args->arguments[3] = (result >= 0) ? (result) : (-1);
 		break;
 	case SYS_GETTIMEOFDAY:
 		sys_getTimeOfDay((int *)&args->arguments[0]);

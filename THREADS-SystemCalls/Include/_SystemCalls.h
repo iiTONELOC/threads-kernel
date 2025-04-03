@@ -34,6 +34,7 @@ typedef struct sem_data
     int status;
     int mutexId; // - mailbox id for the mutex
     int tableIndex;
+    int errorOnFree;
     int privateMboxId; // - mailbox id for the semaphore
     DSL_List waitingProcs;
     struct sem_data *pNextSem;

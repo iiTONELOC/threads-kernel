@@ -209,7 +209,13 @@
     <ClCompile Include="TestCommon.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Include\SystemCalls.h" />
     <ClInclude Include="..\Include\TestCommon.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SystemCalls\SystemCalls.vcxproj">
+      <Project>{fafb29ee-8163-4a96-ba5f-883120e00715}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

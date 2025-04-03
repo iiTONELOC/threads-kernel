@@ -24,33 +24,28 @@ void checkKernelMode(const char *functionName)
 }
 
 /**
- * @brief Resets the user process to its initial state.
+ * @brief Orders the process list based on the priority
  *
- * @param pUserProc - Pointer to the user process to reset.
- * @note this does not reset the tableIndex
+ * @param pNode1 - The first process to compare.
+ * @param pNode2 - The second process to compare.
+ * @return The difference between the two priorites.
  */
-void ResetUserProcess(UserProcess *pUserProc)
+int OrderProcessList(void *pNode1, void *pNode2)
 {
-    if (pUserProc == NULL)
+    if (pNode1 == NULL || pNode2 == NULL)
     {
-        return; /* Invalid user process pointer */
+        return 0;
     }
 
-    pUserProc->pid = 0;
-    pUserProc->status = 0;
-    pUserProc->priority = 0;
-    pUserProc->pNext = NULL;
-    pUserProc->pPrev = NULL;
-    pUserProc->pParent = NULL;
-    memset(pUserProc->startArgs, 0, MAX_START_ARG_LEN);
-    pUserProc->startFunc = NULL;
-    pUserProc->pNextChild = NULL;
-    pUserProc->pPrevChild = NULL;
+    UserProcess *process1 = (UserProcess *)(pNode1);
+    UserProcess *process2 = (UserProcess *)(pNode2);
 
-    /* destroy list - do not delete any list nodes from memory*/
-    DSL_DestroyList(&pUserProc->children, 0);
-    /* Re-init the LL */
-    DSL_InitList(0, OFFSETOF_USER_PROC_CHILD_NODES, &pUserProc->children, NULL);
+    if (process1 == NULL || process2 == NULL)
+    {
+        return 0;
+    }
+
+    return process2->priority - process1->priority;
 }
 
 /**
@@ -62,7 +57,7 @@ void ResetUserProcess(UserProcess *pUserProc)
  *
  * @note Uses a single-slot mailbox to synchronize with the kernel.
  */
-void userProcLeaveCriticalArea(UserProcess *pProcess)
+void UserProcLeaveCriticalArea(UserProcess *pProcess)
 {
     if (!pProcess)
     {
@@ -82,7 +77,7 @@ void userProcLeaveCriticalArea(UserProcess *pProcess)
  *
  * @note Uses a single-slot mailbox to synchronize with the kernel.
  */
-void userProcEnterCriticalArea(UserProcess *pProcess)
+void UserProcEnterCriticalArea(UserProcess *pProcess)
 {
     if (!pProcess)
     {
@@ -101,7 +96,7 @@ void userProcEnterCriticalArea(UserProcess *pProcess)
  * @param pProcess - The process to block on the semaphore.
  * @param pSem - The semaphore to block on.
  */
-void userProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem)
+void UserProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem)
 {
     if (!pSem || !pProcess)
     {
@@ -128,7 +123,7 @@ void userProcBlockOnSemaphore(UserProcess *pProcess, SemData *pSem)
  * @param pProcess - The process to unblock on the semaphore.
  * @param pSem - The semaphore to unblock on.
  */
-void userProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem)
+void UserProcUnblockOnSemaphore(UserProcess *pProcess, SemData *pSem)
 {
     if (!pSem || !pProcess)
     {

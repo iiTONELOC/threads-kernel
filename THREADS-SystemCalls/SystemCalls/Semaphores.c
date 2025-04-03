@@ -1,4 +1,5 @@
 #include "_Semaphore.h"
+#include "UserProcess.h"
 
 /* -------------------------- Globals ------------------------------------- */
 
@@ -25,12 +26,13 @@ void ResetSem(SemData *pSem)
 
     pSem->count = 0;
     pSem->semId = -1;
+    pSem->errorOnFree = 0;
     pSem->pNextSem = NULL;
     pSem->pPrevSem = NULL;
     pSem->status = SEM_FREE;
     /* don't clean nodes, this will reset any processes waiting */
     DSL_DestroyList(&pSem->waitingProcs, 0);
-    DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, NULL);
+    DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, OrderProcessList);
     sys_semCount--;
 }
 
@@ -54,7 +56,7 @@ void InitializeSem(SemData *pSem)
     pSem->privateMboxId = -1;
 
     /* Initialize the waiting processes list */
-    DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, NULL);
+    DSL_InitList(0, OFFSETOF_USER_PROC_NEXT_NODE, &pSem->waitingProcs, OrderProcessList);
 }
 
 /**
@@ -131,4 +133,5 @@ void InitializeSemWData(SemData *pSem, int sem_id, int count, int status)
     pSem->count = count;
     pSem->status = status;
     pSem->privateMboxId = mailbox_create(1, sizeof(int));
+    pSem->mutexId = mailbox_create(1, sizeof(int));
 }
