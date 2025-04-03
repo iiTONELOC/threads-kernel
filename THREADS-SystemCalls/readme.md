@@ -86,6 +86,49 @@ SystemCallsTest00: started
 SystemCallsTest00: Kernel is in user mode, TEST PASSED.
 All processes completed.
 
+SystemCallsTest01: started
+SystemCallsTest01: after spawn of 5
+SystemCallsTest01: Parent done. Calling Exit.
+launchUserProcess - Process signaled in launch.
+All processes completed.
+
+SystemCallsTest02: started and returning -1.
+All processes completed.
+
+SystemCallsTest03: started
+
+SystemCallsTest03-Child1: started
+
+SystemCallsTest03-Child1: Spawning one child
+SystemCallsTest03-Child1-Child1: started
+SystemCallsTest03-Child1-Child1: exiting
+SystemCallsTest03-Child1: after spawn of child with PID 6
+SystemCallsTest03-Child1: finished
+SystemCallsTest03: after spawn of child with PID 5
+SystemCallsTest03: Parent done. Calling Exit.
+All processes completed.
+
+SystemCallsTest04: started
+SystemCallsTest04: sem_result = 0, semaphore = 0
+SystemCallsTest04: sem_result = 0, semaphore = 1
+All processes completed.
+
+SystemCallsTest05: started
+SystemCallsTest05: SemCreate returned  0 at index   0
+SystemCallsTest05: SemCreate returned  0 at index   1
+SystemCallsTest05: SemCreate returned  0 at index   2
+SystemCallsTest05: SemCreate returned  0 at index   3
+SystemCallsTest05: SemCreate returned  0 at index   4
+SystemCallsTest05: SemCreate returned  0 at index   5
+SystemCallsTest05: SemCreate returned  0 at index   6
+SystemCallsTest05: SemCreate returned  0 at index   7
+SystemCallsTest05: SemCreate returned  0 at index   8
+SystemCallsTest05: SemCreate returned  0 at index   9
+SystemCallsTest05: SemCreate returned  0 at index  10
+SystemCallsTest05: SemCreate returned  0 at index  11
+SystemCallsTest05: SemCreate returned  0 at index  12
+SystemCallsTest05: SemCreate returned  0 at index  13
+
 # ... Truncated Output ...
 ```
 
@@ -96,13 +139,30 @@ All processes completed.
 | Test Case Number | Test Result |
 |------------------|-------------|
 | 00               |    PASSED   |
+| 01               |    PASSED   |
+| 02               |    PASSED   |
+| 03               |    PASSED   |
+| 04               |    PASSED   |
+| 05               |    PASSED   |
+| 06               |    PASSED   |
+| 07               |    PASSED   |
+| 08               |    PASSED   |
+| 09               |    PASSED   |
+| 10               |    PASSED   |
+| 11               |    PASSED   |
+| 12               |    PASSED   |
+| 13               |    PASSED   |
+| 14               |    PASSED   |
+| 15               |    PASSED   |
+| 16               |    PASSED   |
+| 17               |    PASSED   |
 
 
 >Note: Test cases with an * indicated that the test passes but does not match the provided output when piped to a file.
 
 ### Test Case Output
 
-[Solution Output file](bin/ExpectedSysCallOut.txt)
+[Solution Output file](bin/out.txt)
 
 ```bash
 
@@ -113,8 +173,7 @@ All processes completed.
 SystemCallsTest01: started
 SystemCallsTest01: after spawn of 5
 SystemCallsTest01: Parent done. Calling Exit.
-SystemCallsTest01-Child1: started
-SystemCallsTest01-Child1: exiting
+launchUserProcess - Process signaled in launch.
 All processes completed.
 
 SystemCallsTest02: started and returning -1.
@@ -416,13 +475,13 @@ All processes completed.
 
 SystemCallsTest10: started
 SystemCallsTest10-Child1: started
-SystemCallsTest10-Child1: Sleep complete - 2003407
+SystemCallsTest10-Child1: Sleep complete - 2000768
 SystemCallsTest10: after spawn of child with PID 5
 SystemCallsTest10-Child1: started
-SystemCallsTest10-Child1: Sleep complete - 2002125
+SystemCallsTest10-Child1: Sleep complete - 2005838
 SystemCallsTest10: after spawn of child with PID 6
 SystemCallsTest10-Child1: started
-SystemCallsTest10-Child1: Sleep complete - 2001599
+SystemCallsTest10-Child1: Sleep complete - 2006096
 SystemCallsTest10: after spawn of child with PID 7
 SystemCallsTest10: Wait returned for child with PID 5 and status 9
 SystemCallsTest10: Wait returned for child with PID 6 and status 9
@@ -432,13 +491,13 @@ All processes completed.
 
 SystemCallsTest11: started
 SystemCallsTest11-Child1: started
-SystemCallsTest11-Child1: Sleep complete - 2002
+SystemCallsTest11-Child1: Sleep complete - 2005
 SystemCallsTest11: after spawn of child with PID 5
 SystemCallsTest11-Child1: started
-SystemCallsTest11-Child1: Sleep complete - 2008
+SystemCallsTest11-Child1: Sleep complete - 2006
 SystemCallsTest11: after spawn of child with PID 6
 SystemCallsTest11-Child1: started
-SystemCallsTest11-Child1: Sleep complete - 2002
+SystemCallsTest11-Child1: Sleep complete - 2003
 SystemCallsTest11: after spawn of child with PID 7
 SystemCallsTest11: Wait returned for child with PID 5 and status 9
 SystemCallsTest11: Wait returned for child with PID 6 and status 9
@@ -490,12 +549,9 @@ SystemCallsTest15-Child1-Child1: after spawn of 7
 SystemCallsTest15-Child1-Child1: after spawn of 8
 SystemCallsTest15-Child1-Child1: after spawn of 9
 SystemCallsTest15-Child1: after spawn of 6
-SystemCallsTest15-Child1-Child1-Child1: started
-SystemCallsTest15-Child1-Child1-Child1: exiting
-SystemCallsTest15-Child1-Child1-Child2: started
-SystemCallsTest15-Child1-Child1-Child2: exiting
-SystemCallsTest15-Child1-Child1-Child3: started
-SystemCallsTest15-Child1-Child1-Child3: exiting
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
 SystemCallsTest15-Child1: Wait returned for child with PID 6 and status 10
 SystemCallsTest15-Child1: after spawn of 10
 SystemCallsTest15-Child1-Child2: started
@@ -582,57 +638,57 @@ SystemCallsTest17-Child1-Child1: after spawn of 47
 SystemCallsTest17-Child1-Child1: after spawn of 48
 SystemCallsTest17-Child1-Child1: after spawn of 49
 SystemCallsTest17-Child1-Child1: after spawn of 50
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
-Failed to create user process.SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
+SystemCallsTest17-Child1-Child1: after spawn of -4
 SystemCallsTest17-Child1-Child1: Exiting and terminating all child processes.
-SystemCallsTest17-Child1-Child1-Child1: started with PID 7
-SystemCallsTest17-Child1-Child1-Child2: started with PID 8
-SystemCallsTest17-Child1-Child1-Child3: started with PID 9
-SystemCallsTest17-Child1-Child1-Child4: started with PID 10
-SystemCallsTest17-Child1-Child1-Child5: started with PID 11
-SystemCallsTest17-Child1-Child1-Child6: started with PID 12
-SystemCallsTest17-Child1-Child1-Child7: started with PID 13
-SystemCallsTest17-Child1-Child1-Child8: started with PID 14
-SystemCallsTest17-Child1-Child1-Child9: started with PID 15
-SystemCallsTest17-Child1-Child1-Child10: started with PID 16
-SystemCallsTest17-Child1-Child1-Child11: started with PID 17
-SystemCallsTest17-Child1-Child1-Child12: started with PID 18
-SystemCallsTest17-Child1-Child1-Child13: started with PID 19
-SystemCallsTest17-Child1-Child1-Child14: started with PID 20
-SystemCallsTest17-Child1-Child1-Child15: started with PID 21
-SystemCallsTest17-Child1-Child1-Child16: started with PID 22
-SystemCallsTest17-Child1-Child1-Child17: started with PID 23
-SystemCallsTest17-Child1-Child1-Child18: started with PID 24
-SystemCallsTest17-Child1-Child1-Child19: started with PID 25
-SystemCallsTest17-Child1-Child1-Child20: started with PID 26
-SystemCallsTest17-Child1-Child1-Child21: started with PID 27
-SystemCallsTest17-Child1-Child1-Child22: started with PID 28
-SystemCallsTest17-Child1-Child1-Child23: started with PID 29
-SystemCallsTest17-Child1-Child1-Child24: started with PID 30
-SystemCallsTest17-Child1-Child1-Child25: started with PID 31
-SystemCallsTest17-Child1-Child1-Child26: started with PID 32
-SystemCallsTest17-Child1-Child1-Child27: started with PID 33
-SystemCallsTest17-Child1-Child1-Child28: started with PID 34
-SystemCallsTest17-Child1-Child1-Child29: started with PID 35
-SystemCallsTest17-Child1-Child1-Child30: started with PID 36
-SystemCallsTest17-Child1-Child1-Child31: started with PID 37
-SystemCallsTest17-Child1-Child1-Child32: started with PID 38
-SystemCallsTest17-Child1-Child1-Child33: started with PID 39
-SystemCallsTest17-Child1-Child1-Child34: started with PID 40
-SystemCallsTest17-Child1-Child1-Child35: started with PID 41
-SystemCallsTest17-Child1-Child1-Child36: started with PID 42
-SystemCallsTest17-Child1-Child1-Child37: started with PID 43
-SystemCallsTest17-Child1-Child1-Child38: started with PID 44
-SystemCallsTest17-Child1-Child1-Child39: started with PID 45
-SystemCallsTest17-Child1-Child1-Child40: started with PID 46
-SystemCallsTest17-Child1-Child1-Child41: started with PID 47
-SystemCallsTest17-Child1-Child1-Child42: started with PID 48
-SystemCallsTest17-Child1-Child1-Child43: started with PID 49
-SystemCallsTest17-Child1-Child1-Child44: started with PID 50
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
+launchUserProcess - Process signaled in launch.
 SystemCallsTest17-Child1: after spawn of 6
 SystemCallsTest17-Child1: Wait returned for child with PID 6 and status 9
 SystemCallsTest17-Child1-Child2: started with PID 56
@@ -642,5 +698,6 @@ SystemCallsTest17-Child1: Parent done. Calling Exit.
 SystemCallsTest17: Wait returned for child with PID 5 and status 9
 SystemCallsTest17: Parent done. Calling Exit.
 All processes completed.
+
 
 ```
