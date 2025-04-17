@@ -7,42 +7,41 @@
 #include <THREADSLib.h>
 #include <Messaging.h>
 #include <Scheduler.h>
-#include <TList.h>
+#include <DoubleSeaLib.h>
 #include <libuser.h>
 #include <SystemCalls.h>
 
-static int	ClockDriver(char*);
-static int	DiskDriver(char*);
+static int ClockDriver(char *);
+static int DiskDriver(char *);
 
 typedef struct devices_proc
 {
-    struct devices_proc* pNext;
-    struct devices_proc* pPrev;
+    struct devices_proc *pNext;
+    struct devices_proc *pPrev;
     int pid;
 } DevicesProcess;
 
-typedef struct 
+typedef struct
 {
     int tracks;
     int platters;
     char deviceName[THREADS_MAX_DEVICE_NAME];
 } DiskInformation;
 
-
 static DevicesProcess DevicesProcesss[MAXPROC]; // Devices process table
-static int running;                          /*semaphore to synchronize drivers and start3*/
+static int running;                             /*semaphore to synchronize drivers and start3*/
 
-static inline void checkKernelMode(const char* functionName);
-extern int DevicesEntryPoint(char*);
+static inline void checkKernelMode(const char *functionName);
+extern int DevicesEntryPoint(char *);
 
-int SystemCallsEntryPoint(char* arg)
+int SystemCallsEntryPoint(char *arg)
 {
-    char    buf[25];
-    char    name[128];
-    int		i;
-    int		clockPID=0;
-    int     diskPids[THREADS_MAX_DISKS];
-    int		status;
+    int i;
+    int status;
+    char buf[25];
+    char name[128];
+    int clockPID = 0;
+    int diskPids[THREADS_MAX_DISKS];
 
     checkKernelMode(__func__);
 
@@ -71,7 +70,7 @@ int SystemCallsEntryPoint(char* arg)
      */
 
     /*
-     * Create the disk device drivers here.  
+     * Create the disk device drivers here.
      */
     for (i = 0; i < THREADS_MAX_DISKS; i++)
     {
@@ -98,10 +97,9 @@ int SystemCallsEntryPoint(char* arg)
     return 0;
 }
 
-
-static int ClockDriver(char* arg)
+static int ClockDriver(char *arg)
 {
-    DevicesProcess* pProc = NULL;
+    DevicesProcess *pProc = NULL;
     int result;
     int status;
 
@@ -117,31 +115,25 @@ static int ClockDriver(char* arg)
         if (result != 0)
         {
             return 0;
-
         }
 
         /*
-        * Compute the current time and wake up any processes
-        * whose time has come.
-        */
-
+         * Compute the current time and wake up any processes
+         * whose time has come.
+         */
     }
     return 0;
-
 }
 
-
-static int DiskDriver(char* arg)
+static int DiskDriver(char *arg)
 {
     int unit = atoi(arg);
-    DevicesProcess* pRequestingProc = NULL;
-    DevicesProcess* pNextRequestingProc = NULL;
+    DevicesProcess *pRequestingProc = NULL;
+    DevicesProcess *pNextRequestingProc = NULL;
     int currentTrack = 0;
     device_control_block_t devRequest;
 
-
     set_psr(get_psr() | PSR_INTERRUPTS);
-
 
     /* Read the disk info */
 
@@ -152,8 +144,8 @@ static int DiskDriver(char* arg)
     return 0;
 }
 
-
-struct psr_bits {
+struct psr_bits
+{
     unsigned int cur_int_enable : 1;
     unsigned int cur_mode : 1;
     unsigned int prev_int_enable : 1;
@@ -161,7 +153,8 @@ struct psr_bits {
     unsigned int unused : 28;
 };
 
-union psr_values {
+union psr_values
+{
     struct psr_bits bits;
     unsigned int integer_part;
 };
@@ -173,10 +166,9 @@ union psr_values {
    Returns -
    Side Effects - Will stop if not in kernel mode
 ****************************************************************************/
-static inline void checkKernelMode(const char* functionName)
+static inline void checkKernelMode(const char *functionName)
 {
     union psr_values psrValue;
-
 
     //    console_output(TRUE, "checkKernelMode(): verifying kernel mode for %d, %s\n", 1, functionName);
 

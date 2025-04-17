@@ -158,7 +158,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)Lib\THREADS.lib;$(SolutionDir)Lib\THREADSMain.lib;$(SolutionDir)Lib\Messaging.lib;$(SolutionDir)Lib\TList.lib;$(SolutionDir)Lib\Scheduler.lib;$(SolutionDir)Lib\SystemCalls.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)Lib\THREADS.lib;$(SolutionDir)Lib\THREADSMain.lib;$(SolutionDir)Lib\Messaging.lib;$(SolutionDir)Lib\DoubleSeaLib.lib;$(SolutionDir)Lib\Scheduler.lib;$(SolutionDir)Lib\TList.lib;$(SolutionDir)Lib\SystemCalls.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
