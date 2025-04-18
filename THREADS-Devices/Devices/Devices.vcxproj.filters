@@ -38,6 +38,12 @@
     <ClInclude Include="..\Include\TList.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\Include\_Devices.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\DoubleSeaLib.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Devices.c">

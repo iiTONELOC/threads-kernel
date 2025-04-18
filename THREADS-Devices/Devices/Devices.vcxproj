@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Include\Devices.h" />
+    <ClInclude Include="..\Include\DoubleSeaLib.h" />
     <ClInclude Include="..\Include\libuser.h" />
     <ClInclude Include="..\Include\Messaging.h" />
     <ClInclude Include="..\Include\Scheduler.h" />
@@ -35,6 +36,7 @@
     <ClInclude Include="..\Include\TestCommon.h" />
     <ClInclude Include="..\Include\THREADSLib.h" />
     <ClInclude Include="..\Include\TList.h" />
+    <ClInclude Include="..\Include\_Devices.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Devices.c" />

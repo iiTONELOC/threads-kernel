@@ -6,17 +6,18 @@
  *
  */
 
-//#include <libuser.h>
+// #include <libuser.h>
 #include <THREADSLib.h>
 #include <SystemCalls.h>
 
-
-#define CHECKMODE {						\
-	if (get_psr() & PSR_KERNEL_MODE) { 				\
-	    console_output(FALSE, "Trying to invoke system_call from kernel\n");	\
-	    stop(1);						\
-	}							\
-}
+#define CHECKMODE                                                                \
+    {                                                                            \
+        if (get_psr() & PSR_KERNEL_MODE)                                         \
+        {                                                                        \
+            console_output(FALSE, "Trying to invoke system_call from kernel\n"); \
+            stop(1);                                                             \
+        }                                                                        \
+    }
 
 /*
  *  Routine:  Spawn
@@ -35,22 +36,21 @@
  *
  */
 int Spawn(char *name, int (*func)(char *), char *arg, int stack_size,
-	int priority, int *pid)   
+          int priority, int *pid)
 {
     system_call_arguments_t sa;
-    
+
     CHECKMODE;
     sa.call_id = SYS_SPAWN;
-    sa.arguments[0] = (intptr_t) func;
-    sa.arguments[1] = (intptr_t) arg;
-    sa.arguments[2] = (intptr_t) stack_size;
-    sa.arguments[3] = (intptr_t) priority;
-    sa.arguments[4] = (intptr_t) name;
+    sa.arguments[0] = (intptr_t)func;
+    sa.arguments[1] = (intptr_t)arg;
+    sa.arguments[2] = (intptr_t)stack_size;
+    sa.arguments[3] = (intptr_t)priority;
+    sa.arguments[4] = (intptr_t)name;
     system_call(&sa);
-    *pid = (int) sa.arguments[0];
-    return (int) sa.arguments[3];
+    *pid = (int)sa.arguments[0];
+    return (int)sa.arguments[3];
 } /* end of Spawn */
-
 
 /*
  *  Routine:  Wait
@@ -65,24 +65,23 @@ int Spawn(char *name, int (*func)(char *), char *arg, int stack_size,
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int Wait(int *pid, int *status)	
+int Wait(int *pid, int *status)
 {
     system_call_arguments_t sa;
-    
+
     CHECKMODE;
     sa.call_id = SYS_WAIT;
     system_call(&sa);
-    *pid = (int) sa.arguments[0];
-    *status = (int) sa.arguments[1];
-    return (int) sa.arguments[3];
-    
-} /* End of Wait */
+    *pid = (int)sa.arguments[0];
+    *status = (int)sa.arguments[1];
+    return (int)sa.arguments[3];
 
+} /* End of Wait */
 
 /*
  *  Routine:  Exit
  *
- *  Description: This is the call entry to Exit 
+ *  Description: This is the call entry to Exit
  *               the invoking process and its children
  *
  *  Arguments:   int status -- the commpletion status of the process
@@ -93,21 +92,20 @@ int Wait(int *pid, int *status)
 void Exit(int status)
 {
     system_call_arguments_t sa;
-    
+
     CHECKMODE;
     sa.call_id = SYS_EXIT;
-    sa.arguments[0] = (intptr_t) status;
+    sa.arguments[0] = (intptr_t)status;
     system_call(&sa);
     return;
-    
-} /* End of Exit */
 
+} /* End of Exit */
 
 /*
  *  Routine:  SemCreate
  *
  *  Description: Create a semaphore.
- *		
+ *
  *
  *  Arguments:      int value -- initial semaphore value
  *		            int *semaphore -- semaphore handle
@@ -120,18 +118,17 @@ int SemCreate(int value, int *semaphore)
 
     CHECKMODE;
     sa.call_id = SYS_SEMCREATE;
-    sa.arguments[0] = (intptr_t) value;
+    sa.arguments[0] = (intptr_t)value;
     system_call(&sa);
-    *semaphore = (int) sa.arguments[0];
-    return (int) sa.arguments[3];
+    *semaphore = (int)sa.arguments[0];
+    return (int)sa.arguments[3];
 } /* end of SemCreate */
-
 
 /*
  *  Routine:  SemP
  *
  *  Description: "P" a semaphore.
- *		
+ *
  *
  *  Arguments:    int semaphore -- semaphore handle
  *                (output value: completion status)
@@ -143,17 +140,16 @@ int SemP(int semaphore)
 
     CHECKMODE;
     sa.call_id = SYS_SEMP;
-    sa.arguments[0] = (intptr_t) semaphore;
+    sa.arguments[0] = (intptr_t)semaphore;
     system_call(&sa);
-    return (int) sa.arguments[3];
+    return (int)sa.arguments[3];
 } /* end of SemP */
-
 
 /*
  *  Routine:  SemV
  *
  *  Description: "V" a semaphore.
- *		
+ *
  *
  *  Arguments:    int semaphore -- semaphore handle
  *                (output value: completion status)
@@ -165,17 +161,16 @@ int SemV(int semaphore)
 
     CHECKMODE;
     sa.call_id = SYS_SEMV;
-    sa.arguments[0] = (intptr_t) semaphore;
+    sa.arguments[0] = (intptr_t)semaphore;
     system_call(&sa);
-    return (int) sa.arguments[3];
+    return (int)sa.arguments[3];
 } /* end of SemV */
-
 
 /*
  *  Routine:  SemFree
  *
  *  Description: Free a semaphore.
- *		
+ *
  *
  *  Arguments:    int semaphore -- semaphore handle
  *                (output value: completion status)
@@ -187,11 +182,10 @@ int SemFree(int semaphore)
 
     CHECKMODE;
     sa.call_id = SYS_SEMFREE;
-    sa.arguments[0] = (intptr_t) semaphore;
+    sa.arguments[0] = (intptr_t)semaphore;
     system_call(&sa);
-    return (int) sa.arguments[3];
+    return (int)sa.arguments[3];
 } /* end of SemFree */
-
 
 /*
  *  Routine:  GetTimeofDay
@@ -202,63 +196,60 @@ int SemFree(int semaphore)
  *                (output value: the time of day)
  *
  */
-void GetTimeofDay(int *tod)                           
+void GetTimeofDay(int *tod)
 {
     system_call_arguments_t sa;
-    
+
     CHECKMODE;
     sa.call_id = SYS_GETTIMEOFDAY;
     system_call(&sa);
-    *tod = (int) sa.arguments[0];
+    *tod = (int)sa.arguments[0];
     return;
 } /* end of GetTimeofDay */
-
 
 /*
  *  Routine:  CPUTime
  *
  *  Description: This is the call entry point for the process' CPU time.
- *		
+ *
  *
  *  Arguments:    int *cpu  -- pointer to output value
  *                (output value: the CPU time of the process)
  *
  */
-void CPUTime(int *cpu)                           
+void CPUTime(int *cpu)
 {
     system_call_arguments_t sa;
 
     CHECKMODE;
     sa.call_id = SYS_CPUTIME;
     system_call(&sa);
-    *cpu = (int) sa.arguments[0];
+    *cpu = (int)sa.arguments[0];
     return;
 } /* end of CPUTime */
-
 
 /*
  *  Routine:  GetPID
  *
  *  Description: This is the call entry point for the process' PID.
- *		
+ *
  *
  *  Arguments:    int *pid  -- pointer to output value
  *                (output value: the PID)
  *
  */
-void GetPID(int *pid)                           
+void GetPID(int *pid)
 {
     system_call_arguments_t sa;
 
     CHECKMODE;
     sa.call_id = SYS_GETPID;
     system_call(&sa);
-    *pid = (int) sa.arguments[0];
+    *pid = (int)sa.arguments[0];
     return;
 } /* end of GetPID */
 
 /* end libuser.c */
-
 
 /*
  *  Routine:  SleepSeconds
@@ -281,15 +272,12 @@ int SleepSeconds(int seconds)
     return (int)sa.arguments[3];
 } /* end of Sleep */
 
-
-
-
 /*
  *  Routine:  DiskRead
  *
  *  Description: This is the call entry point for disk input.
  *
- *  Arguments:    
+ *  Arguments:
  *        char  *deviceName  -- which disk
  *        void  *dataBuffer  -- Buffer to place the data
  *        int   platter      -- platter to read from
@@ -302,7 +290,7 @@ int SleepSeconds(int seconds)
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int DiskRead(char *deviceName, void* dataBuffer, int platter, int track, int firstSector, int sectors, int* status)
+int DiskRead(char *deviceName, void *dataBuffer, int platter, int track, int firstSector, int sectors, int *status)
 {
     system_call_arguments_t sa;
 
@@ -318,7 +306,6 @@ int DiskRead(char *deviceName, void* dataBuffer, int platter, int track, int fir
     *status = (int)sa.arguments[0];
     return (int)sa.arguments[3];
 } /* end of DiskRead */
-
 
 /*
  *  Routine:  DiskWrite
@@ -338,7 +325,7 @@ int DiskRead(char *deviceName, void* dataBuffer, int platter, int track, int fir
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int DiskWrite(char* deviceName, void* dataBuffer, int platter, int track, int firstSector, int sectors, int* status)
+int DiskWrite(char *deviceName, void *dataBuffer, int platter, int track, int firstSector, int sectors, int *status)
 {
     system_call_arguments_t sa;
 
@@ -355,13 +342,12 @@ int DiskWrite(char* deviceName, void* dataBuffer, int platter, int track, int fi
     return (int)sa.arguments[3];
 } /* end of DiskWrite */
 
-
 /*
  *  Routine:  DiskInfo
  *
  *  Description: This is the call entry point for getting the disk size.
  *
- *  Arguments:    
+ *  Arguments:
  *        char  *deviceName  -- which disk
  *		  int	*sectorSize  -- # bytes in a sector
  *		  int	*sectorCount -- # sectors in a track
@@ -372,12 +358,12 @@ int DiskWrite(char* deviceName, void* dataBuffer, int platter, int track, int fi
  *  Return Value: 0 means success, -1 means error occurs
  *
  */
-int DiskInfo(char* deviceName, int* sectorSize, int *sectorCount, int* trackCount, int* platterCount)
+int DiskInfo(char *deviceName, int *sectorSize, int *sectorCount, int *trackCount, int *platterCount)
 {
     system_call_arguments_t sa;
 
     CHECKMODE;
-    sa.call_id = SYS_DISKSIZE;
+    sa.call_id = SYS_DISKINFO;
     sa.arguments[0] = (intptr_t)deviceName;
     system_call(&sa);
     *sectorSize = (int)sa.arguments[0];
