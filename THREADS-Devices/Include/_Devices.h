@@ -1,43 +1,75 @@
 #pragma once
 #ifndef _Devices_H
 #define _Devices_H
+#include <THREADSLib.h>
 #include <SystemCalls.h>
 #include <DoubleSeaLib.h>
 #include "Devices.h"
 
-/* -------------------------------- Typedefs and Structs ------------------------------- */
-
 enum DEVICE_PROC_STATUS
 {
-    DEVICE_PROC_FREE = 0,
-    DEVICE_PROC_READY = 1,
-    DEVICE_PROC_IN_USE = 2,
-    DEVICE_PROC_WAITING = 3,
     DEVICE_PROC_INVALID = -1,
-    DEVICE_PROC_STATUS_COUNT = 4
+    DEVICE_PROC_FREE, // 0
+    DEVICE_PROC_READY,
+    DEVICE_PROC_IN_USE,
+    DEVICE_PROC_WAITING_IO_READ,
+    DEVICE_PROC_WAITING_IO_WRITE,
+    DEVICE_PROC_WAITING_IO_INFO,
+    DEVICE_PROC_SLEEPING,                                  // leave this as the last status
+    DEVICE_PROC_STATUS_MAX = DEVICE_PROC_SLEEPING,         // max valid status value
+    DEVICE_PROC_STATUS_COUNT = DEVICE_PROC_STATUS_MAX + 1, // total number of valid statuses
+
+};
+
+enum TDISK_DIRECTION
+{
+    TDISK_INVALID = -1,
+    TDISK_UNINITIALIZED = 0,
+    TDISK_READ = 4,
+    TDISK_WRITE = 8,
+
 };
 
 /* -------------------------------- Typedefs and Structs ------------------------------- */
 
+typedef struct io_request
+{
+
+    int forPid;                     // process id of the requesting process
+    int startTrack;                 // start track
+    int numSectors;                 // number of sectors to read/write
+    int startSector;                // start sector
+    int startPlatter;               // start platter
+    char *deviceName;               // name of the device
+    char *readBuffer;               // buffer to read data into
+    char *writeBuffer;              // buffer to write data from
+    int opResultStatus;             // operation status
+    enum TDISK_DIRECTION direction; // read or write
+                                    /* Waiting list usage for device disk
+                                       Threads supports 2 disks
+                                    */
+    struct io_request *pNext0;      // pointer to the next IO request for disk 0
+    struct io_request *pPrev0;      // pointer to the previous IO request for disk 0
+    struct io_request *pNext1;      // pointer to the next IO request for disk 1
+    struct io_request *pPrev1;      // pointer to the previous IO request for disk 1
+} IO_Request;
+
 typedef struct device_proc
 {
     int pid;
+    int mutex;
     int status;
-    int priority;
-    char *readBuffer;
-    char *writeBuffer;
-    /* Waiting list usage for device disk
-       Threads supports 2 disks
-    */
-    struct device_proc *pNext0;
-    struct device_proc *pPrev0;
-    struct device_proc *pNext1;
-    struct device_proc *pPrev2;
+    int sleepTime;             // time to sleep in seconds
+    IO_Request *ioRequest;     // pointer to the IO request
+                               // reserved for the sleep list
+    struct device_proc *pNext; // pointer to the next device process in the list
+    struct device_proc *pPrev; // pointer to the previous device process in the list
 
 } DevicesProcess;
 
 typedef struct
 {
+    int pid; // process id of the disk driver
     int mutex;
     int tracks;
     int platters;
@@ -45,12 +77,25 @@ typedef struct
     char deviceName[THREADS_MAX_DEVICE_NAME];
 } DiskInformation;
 
+union DiskInfoResult
+{
+    struct
+    {
+        uint16_t trackCount;  // number of tracks on the disk (bits 0-15)
+        uint8_t platterCount; // number of platters on the disk (bits 16-23)
+        uint8_t resultCode;   // result code from the disk driver (bits 24-31)
+    } info;
+    uint32_t rawResult; // raw 32-bit result
+};
+
+typedef device_control_block_t DeviceControlBlock;
+
 /* -- Put here from threads for reference
 
     THREADS_DISK_SECTOR_SIZE    512
     THREADS_DISK_SECTOR_COUNT   16   Sectors per track
     THREADS_DISK_MAX_PLATTERS   3
-    THREADS_DISK_MAX_TRACKS     256    Max number of track
+    THREADS_DISK_MAX_TRACKS     1024 Max number of track
 
 */
 
@@ -72,26 +117,13 @@ typedef struct
 
 */
 
-union DiskInfoResult
-{
-    struct
-    {
-        uint8_t trackCount;   // number of tracks on the disk (bits 0-7)
-        uint8_t platterCount; // number of platters on the disk (bits 8-15)
-        uint8_t reserved;     // reserved for alignment or future use (bits 16-23)
-        uint8_t resultCode;   // result code from the disk driver (bits 24-31)
-    } info;
-    uint32_t rawResult; // raw 32-bit result
-};
-
-typedef device_control_block_t DeviceControl;
-#define DISC_TRACK_MASK 0x000000FF                                                       // access bits 0-7
-#define DISC_PLATTER_MASK 0x0000FF00                                                     // access bits 8-15
-#define DISC_RESULT_MASK 0xFF000000                                                      // access bits 31-24
+/* -------------------------------- Macros --------------------------------- */
 #define SUPPORTED_SYS_CALL_END 13                                                        // inclusive index into vector table
 #define SUPPORTED_SYS_CALL_START 10                                                      // inclusive index into vector table
 #define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls
-#define OFFSETOF_DISK_0_NEXT offsetof(DevicesProcess, pNext0)                            // Offset to the pNext field in the UserProcess structure
-#define OFFSETOF_DISK_1_NEXT offsetof(DevicesProcess, pNext1)                            // Offset to the pNext field in the UserProcess structure
+#define OFFSETOF_DISK_0_NEXT offsetof(IO_Request, pNext0)                                // Offset to the pNext field in the UserProcess structure
+#define OFFSETOF_DISK_1_NEXT offsetof(IO_Request, pNext1)                                // Offset to the pNext field in the UserProcess structure
+#define OFFSETOF_SLEEP_NEXT offsetof(DevicesProcess, pNext)                              // Offset to the pNext field in the UserProcess structure
+
 #endif
 /* _Devices_H */

@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Include\Devices.h" />
+    <ClInclude Include="..\Include\DeviceUtils.h" />
     <ClInclude Include="..\Include\DoubleSeaLib.h" />
     <ClInclude Include="..\Include\libuser.h" />
     <ClInclude Include="..\Include\Messaging.h" />
@@ -40,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Devices.c" />
+    <ClCompile Include="..\DeviceUtils.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\bin\RunDevicesTests.bat" />

@@ -9,12 +9,13 @@
 #include <Scheduler.h>
 #include <libuser.h>
 #include <SystemCalls.h>
-#include <_Devices.h>
+#include <DeviceUtils.h>
 
 static int running;															   /*semaphore to synchronize drivers and start3*/
 interrupt_handler_t *handlers;												   /*From THREADS*/
+static IO_Request pendingIoRequestTable[MAXPROC] = {0};						   /* pending I/O request table */
 DiskInformation diskInformation[THREADS_MAX_DISKS] = {0};					   /* disk information structure */
-static DevicesProcess DevicesProcesss[MAXPROC] = {0};						   /* device process table (Static storage) */
+static DevicesProcess devicesProcessTable[MAXPROC] = {0};					   /* device process table (Static storage) */
 void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args); /* system call array of function pointers */
 
 static void setUserMode(void);
@@ -26,7 +27,7 @@ extern int DevicesEntryPoint(char *);
 static inline void enableInterrupts();
 static inline void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControl *devRequest);
+static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
 
 int SystemCallsEntryPoint(char *arg)
 {
@@ -35,17 +36,14 @@ int SystemCallsEntryPoint(char *arg)
 	char buf[25];
 	char name[128];
 	int clockPID = 0;
-	int diskPids[THREADS_MAX_DISKS];
 
 	checkKernelMode(__func__);
 
 	/* Assign system call handlers */
 	InitializeHandlers();
 
-	// /* Initialize the process table */
-	// for (int i = 0; i < MAXPROC; ++i)
-	// {
-	// }
+	/* Init the tables */
+	InitializeTables(devicesProcessTable, pendingIoRequestTable);
 
 	/*
 	 * Create clock device driver
@@ -79,8 +77,8 @@ int SystemCallsEntryPoint(char *arg)
 					 &diskInformation[i].waitingProcs,
 					 NULL); // TODO: Provide the sort function that sorts by priority
 
-		diskPids[i] = k_spawn(name, DiskDriver, buf, THREADS_MIN_STACK_SIZE * 4, HIGHEST_PRIORITY);
-		if (diskPids[i] < 0)
+		diskInformation[i].pid = k_spawn(name, DiskDriver, buf, THREADS_MIN_STACK_SIZE * 4, HIGHEST_PRIORITY);
+		if (diskInformation[i].pid < 0)
 		{
 			console_output(TRUE, "start3(): Can't create disk driver %d\n", i);
 			stop(1);
@@ -92,8 +90,12 @@ int SystemCallsEntryPoint(char *arg)
 		k_semp(running);
 	}
 
+	// kill the running semaphore
+	k_semfree(running);
+	running = -1;
+
 	/*
-	 * Create first user-level process and wait for it to finish.
+	 * Create first user-level process (but in kernel mode) and wait for it to finish.
 	 */
 	sys_spawn("DevicesEntryPoint", DevicesEntryPoint, NULL, 8 * THREADS_MIN_STACK_SIZE, 3);
 	sys_wait(&status);
@@ -106,9 +108,10 @@ int SystemCallsEntryPoint(char *arg)
 
 static int ClockDriver(char *arg)
 {
-	DevicesProcess *pProc = NULL;
+
 	int result;
 	int status;
+	DevicesProcess *pProc = NULL;
 
 	/*
 	 * Let the parent know we are running and enable interrupts.
@@ -141,7 +144,7 @@ static int DiskDriver(char *arg)
 	int result = 0;
 	int unit = atoi(arg);
 	int currentTrack = 0;
-	DeviceControl devRequest;
+	DeviceControlBlock devRequest;
 	DevicesProcess *pRequestingProc = NULL;
 	DevicesProcess *pNextRequestingProc = NULL;
 
@@ -155,13 +158,6 @@ static int DiskDriver(char *arg)
 		console_output(TRUE, "DiskDriver(): Can't get disk information for unit %d\n", unit);
 		stop(1);
 	}
-	else
-	{
-		console_output(TRUE, "DiskDriver(): %s has %d tracks and %d platters\n",
-					   diskInformation[unit].deviceName,
-					   diskInformation[unit].tracks,
-					   diskInformation[unit].platters);
-	}
 
 	k_semv(running); // signal the parent that we are running
 
@@ -170,6 +166,10 @@ static int DiskDriver(char *arg)
 	{
 
 		k_semp(diskInformation[unit].mutex); // wait for a request
+
+		/* After request */
+
+		console_output(TRUE, "DiskDriver(): Disk %d is processing a request \n", unit);
 	}
 	return 0;
 }
@@ -319,12 +319,11 @@ static inline void enableInterrupts()
  * The DiskInfo function retrieves the disk information for a given disk unit.
  * It uses the DISK_INFO command to get the disk information and fills the provided
  */
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControl *devRequest)
+static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
 	union DiskInfoResult diskResult = {0}; /* disk information result */
-	// uint32_t diskResult = 0; /* disk result */
 
 	/* check for valid arguments */
 	if (diskInfo == NULL || devRequest == NULL || unit < 0 || unit >= THREADS_MAX_DISKS)
@@ -345,20 +344,10 @@ static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControl *devRe
 	{
 		return -1; /* error getting disk information */
 	}
-	else
-	{
-		// print result
-		console_output(FALSE, "RESULT: %d\n", diskResult.rawResult);
-		console_output(FALSE, "TRACKS: %d\n", diskResult.info.trackCount);
-		console_output(FALSE, "PLATTERS: %d\n", diskResult.info.platterCount);
-		console_output(FALSE, "RESULT CODE: %d\n", diskResult.info.resultCode);
-	}
 
 	/* set the disk information structure */
-	diskInfo->tracks = diskResult.info.trackCount;		   /* number of tracks on the disk */
-	diskInfo->platters = diskResult.info.platterCount + 1; /* number of platters on the disk */
-
-	// console_output(FALSE, "DiskInfo(): Disk %d has %d tracks and %d platters\n", unit, diskInfo->tracks, diskInfo->platters);
+	diskInfo->tracks = diskResult.info.trackCount;	   /* number of tracks on the disk */
+	diskInfo->platters = diskResult.info.platterCount; /* number of platters on the disk */
 
 	return 0;
 }

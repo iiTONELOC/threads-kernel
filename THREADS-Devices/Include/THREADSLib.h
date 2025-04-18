@@ -67,7 +67,7 @@ typedef struct
 #define THREADS_DISK_SECTOR_SIZE 512
 #define THREADS_DISK_SECTOR_COUNT 16 /* Sectors per track*/
 #define THREADS_DISK_MAX_PLATTERS 3
-#define THREADS_DISK_MAX_TRACKS 256 /* Max number of tracks */
+#define THREADS_DISK_MAX_TRACKS 1024 /* Max number of tracks */
 
 /* structure passed to system calls. */
 #define THREADS_MAX_SYSCALL_ARGUMENTS 6

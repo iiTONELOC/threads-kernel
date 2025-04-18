@@ -44,9 +44,15 @@
     <ClInclude Include="..\Include\DoubleSeaLib.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\Include\DeviceUtils.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Devices.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DeviceUtils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
