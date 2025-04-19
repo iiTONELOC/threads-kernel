@@ -43,23 +43,6 @@ size_t ConvertSecondsToMilliseconds(int seconds)
 
     return milliseconds;
 }
-// /**
-//  * @brief Converts seconds to ticks.
-//  *
-//  * This function converts a given number of seconds to ticks based on the system's tick rate.
-//  */
-// size_t ConvertSecondsToTicks(int seconds)
-// {
-//     size_t ticks = 0;
-
-//     // use milliseconds per tick to convert seconds to ticks
-//     if (seconds > 0)
-//     {
-//         ticks = (size_t)(seconds * SECONDS_IN_MILLISECOND / MILLISECONDS_PER_TICK);
-//     }
-
-//     return ticks;
-// }
 
 /**
  * @brief Initializes an IO_Request structure.
@@ -151,8 +134,6 @@ void InitializeDevicesProcess(DevicesProcess *devicesProcess, bool createMutex)
     devicesProcess->wakeTime = 0;
     devicesProcess->ioRequest = NULL;
     devicesProcess->status = DEVICE_PROC_FREE;
-    // if (createMutex)
-    //     devicesProcess->mutex = k_semcreate(0);
     if (createMutex)
         devicesProcess->mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
 }

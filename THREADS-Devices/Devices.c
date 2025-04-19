@@ -63,8 +63,7 @@ int SystemCallsEntryPoint(char *arg)
 	}
 
 	/*
-	 * Wait for the clock driver to start. The idea is that ClockDriver
-	 * will V the semaphore "running" once it is running.
+	 * Wait for the clock driver to start
 	 */
 	k_semp(running);
 
@@ -82,16 +81,17 @@ int SystemCallsEntryPoint(char *arg)
 					 &diskInformation[i].requestList,
 					 compareIoRequest);
 
-		// diskInformation[i].mutex = k_semcreate(0);
 		diskInformation[i].mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
 
 		diskInformation[i].pid = k_spawn(name, DiskDriver, buf, THREADS_MIN_STACK_SIZE * 4, HIGHEST_PRIORITY);
+
 		if (diskInformation[i].pid < 0)
 		{
 			console_output(FALSE, "start3(): Can't create disk driver %d\n", i);
 			stop(1);
 		}
 	}
+
 	/* Wait for the disk drivers to start. */
 	for (i = 0; i < THREADS_MAX_DISKS; i++)
 	{
@@ -111,20 +111,27 @@ int SystemCallsEntryPoint(char *arg)
 	{
 		k_kill(diskInformation[i].pid, SIG_TERM);
 		mailbox_send(diskInformation[i].mutex, NULL, 0, TRUE); // unblock the process
-		k_wait(&status);									   // wait for the disk driver to finish
+		k_wait(&status);
 	}
 
 	// kill the clock driver
 	k_kill(clockPID, SIG_TERM);
-	mailbox_send(diskInformation[0].mutex, NULL, 0, TRUE); // unblock the process
-	k_wait(&status);									   // wait for the clock driver to finish
+	k_wait(&status);
 
-	k_semfree(running); // free the semaphore
+	// free the semaphore
+	k_semfree(running);
 	running = -1;
 
 	return 0;
 }
 
+/**
+ * @brief Clock driver
+ *
+ * This function is the main entry point for the clock driver.
+ * It initializes the clock information, sets up the device name,
+ * and enters the operating loop to process clock requests.
+ */
 static int ClockDriver(char *arg)
 {
 
@@ -152,34 +159,30 @@ static int ClockDriver(char *arg)
 		 * Compute the current time and wake up any processes
 		 * whose time has come.
 		 */
-		/* See if we have any processes on the waiting list*/
 		if (sleeperList.length > 0)
 		{
-			// the list is sorted by sleep time, look at the head w/o removing it, it will have
-			// the smallest sleep time
+			// the list is sorted by sleep time
 			pProc = ((DevicesProcess *)sleeperList.pHead);
-			int currentProcMutex = (int)pProc->mutex;
+			int currentProcMutex = pProc->mutex;
 
 			// check for processes that slept long enough
 			while (pProc != NULL && pProc->wakeTime <= system_clock())
 			{
-
 				pProc->status = DEVICE_PROC_READY;
 				pProc->wakeTime = 0; // reset the wake time
 
-				//// move to the next process
+				// move to the next process - not the mutex yet, we still need it
 				pProc = (DevicesProcess *)pProc->pNext;
 
-				// remove the head of the list
+				// remove the process to wake
 				DSL_Pop(&sleeperList);
 				enableInterrupts();
-				// // unblock the process
-				// k_semv(currentProcMutex);
-				mailbox_send(currentProcMutex, NULL, 0, TRUE); // unblock the process
-
+				// unblock the process
+				mailbox_send(currentProcMutex, NULL, 0, TRUE);
 				disableInterrupts();
 				if (pProc != NULL)
-					currentProcMutex = (int)pProc->mutex; // get the next process mutex
+					// get the next process mutex
+					currentProcMutex = pProc->mutex;
 			}
 		}
 		enableInterrupts();
@@ -189,7 +192,11 @@ static int ClockDriver(char *arg)
 }
 
 /**
+ * @brief Disk driver
  *
+ * This function is the main entry point for the disk driver.
+ * It initializes the disk information, sets up the device name,
+ * and enters the operating loop to process disk requests.
  */
 static int DiskDriver(char *arg)
 {
@@ -201,8 +208,9 @@ static int DiskDriver(char *arg)
 	DevicesProcess *pNextRequestingProc = NULL;
 
 	// get disk information
-	// set the device name, the driver is called on disk init
+	// set the device name
 	sprintf(diskInformation[unit].deviceName, "disk%d", unit);
+
 	enableInterrupts(); // i/o needs interrupts enabled
 	result = GetDiskInfo(unit, &diskInformation[unit], &devRequest);
 	if (result != 0)
@@ -339,20 +347,30 @@ static int sys_sleep(int seconds)
 	/* check for valid arguments */
 	if (seconds < 0)
 	{
-		return -1; /* invalid arguments */
+		return -1;
 	}
 
+	/* disable interrupts */
 	disableInterrupts();
-	int pid = k_getpid();															 /* disable interrupts */
-	DevicesProcess *pProc = &devicesProcessTable[pid];								 /* get the current process */
-	pProc->pid = pid;																 /* set the process id */
-	pProc->status = DEVICE_PROC_SLEEPING;											 /* set the process status to sleeping */
-	pProc->wakeTime = system_clock() +												 /* Figure wakeup time*/
-					  (seconds * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC); /* convert to microseconds */
-	DSL_InsertNode((void *)pProc, &sleeperList);									 /* insert the process into the sleeper list */
-	enableInterrupts();																 /* enable interrupts */
-	// k_semp(pProc->mutex);
-	mailbox_receive(pProc->mutex, NULL, 0, TRUE); /* block the process */
+
+	/* get the current process */
+	int pid = k_getpid();
+	DevicesProcess *pProc = &devicesProcessTable[pid];
+
+	/* set its state */
+	pProc->pid = pid;
+	pProc->status = DEVICE_PROC_SLEEPING;
+
+	/* Figure wakeup time*/
+	pProc->wakeTime = system_clock() + (seconds * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC);
+
+	/* insert the process into the sleeper list */
+	DSL_InsertNode((void *)pProc, &sleeperList);
+
+	enableInterrupts();
+
+	/* block the process */
+	mailbox_receive(pProc->mutex, NULL, 0, TRUE);
 
 	return 0;
 }

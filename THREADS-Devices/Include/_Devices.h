@@ -103,15 +103,12 @@ typedef device_control_block_t DeviceControlBlock;
 /* TODO:
 
     - system calls to implement
-        - SYS_SLEEP 10
         - SYS_DISKREAD 11
         - SYS_DISKWRITE 12
         - SYS_DISKINFO 13 (SYS_DISKSIZE according to SystemCalls.h)
 
     - functions to implement (non system calls)
-        - SleepSeconds
         - DiskDriver
-        - ClockDriver
         - DiskRead
         - DiskWrite
         - DiskInfo
@@ -120,14 +117,14 @@ typedef device_control_block_t DeviceControlBlock;
 
 /* -------------------------------- Macros --------------------------------- */
 
-#define SECONDS_IN_MILLISECOND 1000                                                      // 1000 milliseconds in a second
-#define NUM_MILLISEC_IN_MICROSEC 1000                                                    // 1000 microseconds in a millisecond
 #define SUPPORTED_SYS_CALL_END 13                                                        // inclusive index into vector table
 #define SUPPORTED_SYS_CALL_START 10                                                      // inclusive index into vector table
-#define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls
+#define SECONDS_IN_MILLISECOND 1000                                                      // 1000 milliseconds in a second
+#define NUM_MILLISEC_IN_MICROSEC 1000                                                    // 1000 microseconds in a millisecond
 #define OFFSETOF_DISK_0_NEXT offsetof(IO_Request, pNext0)                                // Offset to the pNext field in the UserProcess structure
 #define OFFSETOF_DISK_1_NEXT offsetof(IO_Request, pNext1)                                // Offset to the pNext field in the UserProcess structure
 #define OFFSETOF_SLEEP_NEXT offsetof(DevicesProcess, pNext)                              // Offset to the pNext field in the UserProcess structure
+#define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls
 
 #endif
 /* _Devices_H */
