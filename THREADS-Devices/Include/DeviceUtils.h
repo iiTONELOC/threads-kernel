@@ -3,6 +3,7 @@
 #define _DEVICE_UTILS_H
 #include <stdbool.h>
 #include <_Devices.h>
+#include <Messaging.h>
 
 /**
  * @brief Gets the elapsed time since the last clock interrupt.

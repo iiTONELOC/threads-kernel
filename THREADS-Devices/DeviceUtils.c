@@ -151,8 +151,10 @@ void InitializeDevicesProcess(DevicesProcess *devicesProcess, bool createMutex)
     devicesProcess->wakeTime = 0;
     devicesProcess->ioRequest = NULL;
     devicesProcess->status = DEVICE_PROC_FREE;
+    // if (createMutex)
+    //     devicesProcess->mutex = k_semcreate(0);
     if (createMutex)
-        devicesProcess->mutex = k_semcreate(0);
+        devicesProcess->mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
 }
 
 /**
@@ -167,6 +169,6 @@ void InitializeTables(DevicesProcess *devicesProcessTable, IO_Request *pendingIo
     for (int i = 0; i < MAX_PROCESSES; ++i)
     {
         InitializeIoRequest(&pendingIoRequestTable[i]);
-        InitializeDevicesProcess(&devicesProcessTable[i], true);
+        InitializeDevicesProcess(&devicesProcessTable[i], TRUE);
     }
 }

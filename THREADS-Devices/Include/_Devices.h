@@ -15,6 +15,7 @@ enum DEVICE_PROC_STATUS
     DEVICE_PROC_WAITING_IO_READ,
     DEVICE_PROC_WAITING_IO_WRITE,
     DEVICE_PROC_WAITING_IO_INFO,
+    DEVICE_PROC_BLOCKED,
     DEVICE_PROC_SLEEPING,                                  // leave this as the last status
     DEVICE_PROC_STATUS_MAX = DEVICE_PROC_SLEEPING,         // max valid status value
     DEVICE_PROC_STATUS_COUNT = DEVICE_PROC_STATUS_MAX + 1, // total number of valid statuses
