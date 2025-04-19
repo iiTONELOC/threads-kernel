@@ -121,8 +121,8 @@ typedef device_control_block_t DeviceControlBlock;
 #define SUPPORTED_SYS_CALL_START 10                                                      // inclusive index into vector table
 #define SECONDS_IN_MILLISECOND 1000                                                      // 1000 milliseconds in a second
 #define NUM_MILLISEC_IN_MICROSEC 1000                                                    // 1000 microseconds in a millisecond
-#define OFFSETOF_DISK_0_NEXT offsetof(IO_Request, pNext0)                                // Offset to the pNext field in the UserProcess structure
-#define OFFSETOF_DISK_1_NEXT offsetof(IO_Request, pNext1)                                // Offset to the pNext field in the UserProcess structure
+#define OFFSETOF_DISK_0_NEXT offsetof(IO_Request, pNext0)                                // Offset to the pNext field in the IO_Request structure
+#define OFFSETOF_DISK_1_NEXT offsetof(IO_Request, pNext1)                                // Offset to the pNext field in the IO_Request structure
 #define OFFSETOF_SLEEP_NEXT offsetof(DevicesProcess, pNext)                              // Offset to the pNext field in the UserProcess structure
 #define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls
 

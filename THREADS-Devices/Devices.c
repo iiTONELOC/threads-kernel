@@ -23,10 +23,13 @@ static void setUserMode(void);
 static int DiskDriver(char *);
 static int ClockDriver(char *);
 static void setKernelMode(void);
-static int sys_sleep(int seconds);
 static void InitializeHandlers(void);
 extern int DevicesEntryPoint(char *);
 static inline void enableInterrupts();
+static void sys_sleep(system_call_arguments_t *args);
+static void sys_diskInfo(system_call_arguments_t *args);
+static void sys_diskRead(system_call_arguments_t *args);
+static void sys_diskWrite(system_call_arguments_t *args);
 static inline void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
 static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
@@ -307,10 +310,7 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	switch (args->call_id)
 	{
 	case SYS_SLEEP:
-		/*TODO: */
-		/* sleep for a number of seconds */
-		result = sys_sleep((int)args->arguments[0]);
-		args->arguments[3] = (result >= 0) ? (0) : (-1);
+		sys_sleep(args);
 		break;
 
 	case SYS_DISKREAD:
@@ -326,9 +326,8 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		break;
 
 	case SYS_DISKINFO:
-		/*TODO: */
-		/* get the size of a disk */
-		console_output(FALSE, "Getting size of disk %d\n", (int)args->arguments[0]);
+		/* get disk information */
+		sys_diskInfo(args);
 		break;
 	default:
 		/* Do nothing as we don't want to overwrite previously declared handlers */
@@ -339,15 +338,16 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	/* --------------------------- USER-SPACE --------------------------- */
 }
 
-static int sys_sleep(int seconds)
+static void sys_sleep(system_call_arguments_t *args)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
 
 	/* check for valid arguments */
-	if (seconds < 0)
+	if (args == NULL || args->arguments[0] < 0)
 	{
-		return -1;
+		args->arguments[3] = -1;
+		return;
 	}
 
 	/* disable interrupts */
@@ -362,7 +362,7 @@ static int sys_sleep(int seconds)
 	pProc->status = DEVICE_PROC_SLEEPING;
 
 	/* Figure wakeup time*/
-	pProc->wakeTime = system_clock() + (seconds * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC);
+	pProc->wakeTime = system_clock() + (args->arguments[0] * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC);
 
 	/* insert the process into the sleeper list */
 	DSL_InsertNode((void *)pProc, &sleeperList);
@@ -372,7 +372,8 @@ static int sys_sleep(int seconds)
 	/* block the process */
 	mailbox_receive(pProc->mutex, NULL, 0, TRUE);
 
-	return 0;
+	args->arguments[3] = 0; /* success */
+	return;
 }
 
 /**
@@ -413,6 +414,49 @@ static inline void enableInterrupts()
 
 // DISC CONTROLLER CODE
 
+static void sys_diskInfo(system_call_arguments_t *args)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+
+	/* check for valid arguments */
+	if (args == NULL || args->arguments[0] == NULL)
+	{
+		console_output(FALSE, "DiskInfo(): Invalid arguments: Disk not specified.\n");
+		args->arguments[3] = -1; /* invalid arguments */
+		return;
+	}
+
+	/* names are disk1, disk2, etc. extract the number and check its value */
+	int unit = atoi(((char *)args->arguments[0]) + 4);
+
+	if (unit < 0 || unit >= THREADS_MAX_DISKS)
+	{
+		console_output(FALSE, "DiskInfo(): Invalid arguments: Disk not specified.\n");
+		args->arguments[3] = -1; /* invalid arguments */
+		return;
+	}
+
+	disableInterrupts();
+	DiskInformation *diskInfo = &diskInformation[unit];
+	DeviceControlBlock devRequest = {0}; /* device control block */
+	enableInterrupts();
+	/* get the disk information */
+	int result = GetDiskInfo(unit, diskInfo, &devRequest);
+	if (result != 0)
+	{
+		args->arguments[3] = -1; /* error getting disk information */
+		return;
+	}
+
+	/* set the expected return values */
+	args->arguments[3] = 0; /* success */
+	args->arguments[0] = THREADS_DISK_SECTOR_SIZE;
+	args->arguments[1] = THREADS_DISK_SECTOR_COUNT;
+	args->arguments[2] = diskInfo->tracks;	 /* number of tracks on the disk */
+	args->arguments[4] = diskInfo->platters; /* number of platters on the disk */
+}
+
 /**
  * The DiskInfo function retrieves the disk information for a given disk unit.
  * It uses the DISK_INFO command to get the disk information and fills the provided
@@ -443,9 +487,12 @@ static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *
 		return -1; /* error getting disk information */
 	}
 
+	disableInterrupts();
 	/* set the disk information structure */
 	diskInfo->tracks = diskResult.info.trackCount;	   /* number of tracks on the disk */
 	diskInfo->platters = diskResult.info.platterCount; /* number of platters on the disk */
+	diskResult.rawResult = 0;						   /* reset the result */
+	enableInterrupts();
 
 	return 0;
 }
