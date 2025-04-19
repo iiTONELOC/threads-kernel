@@ -10,9 +10,9 @@
 static testNameBuffer[512];
 
 /* Can only get this for the test name since there is one buffer for this. */
-char* GetTestName(char* filename)
+char *GetTestName(char *filename)
 {
-    char* testName;
+    char *testName;
 
     testName = filename;
     if (strrchr(filename, '\\'))
@@ -20,26 +20,25 @@ char* GetTestName(char* filename)
         testName = strrchr(filename, '\\') + 1;
     }
 
-    strncpy((char*)testNameBuffer, testName, strlen(testName) - 2);
+    strncpy((char *)testNameBuffer, testName, strlen(testName) - 2);
 
-    return (char*)testNameBuffer;
+    return (char *)testNameBuffer;
 }
 
-char* CreateDevicesTestArgs(char* buffer, int bufferSize, char* prefix, int childId, int sleepTime, TestDiskParameters* testList, int testListCount, unsigned char options)
+char *CreateDevicesTestArgs(char *buffer, int bufferSize, char *prefix, int childId, int wakeTime, TestDiskParameters *testList, int testListCount, unsigned char options)
 {
-    char* separator;
+    char *separator;
 
-    snprintf(buffer, bufferSize, "%s-Child%d:%d-%p-%d-%d", prefix, childId, sleepTime, testList, testListCount, options);
+    snprintf(buffer, bufferSize, "%s-Child%d:%d-%p-%d-%d", prefix, childId, wakeTime, testList, testListCount, options);
 
     separator = strchr(buffer, ':');
 
     return separator;
 }
 
-
-int DevicesTestDriver(char* strArgs)
+int DevicesTestDriver(char *strArgs)
 {
-    char* separator;
+    char *separator;
     int sendCount = 0;
     int receiveCount = 0;
     int options = 0;
@@ -53,7 +52,6 @@ int DevicesTestDriver(char* strArgs)
     int testCaseCount;
     char messageA[] = "The cake is a lie. Disk 0 writes truth.";
     char messageB[] = "Interrupts don't scare me. Disk 1 ready.";
-
 
     /* parse the args */
     separator = strchr(strArgs, ':');
@@ -87,7 +85,7 @@ int DevicesTestDriver(char* strArgs)
             memset(dataBuffer, 0, THREADS_DISK_SECTOR_SIZE * testCases->sectorCount);
             DiskRead(device, dataBuffer, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, &status);
             console_output(FALSE, "%s:\tDiskRead  (%s) -  platter %d, track %02d, sectorStart %02d, sectorCount %02d, status 0x%08x\n",
-                strArgs, device, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, status);
+                           strArgs, device, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, status);
 
             if (options != 0)
             {
@@ -132,15 +130,13 @@ int DevicesTestDriver(char* strArgs)
 
             DiskWrite(device, dataBuffer, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, &status);
             console_output(FALSE, "%s:\tDiskWrite (%s) -  platter %d, track %02d, sectorStart %02d, sectorCount %02d, status 0x%08x\n",
-                strArgs, device, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, status);
+                           strArgs, device, testCases->platter, testCases->track, testCases->sectorStart, testCases->sectorCount, status);
         }
         free(dataBuffer);
         testCases++;
     }
 
-
     Exit(0);
 
     return 0;
-
 }

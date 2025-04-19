@@ -59,7 +59,7 @@ typedef struct device_proc
     int pid;
     int mutex;
     int status;
-    int sleepTime;             // time to sleep in seconds
+    size_t wakeTime;           // time when the process should wake up
     IO_Request *ioRequest;     // pointer to the IO request
                                // reserved for the sleep list
     struct device_proc *pNext; // pointer to the next device process in the list
@@ -73,7 +73,7 @@ typedef struct
     int mutex;
     int tracks;
     int platters;
-    DSL_List waitingProcs;
+    DSL_List requestList;
     char deviceName[THREADS_MAX_DEVICE_NAME];
 } DiskInformation;
 
@@ -118,6 +118,9 @@ typedef device_control_block_t DeviceControlBlock;
 */
 
 /* -------------------------------- Macros --------------------------------- */
+
+#define SECONDS_IN_MILLISECOND 1000                                                      // 1000 milliseconds in a second
+#define NUM_MILLISEC_IN_MICROSEC 1000                                                    // 1000 microseconds in a millisecond
 #define SUPPORTED_SYS_CALL_END 13                                                        // inclusive index into vector table
 #define SUPPORTED_SYS_CALL_START 10                                                      // inclusive index into vector table
 #define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls

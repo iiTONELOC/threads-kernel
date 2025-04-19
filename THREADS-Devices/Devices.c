@@ -12,24 +12,26 @@
 #include <DeviceUtils.h>
 
 static int running;															   /*semaphore to synchronize drivers and start3*/
-interrupt_handler_t *handlers;												   /*From THREADS*/
-static IO_Request pendingIoRequestTable[MAXPROC] = {0};						   /* pending I/O request table */
-DiskInformation diskInformation[THREADS_MAX_DISKS] = {0};					   /* disk information structure */
-static DevicesProcess devicesProcessTable[MAXPROC] = {0};					   /* device process table (Static storage) */
-void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t *args); /* system call array of function pointers */
+interrupt_handler_t* handlers;												   /*From THREADS*/
+static DSL_List sleeperList = { 0 };											   /* list of sleeping processes */
+static IO_Request pendingIoRequestTable[MAXPROC] = { 0 };						   /* pending I/O request table */
+DiskInformation diskInformation[THREADS_MAX_DISKS] = { 0 };					   /* disk information structure */
+static DevicesProcess devicesProcessTable[MAXPROC] = { 0 };					   /* device process table (Static storage) */
+void (*systemCallVector[THREADS_MAX_SYSCALLS])(system_call_arguments_t* args); /* system call array of function pointers */
 
 static void setUserMode(void);
-static int DiskDriver(char *);
-static int ClockDriver(char *);
+static int DiskDriver(char*);
+static int ClockDriver(char*);
 static void setKernelMode(void);
+static int sys_sleep(int seconds);
 static void InitializeHandlers(void);
-extern int DevicesEntryPoint(char *);
+extern int DevicesEntryPoint(char*);
 static inline void enableInterrupts();
-static inline void checkKernelMode(const char *functionName);
-static void sys_call_dispatcher(system_call_arguments_t *args);
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
+static inline void checkKernelMode(const char* functionName);
+static void sys_call_dispatcher(system_call_arguments_t* args);
+static int GetDiskInfo(int unit, DiskInformation* diskInfo, DeviceControlBlock* devRequest);
 
-int SystemCallsEntryPoint(char *arg)
+int SystemCallsEntryPoint(char* arg)
 {
 	int i;
 	int status;
@@ -45,6 +47,9 @@ int SystemCallsEntryPoint(char *arg)
 	/* Init the tables */
 	InitializeTables(devicesProcessTable, pendingIoRequestTable);
 
+	/* Init the sleeper list */
+	DSL_InitList(FALSE, OFFSETOF_SLEEP_NEXT, &sleeperList, compareSleepRequest);
+
 	/*
 	 * Create clock device driver
 	 * Use a semaphore or mailbox for coordinating the start of the drive
@@ -53,7 +58,7 @@ int SystemCallsEntryPoint(char *arg)
 	clockPID = k_spawn("Clock driver", ClockDriver, NULL, THREADS_MIN_STACK_SIZE, HIGHEST_PRIORITY);
 	if (clockPID < 0)
 	{
-		console_output(TRUE, "start3(): Can't create clock driver\n");
+		console_output(FALSE, "start3(): Can't create clock driver\n");
 		stop(1);
 	}
 
@@ -71,16 +76,18 @@ int SystemCallsEntryPoint(char *arg)
 		sprintf(buf, "%d", i);
 		sprintf(name, "DiskDriver%d", i);
 
-		diskInformation[i].mutex = k_semcreate(0); // create a mutex for the disk driver
-		DSL_InitList(FALSE,						   // initialize the waiting list for the disk driver
-					 i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT,
-					 &diskInformation[i].waitingProcs,
-					 NULL); // TODO: Provide the sort function that sorts by priority
+		/* Initialize the disc's request list - sorted by startTrack */
+		DSL_InitList(FALSE,
+			i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT,
+			&diskInformation[i].requestList,
+			compareIoRequest);
+
+		diskInformation[i].mutex = k_semcreate(0);
 
 		diskInformation[i].pid = k_spawn(name, DiskDriver, buf, THREADS_MIN_STACK_SIZE * 4, HIGHEST_PRIORITY);
 		if (diskInformation[i].pid < 0)
 		{
-			console_output(TRUE, "start3(): Can't create disk driver %d\n", i);
+			console_output(FALSE, "start3(): Can't create disk driver %d\n", i);
 			stop(1);
 		}
 	}
@@ -90,28 +97,55 @@ int SystemCallsEntryPoint(char *arg)
 		k_semp(running);
 	}
 
-	// kill the running semaphore
-	k_semfree(running);
-	running = -1;
-
 	/*
 	 * Create first user-level process (but in kernel mode) and wait for it to finish.
 	 */
 	sys_spawn("DevicesEntryPoint", DevicesEntryPoint, NULL, 8 * THREADS_MIN_STACK_SIZE, 3);
 	sys_wait(&status);
 
+	console_output(FALSE, "DevicesEntryPoint() has finished with status %d\n", status);
+
 	/*
 	 * Terminate the device drivers cleanly
 	 */
+	for (i = 0; i < THREADS_MAX_DISKS; i++)
+	{
+		enableInterrupts();
+		k_kill(diskInformation[i].pid, SIG_TERM);
+		k_join(diskInformation[i].pid, &status);
+		//enableInterrupts();
+		//k_semp(running);
+		//disableInterrupts();
+	}
+
+	// kill the clock driver
+	k_kill(clockPID, SIG_TERM);
+	k_semp(running); // wait for the clock driver to finish
+
+	k_semfree(running); // free the semaphore
+	running = -1;
+
+	/*
+	 * Clean up the device process table
+	 */
+	for (i = 0; i < MAXPROC; i++)
+	{
+		if (devicesProcessTable[i].mutex != -1)
+		{
+			k_semfree(devicesProcessTable[i].mutex);
+			devicesProcessTable[i].mutex = -1;
+		}
+	}
+
 	return 0;
 }
 
-static int ClockDriver(char *arg)
+static int ClockDriver(char* arg)
 {
 
 	int result;
 	int status;
-	DevicesProcess *pProc = NULL;
+	DevicesProcess* pProc = NULL;
 
 	/*
 	 * Let the parent know we are running and enable interrupts.
@@ -128,25 +162,57 @@ static int ClockDriver(char *arg)
 			return 0;
 		}
 
+		disableInterrupts();
 		/*
 		 * Compute the current time and wake up any processes
 		 * whose time has come.
 		 */
+		 /* See if we have any processes on the waiting list*/
+		if (sleeperList.length > 0)
+		{
+			// the list is sorted by sleep time, look at the head w/o removing it, it will have
+			// the smallest sleep time
+			pProc = ((DevicesProcess*)sleeperList.pHead);
+			int currentProcMutex = (int)pProc->mutex;
+
+			// check for processes that slept long enough
+			while (pProc != NULL && pProc->wakeTime <= system_clock())
+			{
+				pProc->status = DEVICE_PROC_READY;
+				pProc->mutex = currentProcMutex; // set the mutex to the current process
+				pProc->wakeTime = 0;			 // reset the wake time
+
+				// move to the next process
+				pProc = (DevicesProcess*)pProc->pNext;
+
+				// remove the head of the list
+				DSL_Pop(&sleeperList);
+				enableInterrupts();
+				// unblock the process
+				k_semv(currentProcMutex);
+				// re-enable interrupts
+				disableInterrupts();
+			}
+		}
+		enableInterrupts();
 	}
+
+	// signal the parent that we are done
+	k_semv(running);
 	return 0;
 }
 
 /**
  *
  */
-static int DiskDriver(char *arg)
+static int DiskDriver(char* arg)
 {
 	int result = 0;
 	int unit = atoi(arg);
 	int currentTrack = 0;
 	DeviceControlBlock devRequest;
-	DevicesProcess *pRequestingProc = NULL;
-	DevicesProcess *pNextRequestingProc = NULL;
+	DevicesProcess* pRequestingProc = NULL;
+	DevicesProcess* pNextRequestingProc = NULL;
 
 	// get disk information
 	// set the device name, the driver is called on disk init
@@ -155,7 +221,7 @@ static int DiskDriver(char *arg)
 	result = GetDiskInfo(unit, &diskInformation[unit], &devRequest);
 	if (result != 0)
 	{
-		console_output(TRUE, "DiskDriver(): Can't get disk information for unit %d\n", unit);
+		console_output(FALSE, "DiskDriver(): Can't get disk information for unit %d\n", unit);
 		stop(1);
 	}
 
@@ -169,8 +235,10 @@ static int DiskDriver(char *arg)
 
 		/* After request */
 
-		console_output(TRUE, "DiskDriver(): Disk %d is processing a request \n", unit);
+		console_output(FALSE, "DiskDriver(): Disk %d is processing a request \n", unit);
 	}
+
+	k_semv(running); // signal the parent that we are done
 	return 0;
 }
 
@@ -181,7 +249,7 @@ static int DiskDriver(char *arg)
    Returns -
    Side Effects - Will stop if not in kernel mode
 ****************************************************************************/
-static inline void checkKernelMode(const char *functionName)
+static inline void checkKernelMode(const char* functionName)
 {
 	if (functionName == NULL)
 	{
@@ -223,7 +291,7 @@ static void InitializeHandlers(void)
  * @param args - The system call arguments.
  * @return void
  */
-static void sys_call_dispatcher(system_call_arguments_t *args)
+static void sys_call_dispatcher(system_call_arguments_t* args)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
@@ -248,6 +316,9 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	case SYS_SLEEP:
 		/*TODO: */
 		/* sleep for a number of seconds */
+		result = sys_sleep((int)args->arguments[0]);
+		args->arguments[3] = (result >= 0) ? (0) : (-1);
+
 		console_output(FALSE, "Sleeping for %d seconds\n", (int)args->arguments[0]);
 		break;
 
@@ -275,6 +346,30 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 	/* set mode to user mode before returning.*/
 	setUserMode();
 	/* --------------------------- USER-SPACE --------------------------- */
+}
+
+static int sys_sleep(int seconds)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+
+	/* check for valid arguments */
+	if (seconds < 0)
+	{
+		return -1; /* invalid arguments */
+	}
+
+	disableInterrupts();
+	int pid = k_getpid();																			  /* disable interrupts */
+	DevicesProcess* pProc = &devicesProcessTable[pid];												  /* get the current process */
+	pProc->pid = pid;																				  /* set the process id */
+	pProc->status = DEVICE_PROC_SLEEPING;															  /* set the process status to sleeping */
+	pProc->wakeTime = system_clock() + (seconds * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC); /* set the wake time in milliseconds */
+	DSL_InsertNode((void*)pProc, &sleeperList);													  /* insert the process into the sleeper list */
+	enableInterrupts();																				  /* enable interrupts */
+	k_semp(pProc->mutex);																			  /* block the process */
+
+	return 0;
 }
 
 /**
@@ -319,11 +414,11 @@ static inline void enableInterrupts()
  * The DiskInfo function retrieves the disk information for a given disk unit.
  * It uses the DISK_INFO command to get the disk information and fills the provided
  */
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest)
+static int GetDiskInfo(int unit, DiskInformation* diskInfo, DeviceControlBlock* devRequest)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
-	union DiskInfoResult diskResult = {0}; /* disk information result */
+	union DiskInfoResult diskResult = { 0 }; /* disk information result */
 
 	/* check for valid arguments */
 	if (diskInfo == NULL || devRequest == NULL || unit < 0 || unit >= THREADS_MAX_DISKS)

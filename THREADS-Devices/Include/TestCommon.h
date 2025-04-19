@@ -1,8 +1,7 @@
 #pragma once
 
-
-#define DEVICES_OPTION_MESSAGEA   1
-#define DEVICES_OPTION_MESSAGEB   2
+#define DEVICES_OPTION_MESSAGEA 1
+#define DEVICES_OPTION_MESSAGEB 2
 
 typedef struct
 {
@@ -14,7 +13,7 @@ typedef struct
 	BOOL read;
 } TestDiskParameters;
 
-char* GetTestName(char* filename);
-char* CreateDevicesTestArgs(char* buffer, int bufferSize, char* prefix, int childId, int sleepTime, TestDiskParameters *testList, int testListCount, unsigned char options);
+char *GetTestName(char *filename);
+char *CreateDevicesTestArgs(char *buffer, int bufferSize, char *prefix, int childId, int wakeTime, TestDiskParameters *testList, int testListCount, unsigned char options);
 
-int DevicesTestDriver(char* strArgs);
+int DevicesTestDriver(char *strArgs);
