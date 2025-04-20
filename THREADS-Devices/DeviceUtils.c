@@ -64,7 +64,32 @@ void InitializeIoRequest(IO_Request *ioRequest)
     ioRequest->readBuffer = NULL;
     ioRequest->writeBuffer = NULL;
     ioRequest->opResultStatus = -1;
-    ioRequest->direction = TDISK_UNINITIALIZED;
+    ioRequest->numSectorsCompleted = 0;
+    ioRequest->mode = TDISK_UNINITIALIZED;
+}
+
+/**
+ * @brief Gets the unit number from the system call arguments.
+ *
+ * @param arg - Pointer to the system call arguments.
+ * @return The unit number extracted from the arguments.
+ */
+int GetUnitFromArgs(system_call_arguments_t *arg)
+{
+    if (arg == NULL || arg->arguments[0] == NULL)
+    {
+        return -1; // invalid arguments
+    }
+
+    // names are disk1, disk2, etc. extract the number and check its value
+    int unit = atoi(((char *)arg->arguments[0]) + 4);
+
+    if (unit < 0 || unit >= THREADS_MAX_DISKS)
+    {
+        return -1; // invalid arguments
+    }
+
+    return unit;
 }
 
 /**
@@ -151,5 +176,41 @@ void InitializeTables(DevicesProcess *devicesProcessTable, IO_Request *pendingIo
     {
         InitializeIoRequest(&pendingIoRequestTable[i]);
         InitializeDevicesProcess(&devicesProcessTable[i], TRUE);
+    }
+}
+
+/**
+ * * @brief Sets the IO_Request structure with the provided arguments.
+ */
+void SetIoRequest(IO_Request *ioRequest, char *onDevice, int forPid, system_call_arguments_t *args, enum TDISK_MODE mode)
+{
+    ioRequest->mode = mode;
+    ioRequest->pNext0 = NULL;
+    ioRequest->pPrev0 = NULL;
+    ioRequest->pNext1 = NULL;
+    ioRequest->pPrev1 = NULL;
+    ioRequest->forPid = forPid;
+    ioRequest->opResultStatus = -1;
+    ioRequest->deviceName = onDevice;
+    ioRequest->numSectorsCompleted = 0;
+    ioRequest->numSectors = args->arguments[5];
+    ioRequest->startTrack = args->arguments[3];
+    ioRequest->startSector = args->arguments[4];
+    ioRequest->startPlatter = args->arguments[2];
+
+    switch (mode)
+    {
+    case TDISK_READ:
+        ioRequest->readBuffer = args->arguments[1];
+        ioRequest->writeBuffer = NULL;
+        break;
+    case TDISK_WRITE:
+        ioRequest->readBuffer = NULL;
+        ioRequest->writeBuffer = args->arguments[1];
+        break;
+    default:
+        ioRequest->readBuffer = NULL;
+        ioRequest->writeBuffer = NULL;
+        break;
     }
 }

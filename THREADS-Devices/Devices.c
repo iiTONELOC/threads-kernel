@@ -23,16 +23,16 @@ static void setUserMode(void);
 static int DiskDriver(char *);
 static int ClockDriver(char *);
 static void setKernelMode(void);
+static void ManageSleepers(void);
 static void InitializeHandlers(void);
 extern int DevicesEntryPoint(char *);
 static inline void enableInterrupts();
 static void sys_sleep(system_call_arguments_t *args);
 static void sys_diskInfo(system_call_arguments_t *args);
-static void sys_diskRead(system_call_arguments_t *args);
-static void sys_diskWrite(system_call_arguments_t *args);
 static inline void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
+static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode);
+static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
 
 int SystemCallsEntryPoint(char *arg)
 {
@@ -79,10 +79,7 @@ int SystemCallsEntryPoint(char *arg)
 		sprintf(name, "DiskDriver%d", i);
 
 		/* Initialize the disc's request list - sorted by startTrack */
-		DSL_InitList(FALSE,
-					 i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT,
-					 &diskInformation[i].requestList,
-					 compareIoRequest);
+		DSL_InitList(FALSE, i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT, &diskInformation[i].requestList, compareIoRequest);
 
 		diskInformation[i].mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
 
@@ -137,15 +134,10 @@ int SystemCallsEntryPoint(char *arg)
  */
 static int ClockDriver(char *arg)
 {
-
 	int result;
 	int status;
-	DevicesProcess *pProc = NULL;
 
-	/*
-	 * Let the parent know we are running and enable interrupts.
-	 */
-
+	/* Let the parent know we are running and enable interrupts. */
 	k_semv(running);
 	enableInterrupts();
 
@@ -158,36 +150,7 @@ static int ClockDriver(char *arg)
 		}
 
 		disableInterrupts();
-		/*
-		 * Compute the current time and wake up any processes
-		 * whose time has come.
-		 */
-		if (sleeperList.length > 0)
-		{
-			// the list is sorted by sleep time
-			pProc = ((DevicesProcess *)sleeperList.pHead);
-			int currentProcMutex = pProc->mutex;
-
-			// check for processes that slept long enough
-			while (pProc != NULL && pProc->wakeTime <= system_clock())
-			{
-				pProc->status = DEVICE_PROC_READY;
-				pProc->wakeTime = 0; // reset the wake time
-
-				// move to the next process - not the mutex yet, we still need it
-				pProc = (DevicesProcess *)pProc->pNext;
-
-				// remove the process to wake
-				DSL_Pop(&sleeperList);
-				enableInterrupts();
-				// unblock the process
-				mailbox_send(currentProcMutex, NULL, 0, TRUE);
-				disableInterrupts();
-				if (pProc != NULL)
-					// get the next process mutex
-					currentProcMutex = pProc->mutex;
-			}
-		}
+		ManageSleepers();
 		enableInterrupts();
 	}
 
@@ -210,12 +173,10 @@ static int DiskDriver(char *arg)
 	DevicesProcess *pRequestingProc = NULL;
 	DevicesProcess *pNextRequestingProc = NULL;
 
-	// get disk information
 	// set the device name
 	sprintf(diskInformation[unit].deviceName, "disk%d", unit);
-
 	enableInterrupts(); // i/o needs interrupts enabled
-	result = GetDiskInfo(unit, &diskInformation[unit], &devRequest);
+	result = GetDiskInfoOnInit(unit, &diskInformation[unit], &devRequest);
 	if (result != 0)
 	{
 		console_output(FALSE, "DiskDriver(): Can't get disk information for unit %d\n", unit);
@@ -227,12 +188,23 @@ static int DiskDriver(char *arg)
 	/* Operating loop */
 	while (!signaled())
 	{
-
 		mailbox_receive(diskInformation[unit].mutex, NULL, 0, TRUE); // block until a request is received
 
-		/* After request */
+		disableInterrupts();
+		/* Check for pending requests */
+		if (diskInformation[unit].requestList.length > 0)
+		{
+			IO_Request *pRequest = (IO_Request *)diskInformation[unit].requestList.pHead;
+			console_output(FALSE, "DiskDriver(): Disk %d is processing a %s request for process %d \n", unit,
+						   pRequest->mode == TDISK_READ ? "read" : "write",
+						   pRequest->forPid);
 
-		// console_output(FALSE, "DiskDriver(): Disk %d is processing a request \n", unit);
+			enableInterrupts();
+		}
+		else
+		{
+			enableInterrupts();
+		}
 	}
 
 	return 0;
@@ -258,6 +230,46 @@ static inline void checkKernelMode(const char *functionName)
 		stop(1);
 	}
 }
+
+/**
+ * @brief Manages the list of sleeping processes.
+ *
+ * Checks the list of sleeping processes and wakes up any processes
+ * that have reached their wake time by unblocking them. Unblocked
+ * processes are removed from the sleeper list.
+ */
+static void ManageSleepers(void)
+{
+	DevicesProcess *pProc = NULL;
+
+	if (sleeperList.length > 0)
+	{
+		// the list is sorted by sleep time
+		pProc = ((DevicesProcess *)sleeperList.pHead);
+		int currentProcMutex = pProc->mutex;
+
+		// check for processes that slept long enough
+		while (pProc != NULL && pProc->wakeTime <= system_clock())
+		{
+			pProc->status = DEVICE_PROC_READY;
+			pProc->wakeTime = 0; // reset the wake time
+
+			// move to the next process - not the mutex yet, we still need it
+			pProc = (DevicesProcess *)pProc->pNext;
+
+			// remove the process to wake
+			DSL_Pop(&sleeperList);
+			enableInterrupts();
+			// unblock the process
+			mailbox_send(currentProcMutex, NULL, 0, TRUE);
+			disableInterrupts();
+			if (pProc != NULL)
+				// get the next process mutex
+				currentProcMutex = pProc->mutex;
+		}
+	}
+}
+
 /**
  * @brief Initializes the system call handlers.
  *
@@ -314,15 +326,11 @@ static void sys_call_dispatcher(system_call_arguments_t *args)
 		break;
 
 	case SYS_DISKREAD:
-		/*TODO: */
-		/* read from a disk */
-		console_output(FALSE, "Reading from disk %d\n", (int)args->arguments[0]);
+		sys_io(args, TDISK_READ);
 		break;
 
 	case SYS_DISKWRITE:
-		/*TODO: */
-		/* write to a disk */
-		console_output(FALSE, "Writing to disk %d\n", (int)args->arguments[0]);
+		sys_io(args, TDISK_WRITE);
 		break;
 
 	case SYS_DISKINFO:
@@ -355,14 +363,14 @@ static void sys_sleep(system_call_arguments_t *args)
 
 	/* get the current process */
 	int pid = k_getpid();
-	DevicesProcess *pProc = &devicesProcessTable[pid];
+	DevicesProcess *pProc = &devicesProcessTable[pid % MAXPROC];
 
 	/* set its state */
 	pProc->pid = pid;
 	pProc->status = DEVICE_PROC_SLEEPING;
 
 	/* Figure wakeup time*/
-	pProc->wakeTime = system_clock() + (args->arguments[0] * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC);
+	pProc->wakeTime = (size_t)(system_clock() + ((size_t)((int)args->arguments[0] * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC)));
 
 	/* insert the process into the sleeper list */
 	DSL_InsertNode((void *)pProc, &sleeperList);
@@ -417,20 +425,10 @@ static inline void enableInterrupts()
 static void sys_diskInfo(system_call_arguments_t *args)
 {
 	/* check for kernel mode */
+	int unit = -1;
 	checkKernelMode(__func__);
 
-	/* check for valid arguments */
-	if (args == NULL || args->arguments[0] == NULL)
-	{
-		console_output(FALSE, "DiskInfo(): Invalid arguments: Disk not specified.\n");
-		args->arguments[3] = -1; /* invalid arguments */
-		return;
-	}
-
-	/* names are disk1, disk2, etc. extract the number and check its value */
-	int unit = atoi(((char *)args->arguments[0]) + 4);
-
-	if (unit < 0 || unit >= THREADS_MAX_DISKS)
+	if ((unit = GetUnitFromArgs(args)) < 0)
 	{
 		console_output(FALSE, "DiskInfo(): Invalid arguments: Disk not specified.\n");
 		args->arguments[3] = -1; /* invalid arguments */
@@ -439,29 +437,99 @@ static void sys_diskInfo(system_call_arguments_t *args)
 
 	disableInterrupts();
 	DiskInformation *diskInfo = &diskInformation[unit];
-	DeviceControlBlock devRequest = {0}; /* device control block */
+	DeviceControlBlock devRequest = {0};	 /* device control block */
+	args->arguments[2] = diskInfo->tracks;	 /* number of tracks on the disk */
+	args->arguments[4] = diskInfo->platters; /* number of platters on the disk */
+
 	enableInterrupts();
-	/* get the disk information */
-	int result = GetDiskInfo(unit, diskInfo, &devRequest);
-	if (result != 0)
+
+	/* set the remaining return values */
+	args->arguments[3] = 0;
+	args->arguments[0] = THREADS_DISK_SECTOR_SIZE;
+	args->arguments[1] = THREADS_DISK_SECTOR_COUNT;
+}
+
+/**
+ * * @brief System call handler for reading and writing to disks.
+ */
+static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode)
+{
+	/* check for kernel mode */
+	int unit = -1;
+	checkKernelMode(__func__);
+
+	if ((unit = GetUnitFromArgs(args)) < 0)
 	{
-		args->arguments[3] = -1; /* error getting disk information */
+		console_output(FALSE, "DiskInfo(): Invalid arguments: Disk not specified.\n");
+		args->arguments[3] = -1; /* invalid arguments */
 		return;
 	}
 
-	/* set the expected return values */
-	args->arguments[3] = 0; /* success */
-	args->arguments[0] = THREADS_DISK_SECTOR_SIZE;
-	args->arguments[1] = THREADS_DISK_SECTOR_COUNT;
-	args->arguments[2] = diskInfo->tracks;	 /* number of tracks on the disk */
-	args->arguments[4] = diskInfo->platters; /* number of platters on the disk */
+	/* check for valid arguments */
+	if (args->arguments[1] == NULL || args->arguments[2] < 0 || args->arguments[3] < 0 || args->arguments[4] < 0 || args->arguments[5] < 0)
+	{
+		console_output(FALSE, "DiskInfo(): Invalid arguments or arguments missing.\n");
+		args->arguments[3] = -1; /* invalid arguments */
+		return;
+	}
+
+	int pid = k_getpid();
+	int safeId = pid % MAXPROC; /* safe id for the process */
+	disableInterrupts();
+	/* handle io operations by constructing an IO_Request for the current process */
+	DevicesProcess *pCurrentProcess = &devicesProcessTable[safeId];
+
+	/* ensure the current process doesn't have an active request waiting */
+	if (pCurrentProcess->ioRequest != NULL)
+	{
+		console_output(FALSE, "DiskInfo(): Process %d already has an active request.\n", pCurrentProcess->pid);
+		args->arguments[3] = -1; /* invalid arguments */
+		enableInterrupts();
+		return;
+	}
+
+	/* initialize the IO_Request structure for this process */
+	pCurrentProcess->ioRequest = &pendingIoRequestTable[safeId];
+	SetIoRequest(pCurrentProcess->ioRequest, &diskInformation[unit].deviceName, pid, args, mode);
+
+	/*Add the process to the queue for the correct driver  */
+	DSL_InsertNode((void *)pCurrentProcess->ioRequest, &diskInformation[unit].requestList);
+
+	/* set the wake time to 0, as we are not sleeping */
+	pCurrentProcess->wakeTime = 0;
+
+	/*set the status */
+	pCurrentProcess->status = mode == TDISK_READ ? DEVICE_PROC_WAITING_IO_READ : DEVICE_PROC_WAITING_IO_WRITE;
+
+	/* enable interrupts and block ourselves */
+	enableInterrupts();
+	/* signal the disk to wake up */
+	mailbox_send(diskInformation[unit].mutex, NULL, 0, TRUE);
+	/* wait for the disk driver to finish the request */
+	mailbox_receive(pCurrentProcess->mutex, NULL, 0, TRUE);
+	/* disable interrupts again */
+	disableInterrupts();
+	/* check for errors */
+	if (pCurrentProcess->ioRequest->opResultStatus < 0)
+	{
+		console_output(FALSE, "DiskInfo(): Error in disk operation.\n");
+		args->arguments[3] = -1;		   /* invalid arguments */
+		pCurrentProcess->ioRequest = NULL; /* reset the request */
+		enableInterrupts();
+		return;
+	}
+
+	/* set the return values */
+	args->arguments[3] = 0;											 /* success */
+	args->arguments[0] = pCurrentProcess->ioRequest->opResultStatus; /* operation status */
+	enableInterrupts();												 /* enable interrupts again */
 }
 
 /**
  * The DiskInfo function retrieves the disk information for a given disk unit.
  * It uses the DISK_INFO command to get the disk information and fills the provided
  */
-static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest)
+static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest)
 {
 	/* check for kernel mode */
 	checkKernelMode(__func__);
@@ -475,8 +543,10 @@ static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *
 
 	/* set the command to DISK_INFO and call the device driver */
 	devRequest->command = DISK_INFO;
+	devRequest->control1 = 0; // set track to 0 for disk initialization
+	devRequest->control2 = 0; // set sector to 0 for disk initialization
 
-	/* using device control and the control block, send the request to read*/
+	/* using device control and the control block, send the request to DISK_INFO*/
 	device_control(diskInfo->deviceName, *devRequest);
 
 	/* wait for the result */
@@ -491,7 +561,6 @@ static int GetDiskInfo(int unit, DiskInformation *diskInfo, DeviceControlBlock *
 	/* set the disk information structure */
 	diskInfo->tracks = diskResult.info.trackCount;	   /* number of tracks on the disk */
 	diskInfo->platters = diskResult.info.platterCount; /* number of platters on the disk */
-	diskResult.rawResult = 0;						   /* reset the result */
 	enableInterrupts();
 
 	return 0;

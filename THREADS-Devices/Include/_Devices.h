@@ -22,7 +22,7 @@ enum DEVICE_PROC_STATUS
 
 };
 
-enum TDISK_DIRECTION
+enum TDISK_MODE
 {
     TDISK_INVALID = -1,
     TDISK_UNINITIALIZED = 0,
@@ -36,23 +36,24 @@ enum TDISK_DIRECTION
 typedef struct io_request
 {
 
-    int forPid;                     // process id of the requesting process
-    int startTrack;                 // start track
-    int numSectors;                 // number of sectors to read/write
-    int startSector;                // start sector
-    int startPlatter;               // start platter
-    char *deviceName;               // name of the device
-    char *readBuffer;               // buffer to read data into
-    char *writeBuffer;              // buffer to write data from
-    int opResultStatus;             // operation status
-    enum TDISK_DIRECTION direction; // read or write
-                                    /* Waiting list usage for device disk
-                                       Threads supports 2 disks
-                                    */
-    struct io_request *pNext0;      // pointer to the next IO request for disk 0
-    struct io_request *pPrev0;      // pointer to the previous IO request for disk 0
-    struct io_request *pNext1;      // pointer to the next IO request for disk 1
-    struct io_request *pPrev1;      // pointer to the previous IO request for disk 1
+    int forPid;                // process id of the requesting process
+    int startTrack;            // start track
+    int numSectors;            // number of sectors to read/write
+    int startSector;           // start sector
+    int startPlatter;          // start platter
+    char *deviceName;          // name of the device
+    char *readBuffer;          // buffer to read data into
+    char *writeBuffer;         // buffer to write data from
+    int opResultStatus;        // operation status
+    enum TDISK_MODE mode;      // read or write
+    int numSectorsCompleted;   // number of sectors completed
+                               /* Waiting list usage for device disk
+                                  Threads supports 2 disks
+                               */
+    struct io_request *pNext0; // pointer to the next IO request for disk 0
+    struct io_request *pPrev0; // pointer to the previous IO request for disk 0
+    struct io_request *pNext1; // pointer to the next IO request for disk 1
+    struct io_request *pPrev1; // pointer to the previous IO request for disk 1
 } IO_Request;
 
 typedef struct device_proc
@@ -74,6 +75,10 @@ typedef struct
     int mutex;
     int tracks;
     int platters;
+    int currentTrack;           // current track being processed
+    int currentSector;          // current sector being processed
+    int currentPlatter;         // current platter being processed
+    IO_Request *currentRequest; // current request being processed
     DSL_List requestList;
     char deviceName[THREADS_MAX_DEVICE_NAME];
 } DiskInformation;
