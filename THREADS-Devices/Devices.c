@@ -31,6 +31,11 @@ static void sys_sleep(system_call_arguments_t *args);
 static void sys_diskInfo(system_call_arguments_t *args);
 static inline void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
+static void HandleElevatorAlgorithm(DiskInformation *diskInfo);
+static void HandleFirstComeFirstServed(DiskInformation *diskInfo);
+static int DiskSeek(int unit, int track, int sector, int platter);
+static void HandleOneDirectionAlgorithm(DiskInformation *diskInfo);
+static void HandleShortestSeekTimeFirst(DiskInformation *diskInfo);
 static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode);
 static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
 
@@ -107,16 +112,18 @@ int SystemCallsEntryPoint(char *arg)
 	/*
 	 * Terminate the device drivers cleanly
 	 */
+
+	// kill the clock driver
+	k_kill(clockPID, SIG_TERM);
+	k_wait(&status);
+
+	// kill the disk drivers
 	for (i = 0; i < THREADS_MAX_DISKS; i++)
 	{
 		k_kill(diskInformation[i].pid, SIG_TERM);
 		mailbox_send(diskInformation[i].mutex, NULL, 0, TRUE); // unblock the process
 		k_wait(&status);
 	}
-
-	// kill the clock driver
-	k_kill(clockPID, SIG_TERM);
-	k_wait(&status);
 
 	// free the semaphore
 	k_semfree(running);
@@ -189,21 +196,24 @@ static int DiskDriver(char *arg)
 	while (!signaled())
 	{
 		mailbox_receive(diskInformation[unit].mutex, NULL, 0, TRUE); // block until a request is received
-
-		disableInterrupts();
-		/* Check for pending requests */
-		if (diskInformation[unit].requestList.length > 0)
+		switch (TDISK_ALGO)
 		{
-			IO_Request *pRequest = (IO_Request *)diskInformation[unit].requestList.pHead;
-			console_output(FALSE, "DiskDriver(): Disk %d is processing a %s request for process %d \n", unit,
-						   pRequest->mode == TDISK_READ ? "read" : "write",
-						   pRequest->forPid);
-
-			enableInterrupts();
-		}
-		else
-		{
-			enableInterrupts();
+		case TDISK_ELEVATOR:
+			HandleElevatorAlgorithm(&diskInformation[unit]);
+			break;
+		case TDISK_FCFS:
+			HandleFirstComeFirstServed(&diskInformation[unit]);
+			break;
+		case TDISK_ONE_DIRECTION:
+			HandleOneDirectionAlgorithm(&diskInformation[unit]);
+			break;
+		case TDISK_SSTF:
+			HandleShortestSeekTimeFirst(&diskInformation[unit]);
+			break;
+		default:
+			console_output(FALSE, "DiskDriver(): Invalid disk algorithm.\nFalling back to FCFS.\n");
+			HandleFirstComeFirstServed(&diskInformation[unit]);
+			break;
 		}
 	}
 
@@ -214,7 +224,7 @@ static int DiskDriver(char *arg)
    Name - checkKernelMode
    Purpose - Checks the PSR for kernel mode and stops if in user mode
    Parameters -
-   Returns -
+ Returns -
    Side Effects - Will stop if not in kernel mode
 ****************************************************************************/
 static inline void checkKernelMode(const char *functionName)
@@ -543,8 +553,6 @@ static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlB
 
 	/* set the command to DISK_INFO and call the device driver */
 	devRequest->command = DISK_INFO;
-	devRequest->control1 = 0; // set track to 0 for disk initialization
-	devRequest->control2 = 0; // set sector to 0 for disk initialization
 
 	/* using device control and the control block, send the request to DISK_INFO*/
 	device_control(diskInfo->deviceName, *devRequest);
@@ -552,16 +560,111 @@ static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlB
 	/* wait for the result */
 	wait_device(diskInfo->deviceName, &diskResult.rawResult);
 
-	if (diskResult.rawResult < 0)
+	if (diskResult.rawResult < 0 || (DiskSeek(unit, 0, 0, 0) != 0))
 	{
+		console_output(FALSE, "DiskInfo(): Error getting disk information for unit %d\n", unit);
 		return -1; /* error getting disk information */
 	}
 
 	disableInterrupts();
 	/* set the disk information structure */
+	diskInfo->currentTrack = 0;						   /* current track being processed */
+	diskInfo->currentSector = 0;					   /* current sector being processed */
+	diskInfo->currentPlatter = 0;					   /* current platter being processed */
+	diskInfo->currentRequest = NULL;				   /* current request being processed */
 	diskInfo->tracks = diskResult.info.trackCount;	   /* number of tracks on the disk */
 	diskInfo->platters = diskResult.info.platterCount; /* number of platters on the disk */
+
 	enableInterrupts();
 
 	return 0;
+}
+
+static int DiskSeek(int unit, int track, int sector, int platter)
+{
+	/* check for kernel mode */
+	checkKernelMode(__func__);
+
+	/* check for valid arguments */
+	if (unit < 0 || unit >= THREADS_MAX_DISKS || track < 0 || sector < 0 || platter < 0)
+	{
+		return -1; /* invalid arguments */
+	}
+
+	/* set the command to DISK_SEEK and call the device driver */
+	device_control(diskInformation[unit].deviceName, (DeviceControlBlock){DISK_SEEK, track, sector, NULL, NULL, platter});
+
+	/* wait for the result */
+	union IO_RequestResult ioResult = {0}; /* IO request result */
+	wait_device(diskInformation[unit].deviceName, &ioResult.rawResult);
+	if (ioResult.info.resultCode < 0)
+	{
+		console_output(FALSE, "DiskSeek(): Error seeking disk %d to track %d, sector %d, platter %d\n", unit, track, sector, platter);
+	}
+
+	return ioResult.info.resultCode;
+}
+
+static void HandleFirstComeFirstServed(DiskInformation *diskInfo)
+{
+	disableInterrupts();
+	if (diskInfo->requestList.length > 0)
+	{
+		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
+		// Print out the details of the request, including process number, operation type, and location details
+		console_output(FALSE, "\nDiskDriver()::HandleFirstComeFirstServed: %s is processing a %s request for process %d \n", diskInfo->deviceName,
+					   pRequest->mode == TDISK_READ ? "read" : "write",
+					   pRequest->forPid);
+		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
+					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
+	}
+	enableInterrupts();
+}
+
+static void HandleElevatorAlgorithm(DiskInformation *diskInfo)
+{
+	disableInterrupts();
+	if (diskInfo->requestList.length > 0)
+	{
+		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
+		// Print out the details of the request, including process number, operation type, and location details
+		console_output(FALSE, "\nDiskDriver()::HandleElevatorAlgorithm: %s is processing a %s request for process %d \n", diskInfo->deviceName,
+					   pRequest->mode == TDISK_READ ? "read" : "write",
+					   pRequest->forPid);
+		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
+					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
+	}
+	enableInterrupts();
+}
+
+static void HandleOneDirectionAlgorithm(DiskInformation *diskInfo)
+{
+	disableInterrupts();
+	if (diskInfo->requestList.length > 0)
+	{
+		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
+		// Print out the details of the request, including process number, operation type, and location details
+		console_output(FALSE, "\nDiskDriver()::HandleOneDirectionAlgorithm: %s is processing a %s request for process %d \n", diskInfo->deviceName,
+					   pRequest->mode == TDISK_READ ? "read" : "write",
+					   pRequest->forPid);
+		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
+					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
+	}
+	enableInterrupts();
+}
+
+static void HandleShortestSeekTimeFirst(DiskInformation *diskInfo)
+{
+	disableInterrupts();
+	if (diskInfo->requestList.length > 0)
+	{
+		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
+		// Print out the details of the request, including process number, operation type, and location details
+		console_output(FALSE, "\nDiskDriver()::HandleShortestSeekTimeFirst: %s is processing a %s request for process %d \n", diskInfo->deviceName,
+					   pRequest->mode == TDISK_READ ? "read" : "write",
+					   pRequest->forPid);
+		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
+					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
+	}
+	enableInterrupts();
 }

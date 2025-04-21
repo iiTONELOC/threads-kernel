@@ -31,6 +31,18 @@ enum TDISK_MODE
 
 };
 
+enum SUPPORTED_ALGORITHMS
+{
+    TDISK_FCFS = 0,          // First Come First Served
+    TDISK_SSTF = 1,          // Shortest Seek Time First
+    TDISK_ELEVATOR = 2,      // Elevator Algorithm
+    TDISK_ONE_DIRECTION = 3, // One Direction
+};
+
+#ifndef TDISK_ALGO
+#define TDISK_ALGO TDISK_FCFS // default algorithm
+#endif
+
 /* -------------------------------- Typedefs and Structs ------------------------------- */
 
 typedef struct io_request
@@ -90,6 +102,16 @@ union DiskInfoResult
         uint16_t trackCount;  // number of tracks on the disk (bits 0-15)
         uint8_t platterCount; // number of platters on the disk (bits 16-23)
         uint8_t resultCode;   // result code from the disk driver (bits 24-31)
+    } info;
+    uint32_t rawResult; // raw 32-bit result
+};
+
+union IO_RequestResult
+{
+    struct
+    {
+        unsigned int notUsed : 24;
+        uint8_t resultCode; // result code from the disk driver (bits 24-31)
     } info;
     uint32_t rawResult; // raw 32-bit result
 };
