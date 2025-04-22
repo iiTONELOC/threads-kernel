@@ -6,22 +6,6 @@
 #include <DoubleSeaLib.h>
 #include "Devices.h"
 
-enum DEVICE_PROC_STATUS
-{
-    DEVICE_PROC_INVALID = -1,
-    DEVICE_PROC_FREE, // 0
-    DEVICE_PROC_READY,
-    DEVICE_PROC_IN_USE,
-    DEVICE_PROC_WAITING_IO_READ,
-    DEVICE_PROC_WAITING_IO_WRITE,
-    DEVICE_PROC_WAITING_IO_INFO,
-    DEVICE_PROC_BLOCKED,
-    DEVICE_PROC_SLEEPING,                                  // leave this as the last status
-    DEVICE_PROC_STATUS_MAX = DEVICE_PROC_SLEEPING,         // max valid status value
-    DEVICE_PROC_STATUS_COUNT = DEVICE_PROC_STATUS_MAX + 1, // total number of valid statuses
-
-};
-
 enum TDISK_MODE
 {
     TDISK_INVALID = -1,
@@ -31,16 +15,9 @@ enum TDISK_MODE
 
 };
 
-enum SUPPORTED_ALGORITHMS
-{
-    TDISK_FCFS = 0,          // First Come First Served
-    TDISK_SSTF = 1,          // Shortest Seek Time First
-    TDISK_ELEVATOR = 2,      // Elevator Algorithm
-    TDISK_ONE_DIRECTION = 3, // One Direction
-};
-
 #ifndef TDISK_ALGO
-#define TDISK_ALGO TDISK_FCFS // default algorithm
+#define TDISK_FCFS 0
+#define TDISK_ALGO TDISK_FCFS // First Come First Served
 #endif
 
 /* -------------------------------- Typedefs and Structs ------------------------------- */
@@ -59,9 +36,6 @@ typedef struct io_request
     int opResultStatus;        // operation status
     enum TDISK_MODE mode;      // read or write
     int numSectorsCompleted;   // number of sectors completed
-                               /* Waiting list usage for device disk
-                                  Threads supports 2 disks
-                               */
     struct io_request *pNext0; // pointer to the next IO request for disk 0
     struct io_request *pPrev0; // pointer to the previous IO request for disk 0
     struct io_request *pNext1; // pointer to the next IO request for disk 1
@@ -70,9 +44,8 @@ typedef struct io_request
 
 typedef struct device_proc
 {
-    int pid;
-    int mutex;
-    int status;
+    int pid;                   // process id of the device process
+    int mutex;                 // mailbox id for mutual exclusion
     size_t wakeTime;           // time when the process should wake up
     IO_Request *ioRequest;     // pointer to the IO request
                                // reserved for the sleep list
@@ -83,11 +56,11 @@ typedef struct device_proc
 
 typedef struct
 {
-    int pid; // process id of the disk driver
-    int mutex;
-    int index; // index of the disk driver
-    int tracks;
-    int platters;
+    int pid;                    // process id of the disk driver
+    int mutex;                  // mailbox id for mutual exclusion
+    int index;                  // index of the disk driver
+    int tracks;                 // number of tracks on the disk
+    int platters;               // number of platters on the disk
     int currentTrack;           // current track being processed
     int currentSector;          // current sector being processed
     int currentPlatter;         // current platter being processed
@@ -107,7 +80,7 @@ union DiskInfoResult
     uint32_t rawResult; // raw 32-bit result
 };
 
-union IO_RequestResult
+union DiskIoResult
 {
     struct
     {
@@ -119,30 +92,6 @@ union IO_RequestResult
 
 typedef device_control_block_t DeviceControlBlock;
 
-/* -- Put here from threads for reference
-
-    THREADS_DISK_SECTOR_SIZE    512
-    THREADS_DISK_SECTOR_COUNT   16   Sectors per track
-    THREADS_DISK_MAX_PLATTERS   3
-    THREADS_DISK_MAX_TRACKS     1024 Max number of track
-
-*/
-
-/* TODO:
-
-    - system calls to implement
-        - SYS_DISKREAD 11
-        - SYS_DISKWRITE 12
-        - SYS_DISKINFO 13 (SYS_DISKSIZE according to SystemCalls.h)
-
-    - functions to implement (non system calls)
-        - DiskDriver
-        - DiskRead
-        - DiskWrite
-        - DiskInfo
-
-*/
-
 /* -------------------------------- Macros --------------------------------- */
 
 #define SUPPORTED_SYS_CALL_END 13                                                        // inclusive index into vector table
@@ -153,6 +102,22 @@ typedef device_control_block_t DeviceControlBlock;
 #define OFFSETOF_DISK_1_NEXT offsetof(IO_Request, pNext1)                                // Offset to the pNext field in the IO_Request structure
 #define OFFSETOF_SLEEP_NEXT offsetof(DevicesProcess, pNext)                              // Offset to the pNext field in the UserProcess structure
 #define SUPPORTED_SYS_CALL_COUNT (SUPPORTED_SYS_CALL_END - SUPPORTED_SYS_CALL_START + 1) // number of supported system calls
+#define SEEK_HANDLE_ERRS(diskInfo, pRequest, status)                            \
+    if ((status = DiskSeek(diskInfo->index, pRequest->startTrack,               \
+                           pRequest->startSector, pRequest->startPlatter)) < 0) \
+    {                                                                           \
+        console_output(FALSE,                                                   \
+                       "DiskDriver()::Error seeking "                           \
+                       "%s to track %d from track %d\n",                        \
+                       diskInfo->deviceName, pRequest->startTrack,              \
+                       diskInfo->currentTrack);                                 \
+                                                                                \
+        pRequest->opResultStatus = -1;                                          \
+                                                                                \
+        enableInterrupts();                                                     \
+        mailbox_send(pRequest->forPid, NULL, 0, TRUE);                          \
+        return;                                                                 \
+    }
 
 #endif
 /* _Devices_H */

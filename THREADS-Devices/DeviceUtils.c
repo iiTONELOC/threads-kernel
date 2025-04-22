@@ -158,7 +158,6 @@ void InitializeDevicesProcess(DevicesProcess *devicesProcess, bool createMutex)
     devicesProcess->pPrev = NULL;
     devicesProcess->wakeTime = 0;
     devicesProcess->ioRequest = NULL;
-    devicesProcess->status = DEVICE_PROC_FREE;
     if (createMutex)
         devicesProcess->mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
 }

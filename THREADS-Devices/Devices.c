@@ -31,32 +31,9 @@ static void sys_sleep(system_call_arguments_t *args);
 static void sys_diskInfo(system_call_arguments_t *args);
 static inline void checkKernelMode(const char *functionName);
 static void sys_call_dispatcher(system_call_arguments_t *args);
-static void HandleElevatorAlgorithm(DiskInformation *diskInfo);
-static void HandleFirstComeFirstServed(DiskInformation *diskInfo);
 static int DiskSeek(int unit, int track, int sector, int platter);
-static void HandleOneDirectionAlgorithm(DiskInformation *diskInfo);
-static void HandleShortestSeekTimeFirst(DiskInformation *diskInfo);
 static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode);
 static int GetDiskInfoOnInit(int unit, DiskInformation *diskInfo, DeviceControlBlock *devRequest);
-
-#define HANDLE_DISK_SEEK_ERROR_FCFS(diskInfo, pRequest, status)                   \
-	if ((status = DiskSeek(diskInfo->index, pRequest->startTrack,                 \
-						   pRequest->startSector, pRequest->startPlatter)) < 0)   \
-	{                                                                             \
-		console_output(FALSE,                                                     \
-					   "DiskDriver()::HandleFirstComeFirstServed: Error seeking " \
-					   "%s to track %d from track %d\n",                          \
-					   diskInfo->deviceName, pRequest->startTrack,                \
-					   diskInfo->currentTrack);                                   \
-                                                                                  \
-		DSL_Pop(&diskInfo->requestList);                                          \
-		pRequest->opResultStatus = -1;                                            \
-		pRequest->numSectorsCompleted = 0;                                        \
-                                                                                  \
-		enableInterrupts();                                                       \
-		mailbox_send(pRequest->forPid, NULL, 0, TRUE);                            \
-		return;                                                                   \
-	}
 
 int SystemCallsEntryPoint(char *arg)
 {
@@ -102,8 +79,10 @@ int SystemCallsEntryPoint(char *arg)
 		sprintf(buf, "%d", i);
 		sprintf(name, "DiskDriver%d", i);
 
-		/* Initialize the disc's request list - sorted by startTrack */
-		DSL_InitList(FALSE, i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT, &diskInformation[i].requestList,
+		/* Initialize the disc's request list - sorted by startTrack if not FCFS */
+		DSL_InitList(FALSE,
+					 i == 0 ? OFFSETOF_DISK_0_NEXT : OFFSETOF_DISK_1_NEXT,
+					 &diskInformation[i].requestList,
 					 TDISK_ALGO == TDISK_FCFS ? NULL : compareIoRequest);
 		diskInformation[i].index = i;							   // set the index of the disk driver
 		diskInformation[i].mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
@@ -191,17 +170,22 @@ static int ClockDriver(char *arg)
  */
 static int DiskDriver(char *arg)
 {
-	int result = 0;
-	int unit = atoi(arg);
-	int currentTrack = 0;
-	DeviceControlBlock devRequest;
-	DevicesProcess *pRequestingProc = NULL;
-	DevicesProcess *pNextRequestingProc = NULL;
+	int result = 0;										// disk info result
+	int status = 0;										// disk io result
+	int unit = atoi(arg);								// disk unit number
+	char *readBuffer = NULL;							// io read buffer
+	char *writeBuffer = NULL;							// io write buffer
+	bool needToMoveArm = FALSE;							// need to move the arm to the correct track
+	DeviceControlBlock devRequest;						// device control block structure
+	bool opWillExceedMaxSectors = FALSE;				// operation will exceed max sectors
+	DevicesProcess *pRequestingProc = NULL;				// requesting process
+	DevicesProcess *pNextRequestingProc = NULL;			// next requesting process
+	DiskInformation *diskInfo = &diskInformation[unit]; // get the disk information for this unit
 
 	// set the device name
-	sprintf(diskInformation[unit].deviceName, "disk%d", unit);
+	sprintf(diskInfo->deviceName, "disk%d", unit);
 	enableInterrupts(); // i/o needs interrupts enabled
-	result = GetDiskInfoOnInit(unit, &diskInformation[unit], &devRequest);
+	result = GetDiskInfoOnInit(unit, diskInfo, &devRequest);
 	if (result != 0)
 	{
 		console_output(FALSE, "DiskDriver(): Can't get disk information for unit %d\n", unit);
@@ -210,28 +194,90 @@ static int DiskDriver(char *arg)
 
 	k_semv(running); // signal the parent that we are running
 
-	/* Operating loop */
+	/* Main Operating loop */
 	while (!signaled())
 	{
-		mailbox_receive(diskInformation[unit].mutex, NULL, 0, TRUE); // block until a request is received
-		switch (TDISK_ALGO)
+		mailbox_receive(diskInfo->mutex, NULL, 0, TRUE); // block until a request is received
+		/* After we have been awoken. Check for requests */
+		disableInterrupts();
+		if (diskInfo->requestList.length > 0)
 		{
-		case TDISK_ELEVATOR:
-			HandleElevatorAlgorithm(&diskInformation[unit]);
-			break;
-		case TDISK_FCFS:
-			HandleFirstComeFirstServed(&diskInformation[unit]);
-			break;
-		case TDISK_ONE_DIRECTION:
-			HandleOneDirectionAlgorithm(&diskInformation[unit]);
-			break;
-		case TDISK_SSTF:
-			HandleShortestSeekTimeFirst(&diskInformation[unit]);
-			break;
-		default:
-			console_output(FALSE, "DiskDriver(): Invalid disk algorithm.\nFalling back to FCFS.\n");
-			HandleFirstComeFirstServed(&diskInformation[unit]);
-			break;
+
+// TODO: Implement a get next request function for all four algos
+#if TDISK_ALGO == TDISK_FCFS
+
+			IO_Request *pRequest = (IO_Request *)DSL_Pop(&diskInfo->requestList);
+#endif
+
+			// operation loop - we can only process one sector at a time
+			while (pRequest->numSectorsCompleted < pRequest->numSectors)
+			{
+				needToMoveArm = diskInfo->currentTrack != pRequest->startTrack;
+				opWillExceedMaxSectors = (pRequest->numSectors + pRequest->startSector) >= THREADS_DISK_SECTOR_COUNT ? TRUE : FALSE;
+
+				/* START VARIABLE LOGIC DEPENDING ON ALGORITHM USED */
+				/*-------------------------------------------------*/
+				// TODO: Implement the disk seek function for all four algos
+				// Currently FCFS
+				if (needToMoveArm)
+				{
+					// if the disk seek fails, we need to remove the request from the list and unblock the process ??
+					SEEK_HANDLE_ERRS(diskInfo, pRequest, status);
+				}
+
+				// TODO: Handle ops spanning multiple tracks for all four algos
+				if (opWillExceedMaxSectors && diskInfo->currentSector == 0)
+				{
+					pRequest->startTrack = ((pRequest->startTrack + 1) % diskInfo->tracks);
+					SEEK_HANDLE_ERRS(diskInfo, pRequest, status);
+				}
+
+				/* END VARIABLE LOGIC DEPENDING ON ALGORITHM USED */
+				/*-----------------------------------------------*/
+
+				/* This Logic here should not change, regardless of algo approach, this reads/writes the actual sectors to/from disk*/
+				if (pRequest->mode == TDISK_READ)
+				{
+					readBuffer = pRequest->readBuffer + (pRequest->numSectorsCompleted * THREADS_DISK_SECTOR_SIZE);
+				}
+				else
+				{
+					writeBuffer = pRequest->writeBuffer + (pRequest->numSectorsCompleted * THREADS_DISK_SECTOR_SIZE);
+				}
+				enableInterrupts(); // enable interrupts before doing the I/O operation
+				// write or read our data to/from the disk
+				device_control(diskInfo->deviceName, (DeviceControlBlock){
+														 pRequest->mode,
+														 pRequest->startPlatter,
+														 pRequest->startSector,
+														 readBuffer,
+														 writeBuffer,
+														 THREADS_DISK_SECTOR_SIZE});
+
+				// wait for the result
+				union DiskIoResult ioResult = {0}; /* IO request result */
+				wait_device(diskInfo->deviceName, &ioResult.rawResult);
+				disableInterrupts();
+				if (ioResult.info.resultCode < 0)
+				{
+					console_output(FALSE, "DiskDriver()::HandleFirstComeFirstServed: Error processing request for process %d\n", pRequest->forPid);
+					pRequest->opResultStatus = -1; // set the operation status to error
+					break;
+				}
+				else
+				{
+
+					pRequest->numSectorsCompleted++;
+					pRequest->startSector = (pRequest->startSector + 1) % THREADS_DISK_SECTOR_COUNT;
+					diskInfo->currentSector = pRequest->startSector;
+				}
+			} // end of operation loop
+			pRequest->opResultStatus = 0;						  // set the operation status to success
+			pRequest->numSectorsCompleted = pRequest->numSectors; // set the number of sectors completed to the total number of sectors
+
+			enableInterrupts();
+			// wake up requesting process
+			mailbox_send(devicesProcessTable[pRequest->forPid % MAXPROC].mutex, NULL, 0, TRUE);
 		}
 	}
 
@@ -274,12 +320,12 @@ static void ManageSleepers(void)
 	{
 		// the list is sorted by sleep time
 		pProc = ((DevicesProcess *)sleeperList.pHead);
+
 		int currentProcMutex = pProc->mutex;
 
 		// check for processes that slept long enough
 		while (pProc != NULL && pProc->wakeTime <= system_clock())
 		{
-			pProc->status = DEVICE_PROC_READY;
 			pProc->wakeTime = 0; // reset the wake time
 
 			// move to the next process - not the mutex yet, we still need it
@@ -394,10 +440,7 @@ static void sys_sleep(system_call_arguments_t *args)
 	/* get the current process */
 	int pid = k_getpid();
 	DevicesProcess *pProc = &devicesProcessTable[pid % MAXPROC];
-
-	/* set its state */
 	pProc->pid = pid;
-	pProc->status = DEVICE_PROC_SLEEPING;
 
 	/* Figure wakeup time*/
 	pProc->wakeTime = (size_t)(system_clock() + ((size_t)((int)args->arguments[0] * SECONDS_IN_MILLISECOND * NUM_MILLISEC_IN_MICROSEC)));
@@ -520,9 +563,6 @@ static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode)
 	/* set the wake time to 0, as we are not sleeping */
 	pCurrentProcess->wakeTime = 0;
 
-	/*set the status */
-	pCurrentProcess->status = mode == TDISK_READ ? DEVICE_PROC_WAITING_IO_READ : DEVICE_PROC_WAITING_IO_WRITE;
-
 	/* enable interrupts and block ourselves */
 	enableInterrupts();
 	/* signal the disk to wake up */
@@ -536,8 +576,6 @@ static void sys_io(system_call_arguments_t *args, enum TDISK_MODE mode)
 	{
 		console_output(FALSE, "DiskInfo(): Error in disk operation.\n");
 		args->arguments[3] = -1; /* invalid arguments */
-
-		/* set the return values */
 	}
 	else
 	{
@@ -608,11 +646,10 @@ static int DiskSeek(int unit, int track, int sector, int platter)
 	}
 
 	/* set the command to DISK_SEEK and call the device driver */
-	device_control(diskInformation[unit].deviceName, (DeviceControlBlock){
-														 DISK_SEEK, track, sector, NULL, NULL, platter});
+	device_control(diskInformation[unit].deviceName, (DeviceControlBlock){DISK_SEEK, track, sector, NULL, NULL, platter});
 
 	/* wait for the result */
-	union IO_RequestResult ioResult = {0}; /* IO request result */
+	union DiskIoResult ioResult = {0}; /* IO request result */
 	wait_device(diskInformation[unit].deviceName, &ioResult.rawResult);
 	if (ioResult.info.resultCode < 0)
 	{
@@ -624,133 +661,4 @@ static int DiskSeek(int unit, int track, int sector, int platter)
 	diskInformation[unit].currentPlatter = platter;
 
 	return ioResult.info.resultCode;
-}
-
-/**
- * @brief Handles the First Come First Served (FCFS) disk scheduling algorithm.
- *
- * This function processes the first request in the disk's request list.
- */
-static void HandleFirstComeFirstServed(DiskInformation *diskInfo)
-{
-	int status = 0;
-	bool needToMoveArm = FALSE;
-	bool opWillExceedMaxSectors = FALSE;
-	disableInterrupts();
-	if (diskInfo->requestList.length > 0)
-	{ // grab the first request from the list
-		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
-		needToMoveArm = diskInfo->currentTrack != pRequest->startTrack;
-		opWillExceedMaxSectors = (pRequest->numSectors + pRequest->startSector) >= THREADS_DISK_SECTOR_COUNT ? TRUE : FALSE;
-		//  -- TODO: Make this a function
-		if (needToMoveArm)
-		{
-			// if the disk seek fails, we need to remove the request from the list and unblock the process ??
-			HANDLE_DISK_SEEK_ERROR_FCFS(diskInfo, pRequest, status);
-		}
-		// end of needToMoveArm check
-		// --------------------------
-
-		// operation loop - we can only process one sector at a time
-		while (pRequest->numSectorsCompleted < pRequest->numSectors)
-		{
-			// if the operation will exceed the max sectors AND the current sector is 0
-			// we need to move to the next track
-			if (opWillExceedMaxSectors && diskInfo->currentSector == 0)
-			{
-				pRequest->startTrack = ((pRequest->startTrack + 1) % diskInfo->tracks);
-				HANDLE_DISK_SEEK_ERROR_FCFS(diskInfo, pRequest, status);
-			}
-			enableInterrupts(); // enable interrupts before doing the I/O operation
-			// write or read our data to/from the disk
-			if (pRequest->mode == TDISK_READ)
-			{
-				device_control(diskInfo->deviceName, (DeviceControlBlock){
-														 DISK_READ, pRequest->startPlatter, pRequest->startSector,
-														 pRequest->readBuffer + (pRequest->numSectorsCompleted * THREADS_DISK_SECTOR_SIZE), NULL,
-														 THREADS_DISK_SECTOR_SIZE});
-			}
-			else
-			{
-				device_control(diskInfo->deviceName, (DeviceControlBlock){
-														 DISK_WRITE, pRequest->startPlatter, pRequest->startSector, NULL,
-														 pRequest->writeBuffer + (pRequest->numSectorsCompleted * THREADS_DISK_SECTOR_SIZE),
-														 THREADS_DISK_SECTOR_SIZE});
-			}
-
-			// wait for the result
-			union IO_RequestResult ioResult = {0}; /* IO request result */
-			wait_device(diskInfo->deviceName, &ioResult.rawResult);
-			disableInterrupts();
-			if (ioResult.info.resultCode < 0)
-			{
-				console_output(FALSE, "DiskDriver()::HandleFirstComeFirstServed: Error processing request for process %d\n", pRequest->forPid);
-				pRequest->opResultStatus = -1; // set the operation status to error
-				break;
-			}
-			else
-			{
-
-				pRequest->numSectorsCompleted++;
-				pRequest->startSector = (pRequest->startSector + 1) % THREADS_DISK_SECTOR_COUNT;
-				diskInfo->currentSector = pRequest->startSector;
-			}
-		} // end of operation loop
-		pRequest->opResultStatus = 0;						  // set the operation status to success
-		pRequest->numSectorsCompleted = pRequest->numSectors; // set the number of sectors completed to the total number of sectors
-
-		// remove the request from the list
-		DSL_Pop(&diskInfo->requestList);
-		enableInterrupts();
-		// send a message to the process that requested the I/O operation to wake it up
-		mailbox_send(devicesProcessTable[pRequest->forPid % MAXPROC].mutex, NULL, 0, TRUE);
-	}
-}
-
-static void HandleElevatorAlgorithm(DiskInformation *diskInfo)
-{
-	disableInterrupts();
-	if (diskInfo->requestList.length > 0)
-	{
-		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
-		// Print out the details of the request, including process number, operation type, and location details
-		console_output(FALSE, "\nDiskDriver()::HandleElevatorAlgorithm: %s is processing a %s request for process %d \n", diskInfo->deviceName,
-					   pRequest->mode == TDISK_READ ? "read" : "write",
-					   pRequest->forPid);
-		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
-					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
-	}
-	enableInterrupts();
-}
-
-static void HandleOneDirectionAlgorithm(DiskInformation *diskInfo)
-{
-	disableInterrupts();
-	if (diskInfo->requestList.length > 0)
-	{
-		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
-		// Print out the details of the request, including process number, operation type, and location details
-		console_output(FALSE, "\nDiskDriver()::HandleOneDirectionAlgorithm: %s is processing a %s request for process %d \n", diskInfo->deviceName,
-					   pRequest->mode == TDISK_READ ? "read" : "write",
-					   pRequest->forPid);
-		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
-					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
-	}
-	enableInterrupts();
-}
-
-static void HandleShortestSeekTimeFirst(DiskInformation *diskInfo)
-{
-	disableInterrupts();
-	if (diskInfo->requestList.length > 0)
-	{
-		IO_Request *pRequest = (IO_Request *)diskInfo->requestList.pHead;
-		// Print out the details of the request, including process number, operation type, and location details
-		console_output(FALSE, "\nDiskDriver()::HandleShortestSeekTimeFirst: %s is processing a %s request for process %d \n", diskInfo->deviceName,
-					   pRequest->mode == TDISK_READ ? "read" : "write",
-					   pRequest->forPid);
-		console_output(FALSE, "Request details: Track %d, Sector %d, Platter %d, Number of Sectors %d\n",
-					   pRequest->startTrack, pRequest->startSector, pRequest->startPlatter, pRequest->numSectors);
-	}
-	enableInterrupts();
 }
