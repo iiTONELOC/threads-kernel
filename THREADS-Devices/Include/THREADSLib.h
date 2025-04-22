@@ -57,7 +57,7 @@ typedef enum
 typedef struct
 {
 	uint8_t command;	  /* command to invoke */
-	uint8_t control1;	  /* device specific value - track */
+	uint8_t control1;	  /* device specific value - platter */
 	uint8_t control2;	  /* device specific value - sector*/
 	void *input_data;	  /* incoming data */
 	void *output_data;	  /* outgoing data */

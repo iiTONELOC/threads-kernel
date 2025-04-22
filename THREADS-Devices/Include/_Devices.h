@@ -85,6 +85,7 @@ typedef struct
 {
     int pid; // process id of the disk driver
     int mutex;
+    int index; // index of the disk driver
     int tracks;
     int platters;
     int currentTrack;           // current track being processed

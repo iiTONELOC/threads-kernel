@@ -201,12 +201,12 @@ void SetIoRequest(IO_Request *ioRequest, char *onDevice, int forPid, system_call
     switch (mode)
     {
     case TDISK_READ:
-        ioRequest->readBuffer = args->arguments[1];
+        ioRequest->readBuffer = (char *)args->arguments[1];
         ioRequest->writeBuffer = NULL;
         break;
     case TDISK_WRITE:
         ioRequest->readBuffer = NULL;
-        ioRequest->writeBuffer = args->arguments[1];
+        ioRequest->writeBuffer = (char *)args->arguments[1];
         break;
     default:
         ioRequest->readBuffer = NULL;
