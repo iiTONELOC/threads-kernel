@@ -57,8 +57,8 @@ typedef struct
 	uint8_t		  command;      /* command to invoke */
 	uint8_t		  control1;     /* device specific value */
 	uint8_t		  control2;     /* device specific value */
-	void*		  input_data;   /* incoming data */
-	void*		  output_data;  /* outgoing data */
+	void* input_data;   /* incoming data */
+	void* output_data;  /* outgoing data */
 	uint32_t	  data_length;  /* data length */
 } device_control_block_t;
 
@@ -82,7 +82,7 @@ typedef void (*system_call_handler_t)(system_call_arguments_t* pArgs);
 
 /* THREADS Interface */
 
-LIB_SPEC void*		 context_initialize(process_entrypoint_t entry_point, int stack_size, void* args);
+LIB_SPEC void* context_initialize(process_entrypoint_t entry_point, int stack_size, void* args);
 LIB_SPEC bool        context_switch(LPVOID next_context);
 LIB_SPEC void	     context_stop(LPVOID context);
 
@@ -90,7 +90,7 @@ LIB_SPEC uint32_t    get_psr();
 LIB_SPEC void	     set_psr(uint32_t psr);
 LIB_SPEC uint32_t    system_clock();
 
-LIB_SPEC interrupt_handler_t*	get_interrupt_handlers();
+LIB_SPEC interrupt_handler_t* get_interrupt_handlers();
 LIB_SPEC system_call_handler_t* get_system_call_vector();
 
 LIB_SPEC uint32_t    device_initialize(char* device);

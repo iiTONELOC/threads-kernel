@@ -85,7 +85,7 @@ int SystemCallsEntryPoint(char *arg)
 					 &diskInformation[i].requestList,
 					 TDISK_ALGO == TDISK_FCFS ? NULL : compareIoRequest);
 		diskInformation[i].index = i;							   // set the index of the disk driver
-		diskInformation[i].mutex = mailbox_create(1, sizeof(int)); // Create a mutex for the process
+		diskInformation[i].mutex = mailbox_create(0, sizeof(int)); // Create a mutex for the process
 		diskInformation[i].pid = k_spawn(name, DiskDriver, buf, THREADS_MIN_STACK_SIZE * 4, HIGHEST_PRIORITY);
 		if (diskInformation[i].pid < 0)
 		{
