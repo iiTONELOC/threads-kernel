@@ -11,7 +11,7 @@
 
 ## Description
 
-This repo contains the semester-long, **THREADS** Kernel Project Implementation for CYBV-489 Principles of Operating Systems with Professor Duren at the [**University of Arizona's College of Applied Science and Computing**](https://azcast.arizona.edu/)
+This repo contains the semester-long, **THREADS** Kernel Project Implementation for CYBV-489 Principles of Operating Systems with Professor Duren at the [**University of Arizona's College of Applied Science and Technology**](https://azcast.arizona.edu/)
 
 THREADS stands for **_Threaded Heuristic Research, Educational, And Development Simulator_**, and provides a realistic, virtual platform for operating system design and development.
 
